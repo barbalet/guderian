@@ -5,6 +5,7 @@ public enum NativePlayabilityStatus: String, Codable, Hashable, Sendable {
     case nativeInstanceMissing = "Native instance missing"
     case nativeLoaderMissing = "Native loader missing"
     case nativeBoardHookMissing = "Native board hook missing"
+    case nativeBoardShellReady = "Native board shell ready"
     case nativePlayable = "Native playable"
 }
 
@@ -172,21 +173,39 @@ public enum NativePlayabilityArchitectureCatalog {
         }.count
 
         let loadout = NativeScenarioLoader.load(scenario, seed: UInt32(80_000 + scenario.order))
-        let requiredHookIDs = architecture.requiredEngineHooks.map(\.id)
+        let requiredHookIDs = architecture.requiredEngineHooks
+            .filter { hook in
+                if loadout.canApplyScenarioBoardHook {
+                    return hook.id != "scenario-instance-loader"
+                }
+                return true
+            }
+            .map(\.id)
         var notes = [
-            loadout.canCreateSkirmishBridge
+            loadout.canApplyScenarioBoardHook
+                ? "Native loader creates an army-list skirmish bridge, applies scenario-specific terrain/objectives/mission target through the guarded dzw board hook, and deploys units from the Guderian blueprint."
+                : loadout.canCreateSkirmishBridge
                 ? "Native loader creates an army-list skirmish bridge and deploys units from the Guderian blueprint."
                 : "Authored scenario data is present but the native loader cannot create a skirmish bridge.",
-            "The remaining guarded engine hook is scenario-defined terrain, objectives, mission target score, and event triggers.",
+            "Remaining native work is board-flow polish, debrief mission state, scripted events, reinforcements, and scenario AI controls.",
         ]
         if scenario.isDemoScenario {
             notes.append("Demo parity target: cycle \(architecture.demoPlayableTargetCycle).")
         }
 
+        let status: NativePlayabilityStatus
+        if loadout.canApplyScenarioBoardHook {
+            status = .nativeBoardShellReady
+        } else if loadout.canCreateSkirmishBridge {
+            status = .nativeBoardHookMissing
+        } else {
+            status = .nativeLoaderMissing
+        }
+
         return NativeBattleReadinessReport(
             id: scenario.id,
             title: scenario.title,
-            status: loadout.canCreateSkirmishBridge ? .nativeBoardHookMissing : .nativeLoaderMissing,
+            status: status,
             authoredUnitCount: bundle.setup.units.count,
             authoredObjectiveCount: scenario.objectives.count,
             authoredTerrainElementCount: terrainCount,

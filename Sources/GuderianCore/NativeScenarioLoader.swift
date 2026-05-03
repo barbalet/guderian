@@ -51,12 +51,53 @@ public struct NativeScenarioDeploymentReport: Codable, Hashable, Sendable {
     }
 }
 
+public struct NativeScenarioBoardReport: Codable, Hashable, Sendable {
+    public let applied: Bool
+    public let missionName: String
+    public let missionTargetScore: Int
+    public let requestedTerrainZoneCount: Int
+    public let appliedTerrainZoneCount: Int
+    public let requestedObjectiveCount: Int
+    public let appliedObjectiveCount: Int
+    public let notes: [String]
+
+    public init(
+        applied: Bool,
+        missionName: String,
+        missionTargetScore: Int,
+        requestedTerrainZoneCount: Int,
+        appliedTerrainZoneCount: Int,
+        requestedObjectiveCount: Int,
+        appliedObjectiveCount: Int,
+        notes: [String]
+    ) {
+        self.applied = applied
+        self.missionName = missionName
+        self.missionTargetScore = missionTargetScore
+        self.requestedTerrainZoneCount = requestedTerrainZoneCount
+        self.appliedTerrainZoneCount = appliedTerrainZoneCount
+        self.requestedObjectiveCount = requestedObjectiveCount
+        self.appliedObjectiveCount = appliedObjectiveCount
+        self.notes = notes
+    }
+
+    public var isScenarioSpecific: Bool {
+        applied && missionTargetScore > 0 && appliedTerrainZoneCount > 0 && appliedObjectiveCount > 0
+    }
+}
+
 public final class NativeScenarioLoadedGame {
     public let handle: OpaquePointer
+    public let boardReport: NativeScenarioBoardReport
     public let deploymentReport: NativeScenarioDeploymentReport
 
-    public init(handle: OpaquePointer, deploymentReport: NativeScenarioDeploymentReport) {
+    public init(
+        handle: OpaquePointer,
+        boardReport: NativeScenarioBoardReport,
+        deploymentReport: NativeScenarioDeploymentReport
+    ) {
         self.handle = handle
+        self.boardReport = boardReport
         self.deploymentReport = deploymentReport
     }
 
@@ -93,6 +134,13 @@ public struct NativeScenarioLoadout {
         blueprint.isCompleteForScenarioLoader && !playerEntries.isEmpty && !opponentEntries.isEmpty
     }
 
+    public var canApplyScenarioBoardHook: Bool {
+        canCreateSkirmishBridge &&
+            !scenarioBoardZones.isEmpty &&
+            !scenarioBoardObjectives.isEmpty &&
+            blueprint.missionTargetScore > 0
+    }
+
     public func makeGame() -> NativeScenarioLoadedGame? {
         let playerCEntries = playerEntries.map { army_list_entry_t(catalog_id: Int32($0.catalogID), count: Int32($0.count)) }
         let opponentCEntries = opponentEntries.map { army_list_entry_t(catalog_id: Int32($0.catalogID), count: Int32($0.count)) }
@@ -114,8 +162,115 @@ public struct NativeScenarioLoadout {
             return nil
         }
 
+        let boardReport = applyScenarioBoard(to: game)
         let report = deployBlueprintUnits(in: game)
-        return NativeScenarioLoadedGame(handle: game, deploymentReport: report)
+        return NativeScenarioLoadedGame(handle: game, boardReport: boardReport, deploymentReport: report)
+    }
+
+    private var scenarioBoardZones: [ScenarioBoardZoneSpec] {
+        let preferredTerrain = blueprint.terrain
+            .filter { $0.kind != .objective && $0.kind != .airPressure }
+            .sorted { lhs, rhs in
+                terrainPriority(lhs.kind) > terrainPriority(rhs.kind)
+            }
+        let terrain = preferredTerrain.isEmpty ? blueprint.terrain : preferredTerrain
+        return terrain.prefix(NativeScenarioLoader.boardTerrainZoneCapacity).enumerated().map { index, terrain in
+            let rect = zoneRect(for: terrain)
+            return ScenarioBoardZoneSpec(
+                id: index + 1,
+                name: terrain.name,
+                kind: engineTerrainKind(for: terrain.kind),
+                rect: rect,
+                coverSave: coverSave(for: terrain.kind),
+                blocksLineOfSight: terrain.blocksLineOfSightHint,
+                hullDown: terrain.kind == .ridge || terrain.kind == .bunker || terrain.kind == .fortifiedLine
+            )
+        }
+    }
+
+    private var scenarioBoardObjectives: [ScenarioBoardObjectiveSpec] {
+        blueprint.objectives.prefix(NativeScenarioLoader.boardObjectiveCapacity).enumerated().map { index, objective in
+            ScenarioBoardObjectiveSpec(
+                id: index + 1,
+                name: objective.name,
+                x: Float(clamp(objective.x, min: 1, max: blueprint.engineBoardFrame.width - 1)),
+                y: Float(clamp(objective.y, min: 1, max: blueprint.engineBoardFrame.height - 1)),
+                radius: Float(clamp(Double(objective.victoryPoints) + 2.5, min: 3.5, max: 7.5))
+            )
+        }
+    }
+
+    private func applyScenarioBoard(to game: OpaquePointer) -> NativeScenarioBoardReport {
+        let zones = scenarioBoardZones
+        let objectives = scenarioBoardObjectives
+        var notes: [String] = []
+        if blueprint.terrain.count > zones.count {
+            notes.append("\(blueprint.terrain.count - zones.count) terrain features were summarized because the current dzw zone view exposes \(NativeScenarioLoader.boardTerrainZoneCapacity) scenario zones.")
+        }
+        if blueprint.objectives.count > objectives.count {
+            notes.append("\(blueprint.objectives.count - objectives.count) objectives were summarized because the current dzw objective view exposes \(NativeScenarioLoader.boardObjectiveCapacity) objectives.")
+        }
+
+        let applied = withCStringPointers(zones.map(\.name)) { zoneNames in
+            withCStringPointers(objectives.map(\.name)) { objectiveNames in
+                "\(scenario.title)".withCString { missionName in
+                    let cZones = zones.enumerated().map { index, zone in
+                        guderian_scenario_zone_t(
+                            id: Int32(zone.id),
+                            name: zoneNames[index],
+                            kind: zone.kind,
+                            rect: rect_t(
+                                x: zone.rect.x,
+                                y: zone.rect.y,
+                                width: zone.rect.width,
+                                height: zone.rect.height
+                            ),
+                            cover_save: Int32(zone.coverSave),
+                            blocks_line_of_sight: zone.blocksLineOfSight,
+                            hull_down: zone.hullDown
+                        )
+                    }
+                    let cObjectives = objectives.enumerated().map { index, objective in
+                        guderian_scenario_objective_t(
+                            id: Int32(objective.id),
+                            name: objectiveNames[index],
+                            x: objective.x,
+                            y: objective.y,
+                            radius: objective.radius
+                        )
+                    }
+                    return cZones.withUnsafeBufferPointer { zoneBuffer in
+                        cObjectives.withUnsafeBufferPointer { objectiveBuffer in
+                            game_apply_guderian_scenario_board(
+                                game,
+                                missionName,
+                                Int32(blueprint.missionTargetScore),
+                                zoneBuffer.baseAddress,
+                                Int32(zoneBuffer.count),
+                                objectiveBuffer.baseAddress,
+                                Int32(objectiveBuffer.count)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if !applied, let error = game_last_error(game), String(cString: error).isEmpty == false {
+            notes.append(String(cString: error))
+        }
+
+        let mission = game_mission_view(game)
+        return NativeScenarioBoardReport(
+            applied: applied,
+            missionName: nativeScenarioCString(mission.name),
+            missionTargetScore: Int(mission.target_score),
+            requestedTerrainZoneCount: blueprint.terrain.count,
+            appliedTerrainZoneCount: Int(game_zone_count(game)),
+            requestedObjectiveCount: blueprint.objectives.count,
+            appliedObjectiveCount: Int(game_objective_count(game)),
+            notes: notes
+        )
     }
 
     private func deployBlueprintUnits(in game: OpaquePointer) -> NativeScenarioDeploymentReport {
@@ -201,13 +356,129 @@ public struct NativeScenarioLoadout {
         return false
     }
 
+    private func zoneRect(for terrain: NativeEngineTerrainSpawn) -> ScenarioBoardRect {
+        let points = terrain.points.isEmpty
+            ? [NativeBattleCoordinate(x: blueprint.engineBoardFrame.width / 2, y: blueprint.engineBoardFrame.height / 2)]
+            : terrain.points
+        let xs = points.map(\.x)
+        let ys = points.map(\.y)
+        let padding = max(1.5, terrain.radius, terrain.kind == .road || terrain.kind == .river ? 1.75 : 2.75)
+        let minX = clamp((xs.min() ?? 0) - padding, min: 0, max: blueprint.engineBoardFrame.width - 1)
+        let maxX = clamp((xs.max() ?? blueprint.engineBoardFrame.width) + padding, min: minX + 1, max: blueprint.engineBoardFrame.width)
+        let minY = clamp((ys.min() ?? 0) - padding, min: 0, max: blueprint.engineBoardFrame.height - 1)
+        let maxY = clamp((ys.max() ?? blueprint.engineBoardFrame.height) + padding, min: minY + 1, max: blueprint.engineBoardFrame.height)
+
+        return ScenarioBoardRect(
+            x: Float(minX),
+            y: Float(minY),
+            width: Float(max(1, maxX - minX)),
+            height: Float(max(1, maxY - minY))
+        )
+    }
+
+    private func engineTerrainKind(for kind: NativeBattleTerrainKind) -> terrain_kind_t {
+        switch kind {
+        case .river:
+            return TE_TERRAIN_IMPASSABLE
+        case .town, .forest, .ridge, .bunker, .fortifiedLine:
+            return TE_TERRAIN_DIFFICULT
+        case .road, .bridge, .objective, .artilleryPark, .airPressure:
+            return TE_TERRAIN_OPEN
+        }
+    }
+
+    private func coverSave(for kind: NativeBattleTerrainKind) -> Int {
+        switch kind {
+        case .bunker, .fortifiedLine:
+            return 4
+        case .town, .forest, .ridge:
+            return 5
+        case .bridge, .artilleryPark:
+            return 6
+        case .road, .river, .objective, .airPressure:
+            return 0
+        }
+    }
+
+    private func terrainPriority(_ kind: NativeBattleTerrainKind) -> Int {
+        switch kind {
+        case .river, .bunker, .fortifiedLine:
+            return 6
+        case .town, .forest, .ridge:
+            return 5
+        case .bridge:
+            return 4
+        case .road:
+            return 3
+        case .artilleryPark:
+            return 2
+        case .objective, .airPressure:
+            return 1
+        }
+    }
+
     private func clamp(_ value: Double, min minimum: Double, max maximum: Double) -> Double {
         Swift.min(Swift.max(value, minimum), maximum)
     }
 }
 
+private struct ScenarioBoardRect {
+    let x: Float
+    let y: Float
+    let width: Float
+    let height: Float
+}
+
+private struct ScenarioBoardZoneSpec {
+    let id: Int
+    let name: String
+    let kind: terrain_kind_t
+    let rect: ScenarioBoardRect
+    let coverSave: Int
+    let blocksLineOfSight: Bool
+    let hullDown: Bool
+}
+
+private struct ScenarioBoardObjectiveSpec {
+    let id: Int
+    let name: String
+    let x: Float
+    let y: Float
+    let radius: Float
+}
+
+private func withCStringPointers<Result>(
+    _ strings: [String],
+    _ body: ([UnsafePointer<CChar>?]) -> Result
+) -> Result {
+    var result: Result?
+
+    func recurse(_ index: Int, _ pointers: [UnsafePointer<CChar>?]) {
+        if index == strings.count {
+            result = body(pointers)
+            return
+        }
+        strings[index].withCString { pointer in
+            recurse(index + 1, pointers + [pointer])
+        }
+    }
+
+    recurse(0, [])
+    return result!
+}
+
+private func nativeScenarioCString(_ pointer: UnsafePointer<CChar>?) -> String {
+    guard let pointer else {
+        return ""
+    }
+    return String(cString: pointer)
+}
+
 public enum NativeScenarioLoader {
     public static let cycleRange = 271...280
+    public static let boardHookCycleRange = 281...290
+    public static let boardTerrainZoneCapacity = 8
+    public static let boardObjectiveCapacity = 8
 
     public static func load(_ id: GuderianBattleID, seed: UInt32 = 1941) -> NativeScenarioLoadout? {
         guard let scenario = GuderianCampaignCatalog.scenario(id: id) else {
@@ -359,9 +630,9 @@ public enum NativeScenarioLoader {
     ) -> [NativeScenarioLoaderWarning] {
         var warnings: [NativeScenarioLoaderWarning] = [
             NativeScenarioLoaderWarning(
-                id: "\(scenario.id.rawValue)-board-hook",
-                title: "Scenario board hook pending",
-                detail: "The native loader creates skirmish rosters and deploys units from the Guderian blueprint, but the dzw C engine still needs the guarded scenario board/mission constructor for custom terrain, objectives, mission target score, and event triggers."
+                id: "\(scenario.id.rawValue)-event-hook",
+                title: "Scripted event hook pending",
+                detail: "The native loader now applies Guderian terrain, objectives, and mission target score through the guarded dzw board hook. Reinforcements, weather, supply, demolition, evacuation, pocket, and air-pressure events still need the later scenario event hook."
             )
         ]
         if !blueprint.isCompleteForScenarioLoader {

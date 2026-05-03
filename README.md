@@ -8,7 +8,7 @@ The intended stack is a macOS game using SwiftUI, Metal, and a C rules core. The
 #define HEINZ_GUDERIAN_GAME
 ```
 
-That define should exist only in the Guderian Xcode project so upstream `dzw` development is not affected.
+That define is enabled only for the Guderian workspace/package path so upstream `dzw` development is not affected.
 
 ## Included Engine Review
 
@@ -93,6 +93,8 @@ Cycle 270 update: every battle now converts into a native Guderian battle instan
 
 Cycle 280 update: the native scenario loader now builds custom dzw army-list skirmishes from Guderian battle blueprints and deploys units to scenario-derived positions, so automation no longer depends on fixed force presets. The remaining blocker is the guarded scenario board/mission hook for custom terrain, objectives, mission target score, and scripted events.
 
+Cycle 290 update: the guarded dzw board hook now applies Guderian terrain zones, objective names/positions, and mission target scores to native skirmish games. The Guderian app also has a native board shell with unit selection, movement, fire diagnostics, pending-choice resolution, objective/terrain snapshots, phase controls, and log display. Demo parity still targets cycle 300 for Wizna, Sedan, and Moscow/Tula/Kashira debrief/scoring flow.
+
 ## Run
 
 Build and test from the repository root:
@@ -112,7 +114,7 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 
 ## Ship Status
 
-The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 280 completes the native scenario-loader bridge for all battles; executable battles now use scenario-derived army-list skirmishes and deployment positions, while custom terrain/objectives/missions still wait on the guarded board hook and board flow.
+The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 290 completes the native board-shell pass for all battles; executable battles now use scenario-derived army-list skirmishes, terrain/objectives, mission targets, and deployment positions. Scripted events, reinforcements, scenario AI, scoring/debrief polish, and demo parity remain for the cycle 300 block.
 
 ## App Identity
 

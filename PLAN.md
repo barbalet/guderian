@@ -26,6 +26,8 @@ Cycle 270 update: cycles 261-270 are complete. Guderian now has a native battle 
 
 Cycle 280 update: cycles 271-280 are complete. The native scenario loader now consumes each Guderian battle instance, builds custom dzw army-list skirmish entries instead of fixed force presets, creates a playable C-engine skirmish bridge, and deploys engine units from the native blueprint positions. Readiness has advanced from "native loader missing" to "native board hook missing": unit rosters and deployment are no longer force-preset proxies, but dzw still needs the guarded scenario board/mission constructor for terrain, objectives, mission target score, and scripted events.
 
+Cycle 290 update: cycles 281-290 are complete. The guarded `HEINZ_GUDERIAN_GAME` dzw board hook now applies Guderian scenario terrain zones, objective names/positions, and mission target scores to native skirmish games, and `NativeBoardSession` exposes a playable board shell with unit selection, movement, shooting diagnostics, pending-choice resolution, objective/terrain snapshots, phase advancement, and log display. Readiness has advanced from "native board hook missing" to "native board shell ready"; the remaining native demo work is board-flow polish, debrief mission state, scripted events/reinforcements, and scenario AI controls for cycle 300 parity.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -186,6 +188,8 @@ Status through cycle 260: completed. The native playability boundary is now repr
 Status through cycle 270: completed. Every campaign battle converts from the authored scenario bundle into a native Guderian battle instance and an engine-ready blueprint with scenario-specific units, terrain, objectives, events, AI, and victory data. No `dzw` files were modified. The next implementation block is cycles 271-280: the guarded scenario-defined game creation hook that consumes these blueprints instead of proxy force presets.
 
 Status through cycle 280: completed. `NativeScenarioLoader` is now the primary automation load path and replaces fixed force-preset proxy loading with scenario-derived army-list skirmishes and blueprint deployment. No `dzw` files were modified. The next implementation block is cycles 281-290: the Guderian board shell, plus the remaining guarded C hook for scenario-defined terrain/objectives/mission state.
+
+Status through cycle 290: completed. `dzw` now contains a guarded Guderian scenario-board hook and the root app includes a native board shell on each scenario briefing. All 19 battles launch through scenario-derived rosters, terrain/objectives, mission targets, and deployment positions; automation records `Native Board` diagnostics. The next implementation block is cycles 291-300: demo parity for Wizna, Sedan, and Moscow/Tula/Kashira from campaign row to board, scoring, debrief, and completion records.
 
 ## Acceptance Criteria
 

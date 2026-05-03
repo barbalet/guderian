@@ -708,7 +708,7 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(architecture.requiredEngineHooks.allSatisfy { $0.owner == .dzwEngine })
     }
 
-    func testCycle280EveryBattleHasNativeLoaderButStillNeedsBoardHook() throws {
+    func testCycle290EveryBattleHasNativeBoardShellButStillNeedsEventAndAIHooks() throws {
         let reports = NativePlayabilityArchitectureCatalog.allReadinessReports
         let orderedIDs = GuderianCampaignCatalog.all
             .sorted { $0.order < $1.order }
@@ -719,10 +719,12 @@ final class GuderianCampaignTests: XCTestCase {
 
         for report in reports {
             XCTAssertTrue(report.hasMinimumAuthoredInputs, "\(report.title): \(report.summary)")
-            XCTAssertEqual(report.status, .nativeBoardHookMissing)
-            XCTAssertTrue(report.requiredHookIDs.contains("scenario-instance-loader"))
-            XCTAssertTrue(report.notes.contains { $0.contains("skirmish bridge") })
-            XCTAssertTrue(report.notes.contains { $0.contains("remaining guarded engine hook") })
+            XCTAssertEqual(report.status, .nativeBoardShellReady)
+            XCTAssertFalse(report.requiredHookIDs.contains("scenario-instance-loader"))
+            XCTAssertTrue(report.requiredHookIDs.contains("scenario-event-triggers"))
+            XCTAssertTrue(report.requiredHookIDs.contains("scenario-ai-controls"))
+            XCTAssertTrue(report.notes.contains { $0.contains("scenario-specific terrain/objectives/mission target") })
+            XCTAssertTrue(report.notes.contains { $0.contains("Remaining native work") })
         }
 
         let demoReports = reports.filter { GuderianCampaignCatalog.demoIDs.contains($0.id) }
@@ -791,6 +793,7 @@ final class GuderianCampaignTests: XCTestCase {
 
     func testCycle280NativeScenarioLoaderCreatesSkirmishBridgeForEveryBattle() throws {
         XCTAssertEqual(NativeScenarioLoader.cycleRange, 271...280)
+        XCTAssertEqual(NativeScenarioLoader.boardHookCycleRange, 281...290)
 
         for scenario in GuderianCampaignCatalog.all {
             let loadout = NativeScenarioLoader.load(scenario, seed: UInt32(100_000 + scenario.order))
@@ -800,20 +803,25 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertFalse(loadout.usesForcePresetProxy)
             XCTAssertEqual(loadout.gameCreationMode, .nativeBlueprintSkirmishBridge)
             XCTAssertTrue(loadout.canCreateSkirmishBridge, scenario.title)
+            XCTAssertTrue(loadout.canApplyScenarioBoardHook, scenario.title)
             XCTAssertFalse(loadout.playerEntries.isEmpty, "\(scenario.title) needs player army-list entries")
             XCTAssertFalse(loadout.opponentEntries.isEmpty, "\(scenario.title) needs opponent army-list entries")
             XCTAssertTrue(loadout.playerEntries.allSatisfy { $0.count > 0 })
             XCTAssertTrue(loadout.opponentEntries.allSatisfy { $0.count > 0 })
-            XCTAssertTrue(loadout.warnings.contains { $0.id.contains("board-hook") })
+            XCTAssertTrue(loadout.warnings.contains { $0.id.contains("event-hook") })
 
             XCTAssertGreaterThan(Int(game_unit_count(loadedGame.handle)), 0)
             XCTAssertGreaterThan(Int(game_objective_count(loadedGame.handle)), 0)
+            XCTAssertTrue(loadedGame.boardReport.isScenarioSpecific, "\(scenario.title) should apply a scenario board")
+            XCTAssertEqual(game_mission_view(loadedGame.handle).target_score, Int32(loadout.blueprint.missionTargetScore))
+            XCTAssertEqual(Int(game_objective_count(loadedGame.handle)), min(loadout.blueprint.objectives.count, NativeScenarioLoader.boardObjectiveCapacity))
+            XCTAssertEqual(Int(game_zone_count(loadedGame.handle)), min(loadout.blueprint.terrain.filter { $0.kind != .objective && $0.kind != .airPressure }.isEmpty ? loadout.blueprint.terrain.count : loadout.blueprint.terrain.filter { $0.kind != .objective && $0.kind != .airPressure }.count, NativeScenarioLoader.boardTerrainZoneCapacity))
             XCTAssertGreaterThan(loadedGame.deploymentReport.attempted, 0, "\(scenario.title) should attempt scenario deployments")
             XCTAssertTrue(loadedGame.deploymentReport.placedAnyScenarioUnit, "\(scenario.title) should place at least one native blueprint unit")
         }
     }
 
-    func testCycle280DemoNativeLoaderUsesScenarioBlueprintPositions() throws {
+    func testCycle290DemoNativeLoaderUsesScenarioBoardAndBlueprintPositions() throws {
         for id in GuderianCampaignCatalog.demoIDs {
             let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: id))
             let loadout = NativeScenarioLoader.load(scenario, seed: UInt32(110_000 + scenario.order))
@@ -825,8 +833,44 @@ final class GuderianCampaignTests: XCTestCase {
 
             XCTAssertLessThanOrEqual(abs(Double(playerUnit.x) - firstPlayerSpawn.x), 8.5, scenario.title)
             XCTAssertLessThanOrEqual(abs(Double(playerUnit.y) - firstPlayerSpawn.y), 8.5, scenario.title)
-            XCTAssertNotEqual(game_mission_view(loadedGame.handle).target_score, Int32(loadout.blueprint.missionTargetScore), "The guarded board/mission C hook should still be visible as pending.")
+            XCTAssertEqual(game_mission_view(loadedGame.handle).target_score, Int32(loadout.blueprint.missionTargetScore))
+            XCTAssertEqual(String(cString: game_mission_view(loadedGame.handle).name), scenario.title)
+            XCTAssertEqual(String(cString: game_objective_view(loadedGame.handle, 0).name), loadout.blueprint.objectives[0].name)
+            XCTAssertGreaterThan(Int(game_zone_count(loadedGame.handle)), 0, "The guarded board/mission C hook should apply scenario terrain.")
         }
+    }
+
+    func testCycle290NativeBoardSessionExposesPlayableBoardControls() throws {
+        XCTAssertEqual(NativeBoardSession.cycleRange, 281...290)
+
+        let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .sedan))
+        let session = try XCTUnwrap(NativeBoardSession(scenario: scenario, seed: 19400513))
+        let opening = session.snapshot()
+
+        XCTAssertTrue(opening.isScenarioBoardPlayable)
+        XCTAssertEqual(opening.scenarioID, .sedan)
+        XCTAssertEqual(opening.mission.name, scenario.title)
+        XCTAssertEqual(opening.mission.targetScore, NativeBattleInstanceCatalog.instance(for: scenario).victory.missionTargetScore)
+        XCTAssertFalse(opening.zones.isEmpty)
+        XCTAssertFalse(opening.objectives.isEmpty)
+        XCTAssertFalse(opening.units.isEmpty)
+        XCTAssertNotNil(opening.selectedUnit)
+        XCTAssertNotNil(opening.selectedTarget)
+        XCTAssertEqual(opening.phase, .movement)
+
+        _ = session.moveSelectedUnitTowardNearestObjective(maxDistance: 2)
+        let afterMove = session.snapshot()
+        XCTAssertNotEqual(afterMove.lastAction.status, .idle)
+
+        session.advancePhase()
+        let shooting = session.snapshot()
+        XCTAssertEqual(shooting.phase, .shooting)
+        XCTAssertNotNil(shooting.selectedUnit)
+
+        _ = session.shootSelectedTarget()
+        let afterFire = session.snapshot()
+        XCTAssertNotEqual(afterFire.lastAction.status, .idle)
+        XCTAssertFalse(afterFire.logLines.isEmpty)
     }
 
     func testGuderianTestAutomationRunsEveryBattleAndSurfacesDiagnostics() throws {
@@ -847,6 +891,7 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertGreaterThan(battle.engineObjectiveCount, 0, "\(battle.title) should load engine objectives")
             XCTAssertFalse(battle.steps.isEmpty, "\(battle.title) should expose an automation timeline")
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native Loader" })
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native Board" })
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native Playability" })
             XCTAssertTrue(battle.issues.contains { $0.stage == "Native Playability" && $0.kind == .warning })
             XCTAssertTrue(battle.issues.contains { $0.stage == "Native Loader" && $0.kind == .warning })

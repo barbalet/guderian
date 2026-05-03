@@ -339,6 +339,9 @@ struct ScenarioBriefingView: View {
                 shipReadinessView
                 ScenarioMapView(layout: layout)
                     .frame(maxWidth: 860)
+                NativeBattleBoardView(scenario: scenario)
+                    .id(scenario.id)
+                    .frame(maxWidth: 860)
                 briefingSection("Player Force", scenario.playerForceSummary, icon: "shield.lefthalf.filled")
                 briefingSection("Guderian Command", scenario.guderianCommand, icon: "bolt.horizontal")
                 briefingSection("Design Intent", scenario.designIntent, icon: "scope")
@@ -1011,6 +1014,306 @@ struct ScenarioBriefingView: View {
                 Link(source.title, destination: source.url)
                     .font(.callout)
             }
+        }
+    }
+}
+
+@MainActor
+final class NativeBattleBoardViewModel: ObservableObject {
+    @Published private(set) var snapshot: NativeBoardSnapshot?
+
+    private var session: NativeBoardSession?
+
+    init(scenario: GuderianScenario) {
+        session = NativeBoardSession(scenario: scenario, seed: UInt32(120_000 + scenario.order))
+        refresh()
+    }
+
+    func select(_ unit: NativeBoardUnitSnapshot) {
+        guard let session else {
+            return
+        }
+        if unit.owner == snapshot?.activePlayer {
+            session.selectUnit(unit.id)
+            session.selectNearestEnemyToSelectedUnit()
+        } else {
+            session.selectTarget(unit.id)
+        }
+        refresh()
+    }
+
+    func moveSelectedUnit() {
+        session?.moveSelectedUnitTowardNearestObjective()
+        refresh()
+    }
+
+    func shootSelectedTarget() {
+        session?.shootSelectedTarget()
+        refresh()
+    }
+
+    func advancePhase() {
+        session?.advancePhase()
+        refresh()
+    }
+
+    func resolvePendingChoice() {
+        session?.resolveFirstPendingChoice()
+        refresh()
+    }
+
+    private func refresh() {
+        snapshot = session?.snapshot()
+    }
+}
+
+struct NativeBattleBoardView: View {
+    @StateObject private var model: NativeBattleBoardViewModel
+
+    init(scenario: GuderianScenario) {
+        _model = StateObject(wrappedValue: NativeBattleBoardViewModel(scenario: scenario))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Native Battle Board", systemImage: "square.grid.3x3")
+                .font(.headline)
+
+            if let snapshot = model.snapshot {
+                HStack(alignment: .top, spacing: 14) {
+                    board(snapshot)
+                    boardControls(snapshot)
+                }
+            } else {
+                Label("Board session unavailable", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("native-battle-board")
+    }
+
+    private func board(_ snapshot: NativeBoardSnapshot) -> some View {
+        GeometryReader { proxy in
+            ZStack {
+                Rectangle()
+                    .fill(Color(red: 0.69, green: 0.73, blue: 0.62))
+                boardGrid(in: proxy.size)
+
+                ForEach(snapshot.zones) { zone in
+                    terrainZone(zone, in: proxy.size)
+                }
+
+                ForEach(snapshot.objectives) { objective in
+                    objectiveMarker(objective, in: proxy.size)
+                }
+
+                ForEach(snapshot.units) { unit in
+                    unitButton(unit, in: proxy.size, activePlayer: snapshot.activePlayer)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.primary.opacity(0.18), lineWidth: 1)
+            }
+        }
+        .aspectRatio(72 / 48, contentMode: .fit)
+        .frame(minWidth: 520)
+    }
+
+    private func boardControls(_ snapshot: NativeBoardSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(snapshot.mission.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                Text("Turn \(snapshot.turnNumber) | \(snapshot.activePlayer.rawValue) | \(snapshot.phase.rawValue)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("\(snapshot.mission.playerScore)-\(snapshot.mission.opponentScore) / \(snapshot.mission.targetScore) VP")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Button {
+                    model.moveSelectedUnit()
+                } label: {
+                    Label("Move", systemImage: "arrow.up.right")
+                }
+                .disabled(snapshot.phase != .movement || snapshot.selectedUnit?.canMoveNow != true)
+
+                Button {
+                    model.shootSelectedTarget()
+                } label: {
+                    Label("Fire", systemImage: "scope")
+                }
+                .disabled(snapshot.phase != .shooting || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
+            }
+            .buttonStyle(.bordered)
+
+            HStack {
+                Button {
+                    model.resolvePendingChoice()
+                } label: {
+                    Label("Resolve", systemImage: "checkmark.circle")
+                }
+
+                Button {
+                    model.advancePhase()
+                } label: {
+                    Label("Phase", systemImage: "forward.end")
+                }
+            }
+            .buttonStyle(.bordered)
+
+            if let selected = snapshot.selectedUnit {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(selected.name, systemImage: "dot.scope")
+                        .font(.caption.weight(.semibold))
+                    Text("\(selected.kind) | \(selected.owner.rawValue)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Wounds \(selected.totalWoundsRemaining), \(selected.inCover ? "in cover" : "open"), \(selected.hullDown ? "hull-down" : "exposed")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Label(snapshot.lastAction.title, systemImage: snapshot.lastAction.status == .blocked ? "exclamationmark.triangle" : "checkmark.circle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(snapshot.lastAction.status == .blocked ? .orange : .secondary)
+                Text(snapshot.lastAction.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+
+            Divider()
+
+            ForEach(snapshot.logLines.suffix(5), id: \.self) { line in
+                Text(line)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .frame(width: 260, alignment: .topLeading)
+    }
+
+    private func boardGrid(in size: CGSize) -> some View {
+        Path { path in
+            for column in 1..<12 {
+                let x = size.width * CGFloat(column) / 12
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
+            }
+            for row in 1..<8 {
+                let y = size.height * CGFloat(row) / 8
+                path.move(to: CGPoint(x: 0, y: y))
+                path.addLine(to: CGPoint(x: size.width, y: y))
+            }
+        }
+        .stroke(Color.primary.opacity(0.07), lineWidth: 1)
+    }
+
+    private func terrainZone(_ zone: NativeBoardZoneSnapshot, in size: CGSize) -> some View {
+        Rectangle()
+            .fill(terrainColor(zone).opacity(zone.kind == "Impassable" ? 0.42 : 0.28))
+            .overlay {
+                Rectangle()
+                    .stroke(terrainColor(zone).opacity(0.65), lineWidth: zone.blocksLineOfSight ? 2 : 1)
+            }
+            .frame(
+                width: max(8, size.width * zone.width / 72),
+                height: max(8, size.height * zone.height / 48)
+            )
+            .position(
+                x: size.width * (zone.x + zone.width / 2) / 72,
+                y: size.height * (zone.y + zone.height / 2) / 48
+            )
+            .accessibilityLabel(zone.name)
+    }
+
+    private func objectiveMarker(_ objective: NativeBoardObjectiveSnapshot, in size: CGSize) -> some View {
+        ZStack {
+            Circle()
+                .fill(objectiveColor(objective.controller).opacity(0.78))
+                .frame(width: max(22, objective.radius * 6), height: max(22, objective.radius * 6))
+            Image(systemName: "target")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+        }
+        .position(x: size.width * objective.x / 72, y: size.height * objective.y / 48)
+        .accessibilityLabel(objective.name)
+    }
+
+    private func unitButton(_ unit: NativeBoardUnitSnapshot, in size: CGSize, activePlayer: NativeBoardPlayer) -> some View {
+        Button {
+            model.select(unit)
+        } label: {
+            Image(systemName: unitSymbol(unit))
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: unit.selected || unit.targeted ? 28 : 24, height: unit.selected || unit.targeted ? 28 : 24)
+                .background(unitColor(unit.owner))
+                .clipShape(Circle())
+                .overlay {
+                    Circle()
+                        .stroke(unit.selected ? Color.yellow : unit.targeted ? Color.white : Color.black.opacity(0.18), lineWidth: unit.selected || unit.targeted ? 3 : 1)
+                }
+                .opacity(unit.destroyed ? 0.35 : activePlayer == unit.owner ? 1 : 0.86)
+        }
+        .buttonStyle(.plain)
+        .position(x: size.width * unit.x / 72, y: size.height * unit.y / 48)
+        .accessibilityLabel("\(unit.name), \(unit.owner.rawValue)")
+    }
+
+    private func terrainColor(_ zone: NativeBoardZoneSnapshot) -> Color {
+        if zone.kind == "Impassable" {
+            return Color(red: 0.12, green: 0.36, blue: 0.66)
+        }
+        if zone.hullDown {
+            return Color(red: 0.45, green: 0.43, blue: 0.34)
+        }
+        if zone.blocksLineOfSight {
+            return Color(red: 0.23, green: 0.43, blue: 0.26)
+        }
+        return Color(red: 0.48, green: 0.42, blue: 0.34)
+    }
+
+    private func unitColor(_ player: NativeBoardPlayer) -> Color {
+        switch player {
+        case .player:
+            return Color(red: 0.10, green: 0.33, blue: 0.68)
+        case .guderianAI:
+            return Color(red: 0.62, green: 0.14, blue: 0.11)
+        case .none:
+            return .secondary
+        }
+    }
+
+    private func objectiveColor(_ player: NativeBoardPlayer) -> Color {
+        switch player {
+        case .player:
+            return Color(red: 0.10, green: 0.45, blue: 0.62)
+        case .guderianAI:
+            return Color(red: 0.68, green: 0.22, blue: 0.12)
+        case .none:
+            return Color(red: 0.38, green: 0.30, blue: 0.62)
+        }
+    }
+
+    private func unitSymbol(_ unit: NativeBoardUnitSnapshot) -> String {
+        switch unit.kind {
+        case "Vehicle":
+            return "truck.box"
+        case "Assault gun":
+            return "shield.lefthalf.filled"
+        default:
+            return "figure.stand"
         }
     }
 }

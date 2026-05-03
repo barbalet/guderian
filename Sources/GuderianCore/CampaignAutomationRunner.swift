@@ -192,6 +192,15 @@ public enum CampaignAutomationRunner {
         }
         let game = loadedGame.handle
         accumulator.step(
+            "Native Board",
+            loadedGame.boardReport.isScenarioSpecific ? .passed : .warning,
+            "Applied scenario board",
+            "\(loadedGame.boardReport.appliedTerrainZoneCount)/\(loadedGame.boardReport.requestedTerrainZoneCount) terrain zones and \(loadedGame.boardReport.appliedObjectiveCount)/\(loadedGame.boardReport.requestedObjectiveCount) objectives; mission target \(loadedGame.boardReport.missionTargetScore)."
+        )
+        for note in loadedGame.boardReport.notes {
+            accumulator.step("Native Board", .warning, "Board note", note)
+        }
+        accumulator.step(
             "Native Loader",
             loadedGame.deploymentReport.placedAnyScenarioUnit ? .passed : .warning,
             "Applied scenario deployments",
@@ -240,7 +249,7 @@ public enum CampaignAutomationRunner {
                 .warning,
                 "Native Playability",
                 "Native scenario instance unavailable",
-                "\(scenario.title) still runs through the dzw proxy loader until \(readiness.requiredHookIDs.joined(separator: ", ")) are implemented. \(readiness.notes.joined(separator: " "))"
+                "\(scenario.title) is past proxy loading but still has native-playability work before the cycle \(NativePlayabilityArchitectureCatalog.architecture.demoPlayableTargetCycle) demo target. Pending hooks: \(readiness.requiredHookIDs.joined(separator: ", ")). \(readiness.notes.joined(separator: " "))"
             )
         }
 
