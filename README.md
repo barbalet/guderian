@@ -1,2 +1,76 @@
 # guderian
-Simulate the WW2 battles of Heinz Guderian
+
+`guderian` is a macOS World War II wargame project about opposing Heinz Guderian's field commands. The player is always the force resisting, delaying, escaping, or counterattacking Guderian's formations rather than commanding them.
+
+The intended stack is a macOS game using SwiftUI, Metal, and a C rules core. The project is based on the included `dzw` (`derZweiteWeltkrieg`) engine, which should be treated as read-only unless a Guderian-specific hook is guarded by:
+
+```c
+#define HEINZ_GUDERIAN_GAME
+```
+
+That define should exist only in the Guderian Xcode project so upstream `dzw` development is not affected.
+
+## Included Engine Review
+
+The `dzw` directory is a complete playable World War II skirmish engine and app:
+
+- C rules engine: `dzw/Sources/DerZweiteWeltkriegCore`
+- SwiftUI shell: `dzw/Sources/DerZweiteWeltkriegApp`
+- Swift tests: `dzw/Tests/DerZweiteWeltkriegTests`
+- Existing engine roadmap and rules notes: `dzw/docs/wwii_development_roadmap.md`, `dzw/docs/engine_strategy.md`
+- Existing data ledgers: `dzw/docs/wwii_demo_scope.md`, `dzw/docs/wwii_unit_profiles.md`, `dzw/docs/wwii_weapon_taxonomy.md`, `dzw/docs/wwii_armor_profiles.md`, `dzw/docs/wwii_battlefield_profiles.md`
+
+Useful inherited scope from `dzw`:
+
+- Allies/Axis nation selection for British, American, Australian, Soviet, German, and Italian forces.
+- Objective missions, turn phases, movement, shooting, morale, pinning, assaults, artillery, transports, mounted fire arcs, vehicle damage, hull-down, smoke, and victory scoring.
+- A SwiftUI setup/board/sidebar flow backed by C snapshots, which is a good fit for adding historical scenarios without duplicating rules in the UI.
+
+Guderian-specific work should mostly add campaign data, scenario maps, app identity, opponent AI, and historical presentation around this engine. Engine changes should be rare, guarded, and documented.
+
+## Historical Scope
+
+Wikipedia was used as the initial open research shelf for [Heinz Guderian](https://en.wikipedia.org/wiki/Heinz_Guderian)'s World War II field-command battles. The playable campaign should prioritize battles where Guderian commanded XIX Army Corps, Panzergruppe Guderian, 2nd Panzer Group, or 2nd Panzer Army. Later staff positions, including Inspector General of Armoured Troops and acting Chief of the Army General Staff, are historical context rather than direct battlefield command scenarios.
+
+The game should avoid celebratory framing. Guderian was a senior Nazi German commander; the player-facing fantasy is resistance against his offensives, and the historical notes should acknowledge the wider criminal context of the Wehrmacht where relevant.
+
+## Battle Chronology
+
+| Order | Date | Battle / Operation | Guderian Command | Opposing Force For Player | Result | Scenario Design Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 1-5 Sep 1939 | [Battle of Tuchola Forest](https://en.wikipedia.org/wiki/Battle_of_Tuchola_Forest) | XIX Panzer Corps under 4th Army | Polish Pomeranian Army elements in the Polish Corridor | German victory | Forest/corridor breakout. Player delays armor with infantry, cavalry, roadblocks, limited anti-tank assets, and withdrawal objectives. |
+| 2 | 7-10 Sep 1939 | [Battle of Wizna](https://en.wikipedia.org/wiki/Battle_of_Wizna) | XIX Panzer Corps; Guderian listed with Ferdinand Schaal | Polish fortified line under Wladyslaw Raginis and Stanislaw Brykalski | German victory | Compact tutorial battle. Player holds bunkers, anti-tank guns, and machine-gun positions against overwhelming German armor and artillery. |
+| 3 | 14-17 Sep 1939 | [Battle of Brzesc Litewski](https://en.wikipedia.org/wiki/Battle_of_Brze%C5%9B%C4%87_Litewski) | XIX Panzer Corps, including 10th Panzer, 3rd Panzer, and 20th Infantry Division | Polish Brzesc defense group under Konstanty Plisowski | German victory | Fortress/urban delay. Player uses old FT-17 tanks, armored trains, artillery, and fallback routes to slow mechanized assault. |
+| 4 | 14-18 Sep 1939 | [Battle of Kobryn](https://en.wikipedia.org/wiki/Battle_of_Kobry%C5%84) | XIX Panzer Corps, primarily 2nd Motorized Infantry Division | Polish Operational Group Polesie / 60th Reserve Infantry Division under Adam Epler | Inconclusive | Rearguard battle. Player scores by preserving force cohesion, blocking routes, and escaping before encirclement. |
+| 5 | 12-17 May 1940 | [Battle of Sedan](https://en.wikipedia.org/wiki/Battle_of_Sedan_%281940%29) | XIX Army Corps under Panzergruppe Kleist | French 2nd Army sector with British air support | German victory | First demo centerpiece. Player defends the Meuse crossing, bridge approaches, artillery positions, and counterattack routes under air pressure. |
+| 6 | 15-17 May 1940 | Stonne / Sedan bridgehead flank actions, documented in [Battle of Sedan](https://en.wikipedia.org/wiki/Battle_of_Sedan_%281940%29) and [XIX Army Corps](https://en.wikipedia.org/wiki/XIX_Army_Corps) | XIX Army Corps, especially 10th Panzer and Grossdeutschland | French armor and infantry around Stonne heights | German bridgehead secured | Heavy-tank counterattack scenario. Player uses Char B1 bis shock, village cover, and hill control to threaten the bridgehead. |
+| 7 | 17-19 May 1940 | [Battle of Montcornet](https://en.wikipedia.org/wiki/Battle_of_Montcornet) | Guderian listed with Luftwaffe support; German 1st Panzer Division in sector | French 4e Division cuirassee under Charles de Gaulle | French tactical victory / withdrawal after air pressure | Armored counterattack. Player gets strong tanks but limited support and must raid German columns before disengaging. |
+| 8 | 20 May 1940 | Channel coast race through Amiens-Abbeville, documented in [XIX Army Corps](https://en.wikipedia.org/wiki/XIX_Army_Corps) | XIX Army Corps | French/British blocking forces on Somme approaches | German breakthrough to Channel | Mobile operational interlude. Player buys evacuation time by holding bridges, towns, and road junctions. |
+| 9 | 22-25 May 1940 | [Battle of Boulogne](https://en.wikipedia.org/wiki/Battle_of_Boulogne) | XIX Corps under Guderian; 2nd Panzer Division attack | French, British, Belgian port defenders | German victory | Port defense. Player protects evacuation points, demolitions, and naval-fire support while German armor closes in. |
+| 10 | 22-26 May 1940 | [Siege of Calais](https://en.wikipedia.org/wiki/Siege_of_Calais_%281940%29) | XIX Corps sector; 10th Panzer Division under Ferdinand Schaal | British, French, Belgian defenders | German victory | High-value delay. Player wins by holding long enough to support Dunkirk evacuation, not necessarily by retaining the port. |
+| 11 | 26 May-4 Jun 1940 | [Battle of Dunkirk](https://en.wikipedia.org/wiki/Battle_of_Dunkirk) | Guderian-adjacent campaign pressure after Channel port drive | British, French, Belgian, Dutch evacuation perimeter | Allied evacuation / German operational success in France | Supplemental scenario. Player conducts perimeter defense and evacuation management; direct Guderian command involvement should be treated carefully. |
+| 12 | 10-22 Jun 1940 | Fall Rot / Panzergruppe Guderian drive toward the Swiss border, documented in [XIX Army Corps](https://en.wikipedia.org/wiki/XIX_Army_Corps) | Panzergruppe Guderian | French defenders around Aisne, Marne-Rhine Canal, Langres, Belfort, and Epinal | German victory | Late-France campaign chain. Player stages bridge demolitions, fortress stands, fuel denial, and retreat corridors. |
+| 13 | 22 Jun-9 Jul 1941 | [Battle of Bialystok-Minsk](https://en.wikipedia.org/wiki/Battle_of_Bia%C5%82ystok%E2%80%93Minsk) | 2nd Panzer Group as Army Group Centre's southern pincer | Soviet Western Front formations | German victory | Encirclement survival. Player fights breakout and delaying actions while preserving command assets and supply routes. |
+| 14 | 10 Jul-10 Sep 1941 | [Battle of Smolensk](https://en.wikipedia.org/wiki/Battle_of_Smolensk_%281941%29) | 2nd Panzer Group with Hoth's northern pincer | Soviet armies around Smolensk | German victory, but German advance slowed | Major Eastern Front module. Player counterattacks, holds river crossings, and opens pocket escape lanes. |
+| 15 | 30 Aug-12 Sep 1941 | [Roslavl-Novozybkov offensive](https://en.wikipedia.org/wiki/Roslavl%E2%80%93Novozybkov_offensive) | 2nd Panzer Group turned south toward Kiev | Soviet Bryansk Front under Andrey Yeryomenko | German victory | Soviet spoiling offensive. Player attempts to disrupt the southward turn and damage German spearheads before Operation Typhoon. |
+| 16 | 7 Jul-26 Sep 1941 | [Battle of Kiev](https://en.wikipedia.org/wiki/Battle_of_Kiev_%281941%29) | 2nd Panzer Group northern pincer with Kleist's 1st Panzer Group | Soviet Southwestern Front | German victory and major encirclement | Large pocket campaign. Player prioritizes command evacuation, breakout corridors, and delaying German pincer closure. |
+| 17 | 30 Sep-21 Oct 1941 | [Battle of Bryansk](https://en.wikipedia.org/wiki/Battle_of_Bryansk_%281941%29) | 2nd Panzer Army / 2nd Panzer Group after Kiev | Soviet Bryansk Front, including 50th, 13th, and 3rd Armies | German victory | Operation Typhoon southern approach. Player trades ground for time, fights pocket liquidation, and protects the Tula axis. |
+| 18 | 4-11 Oct 1941 | Mtsensk fighting, supported by [Mikhail Katukov](https://en.wikipedia.org/wiki/Mikhail_Katukov) and [Battle of Moscow](https://en.wikipedia.org/wiki/Battle_of_Moscow) context | Guderian's Panzergruppe 2 sector | Soviet 4th Tank Brigade / future 1st Guards Tank Brigade | Soviet delaying success | Small armored showcase. Player uses T-34/KV ambushes, anti-tank screens, and terrain to blunt German panzer divisions. |
+| 19 | 2 Oct 1941-7 Jan 1942 | [Battle of Moscow](https://en.wikipedia.org/wiki/Battle_of_Moscow), focused on Tula/Kashira southern pincer | 2nd Panzer Army under Guderian | Soviet forces defending Tula, Kashira, and southern approaches to Moscow | Soviet victory | Final demo/full-campaign climax. Player balances winter, logistics, reinforcements, city defense, and counteroffensive timing. |
+
+## Development Plan
+
+The detailed development plan is tracked in [PLAN.md](PLAN.md). The short version:
+
+- Cycles 1-100: playable demo, centered on a fortified-delay tutorial plus two famous command-scope scenarios: Sedan/Meuse and Moscow/Tula.
+- Cycles 101-250: complete campaign, expanding to every battle listed above and shipping all scenarios as playable, tested, historically annotated missions.
+
+Cycle 0 update: initial repository review, `dzw` engine review, and Wikipedia battle-scope research completed on 2026-05-03.
+
+## App Identity
+
+Use an image of Heinz Guderian's face as the app icon only if a suitable public-domain or permissively licensed source image is selected and recorded. The icon should not make the game celebratory; it should read as historical subject identification.
+
+## Contact
+
+Contact `barbalet at gmail dot com` if you have questions, feedback, or would like to collaborate.
