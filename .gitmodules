@@ -1,0 +1,3 @@
+[submodule "dzw"]
+	path = dzw
+	url = git@github.com:barbalet/derZweiteWeltkrieg.git
