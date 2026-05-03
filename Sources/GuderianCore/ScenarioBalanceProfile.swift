@@ -162,6 +162,14 @@ public enum ScenarioBalanceCatalog {
             return fallRot
         case .bialystokMinsk:
             return bialystokMinsk
+        case .smolensk:
+            return smolensk
+        case .roslavlNovozybkov:
+            return roslavlNovozybkov
+        case .kiev:
+            return kiev
+        case .bryansk:
+            return bryansk
         case .moscowTulaKashira:
             return moscowTulaKashira
         default:
@@ -551,6 +559,130 @@ public enum ScenarioBalanceCatalog {
             outcome("bialystok-operational", .operational, 8...11, "Some command and army assets escape despite German encirclement."),
             outcome("bialystok-marginal", .marginal, 4...7, "One escape lane opens briefly, but pocket attrition is severe."),
             outcome("bialystok-historical", .historicalPressure, 0...3, "German pincer closure destroys most Western Front formations."),
+        ]
+    )
+
+    private static let smolensk = ScenarioBalanceProfile(
+        id: .smolensk,
+        targetTurns: 8...10,
+        balanceIntent: "Smolensk should feel like an operational delay and breakout fight: the player can lose the city and still succeed by forcing German logistics strain, counterattacking pincer shoulders, and extracting trapped armies.",
+        playerWinCondition: "Keep at least one river crossing contested through the early game, open the Yartsevo corridor, and exit two army assets before pocket attrition peaks.",
+        germanPressureLimit: "German pincer closure should be dangerous, but reserve counterstrokes and crossing defense must each delay one German tempo step if executed on time.",
+        scoreChannels: [
+            score("smolensk-crossing-delay", "Dnieper and Dvina delay", .player, 4, "Turns 1-4", "Award for contested or blocked river crossings."),
+            score("smolensk-yartsevo-escape", "Yartsevo escape lane", .player, 5, "Turns 3-9", "Award for exiting trapped army assets through the Moscow-road corridor."),
+            score("smolensk-reserve-counterstroke", "Reserve counterstrokes", .player, 3, "Turns 2-6", "Award if reserve armies delay a pincer shoulder."),
+            score("smolensk-supply-strain", "German supply strain", .player, 3, "Any German turn", "Award when crossing delay or counterattacks create supply-strain markers."),
+            score("smolensk-german-pocket", "Pocket closed", .guderianAI, 8, "Scenario end", "German score for cutting Yartsevo and reducing the Smolensk pocket."),
+        ],
+        pacingRules: [
+            pacing("smolensk-river-window", "River-defense window", "Turns 1-2", "German armor can force bridgeheads but cannot both close the pocket and clear all crossing defenders."),
+            pacing("smolensk-counterstroke-window", "Counterstroke window", "Turns 2-5", "Reserve armies can delay a pincer shoulder once before disruption penalties apply."),
+            pacing("smolensk-pocket-attrition", "Pocket attrition", "Turns 4-8", "Each closed route raises attrition but Yartsevo can still exit one asset if contested."),
+            pacing("smolensk-logistics-choice", "Logistics choice", "Turns 5+", "German AI with two strain markers must slow either pincer closure or bridgehead reinforcement."),
+        ],
+        reinforcements: [
+            reinforcement("smolensk-reserve-armies", .player, "Turns 2-3", "Stavka reserve counterattack armies", "Enter after a German pincer marker controls a crossing approach.", "Counterstroke"),
+            reinforcement("smolensk-german-infantry", .guderianAI, "Turns 5-6", "German infantry pocket-reduction armies", "Enter after a pocket marker is closed or Yartsevo is threatened.", "Pocket reduction"),
+        ],
+        outcomeBands: [
+            outcome("smolensk-decisive", .decisive, 12...15, "The Soviet defense forces serious delay and extracts several armies before the pocket collapses."),
+            outcome("smolensk-operational", .operational, 8...11, "Crossing delays and counterstrokes slow the German advance while some trapped forces escape."),
+            outcome("smolensk-marginal", .marginal, 4...7, "The pocket narrows, but one escape or logistics success buys time."),
+            outcome("smolensk-historical", .historicalPressure, 0...3, "German pincer closure proceeds near historical pressure with limited Soviet extraction."),
+        ]
+    )
+
+    private static let roslavlNovozybkov = ScenarioBalanceProfile(
+        id: .roslavlNovozybkov,
+        targetTurns: 6...8,
+        balanceIntent: "Roslavl-Novozybkov is a spoiling-offensive puzzle: Soviet attacks should be able to damage tempo and columns, but overcommitted tanks can be trapped by German counterpressure.",
+        playerWinCondition: "Reveal the German southward-turn screen, disrupt at least two road or supply objectives, and withdraw one tank group intact.",
+        germanPressureLimit: "German counterpressure should punish lingering attacks, but not before the player has a real raid-and-withdrawal window.",
+        scoreChannels: [
+            score("roslavl-intel-reveal", "Southward turn revealed", .player, 2, "Turns 1-3", "Award for revealing German operational intent."),
+            score("roslavl-column-disruption", "Column disruption", .player, 5, "Turns 2-5", "Award for damaging or contesting supply-column objectives."),
+            score("roslavl-tank-preservation", "Tank preservation", .player, 3, "Turns 3-8", "Award if a tank group exits after a raid."),
+            score("roslavl-delay-south-turn", "Southward turn delayed", .player, 3, "Scenario end", "Award if German southward-turn tempo is reduced by raid or crossing results."),
+            score("roslavl-german-counterpressure", "Counterpressure trap", .guderianAI, 6, "Scenario end", "German score for closing withdrawal lanes and preserving columns."),
+        ],
+        pacingRules: [
+            pacing("roslavl-recon-window", "Recon window", "Turn 1", "Soviet reconnaissance can reveal one German screen before main attacks commit."),
+            pacing("roslavl-raid-window", "Raid window", "Turns 2-4", "Soviet tanks can score against columns before German counterpressure peaks."),
+            pacing("roslavl-withdrawal-choice", "Withdrawal choice", "Turns 4-7", "Attack groups must choose between a second disruption and preservation scoring."),
+            pacing("roslavl-counterpressure-escalation", "Counterpressure escalation", "Turns 5+", "German counterattacks close roads only after a Soviet raid or delayed withdrawal."),
+        ],
+        reinforcements: [
+            reinforcement("roslavl-soviet-tanks", .player, "Turns 2-3", "Soviet tank raid groups", "Enter after intent is revealed or a road-column objective is exposed.", "Spoiling raid"),
+            reinforcement("roslavl-german-counterpressure", .guderianAI, "Turns 4-5", "German counterpressure group", "Enter after a Soviet tank group scores or remains on a road objective.", "Trap response"),
+        ],
+        outcomeBands: [
+            outcome("roslavl-decisive", .decisive, 10...13, "The spoiling offensive disrupts the southward turn and preserves mobile reserves."),
+            outcome("roslavl-operational", .operational, 7...9, "German tempo is slowed, though Soviet attack groups take losses."),
+            outcome("roslavl-marginal", .marginal, 4...6, "A local raid succeeds before German counterpressure closes in."),
+            outcome("roslavl-historical", .historicalPressure, 0...3, "German columns absorb the offensive and continue the operational turn."),
+        ]
+    )
+
+    private static let kiev = ScenarioBalanceProfile(
+        id: .kiev,
+        targetTurns: 8...10,
+        balanceIntent: "Kiev is a large pocket scenario where the player is rewarded for command evacuation, corridor defense, and breakout operations rather than an ahistorical full halt of the pincers.",
+        playerWinCondition: "Evacuate at least two command or artillery-control assets, keep one eastern corridor contested, and delay pincer link-up for two turns.",
+        germanPressureLimit: "The pincer link-up should close if ignored, but command evacuation must be possible before the pocket fully seals.",
+        scoreChannels: [
+            score("kiev-command-evacuation", "Command evacuation", .player, 5, "Turns 2-8", "Award for headquarters and artillery-control assets exiting through the eastern corridor."),
+            score("kiev-corridor-held", "Eastern corridor held", .player, 4, "Turns 2-7", "Award for keeping the closure corridor controlled or contested."),
+            score("kiev-pincer-delay", "Pincer link-up delayed", .player, 3, "Turns 3-6", "Award for delaying northern or southern pincer markers."),
+            score("kiev-breakout-operations", "Breakout operations", .player, 4, "Turns 5-10", "Award for exiting trapped rifle army assets after closure pressure begins."),
+            score("kiev-german-encirclement", "Kiev pocket closed", .guderianAI, 9, "Scenario end", "German score for pincer link-up and pocket reduction."),
+        ],
+        pacingRules: [
+            pacing("kiev-evacuation-window", "Evacuation window", "Turns 1-3", "Command posts can move before both pincer markers threaten closure."),
+            pacing("kiev-northern-pressure", "Northern pressure", "Turns 2-5", "2nd Panzer Group narrows one corridor after reaching the eastern closure line."),
+            pacing("kiev-linkup-clock", "Link-up clock", "Turns 4-7", "Once both pincer markers are active, closure advances every turn unless delayed."),
+            pacing("kiev-breakout-shift", "Breakout shift", "Turns 6-10", "After link-up pressure, scoring shifts from position defense to breakout and command preservation."),
+        ],
+        reinforcements: [
+            reinforcement("kiev-soviet-breakout", .player, "Turns 5-6", "Soviet breakout groups", "Enter if an eastern corridor remains contested.", "Breakout operation"),
+            reinforcement("kiev-german-infantry", .guderianAI, "Turns 6-7", "German infantry pocket-reduction armies", "Enter after pincer link-up or two closure objectives are German-controlled.", "Pocket reduction"),
+        ],
+        outcomeBands: [
+            outcome("kiev-decisive", .decisive, 13...16, "Command assets escape and multiple formations break out before the pocket is reduced."),
+            outcome("kiev-operational", .operational, 9...12, "The pocket closes, but command evacuation and corridor defense save meaningful combat power."),
+            outcome("kiev-marginal", .marginal, 5...8, "Some assets escape while the encirclement develops."),
+            outcome("kiev-historical", .historicalPressure, 0...4, "The encirclement traps most assets and command evacuation fails."),
+        ]
+    )
+
+    private static let bryansk = ScenarioBalanceProfile(
+        id: .bryansk,
+        targetTurns: 7...9,
+        balanceIntent: "Bryansk should bridge Kiev and Moscow: German tempo is strong, but Soviet success comes from delaying pockets, preserving the Tula road, and forcing autumn logistics strain.",
+        playerWinCondition: "Keep Bryansk or a pocket exit contested through the midgame, deny German exit scoring on the Orel-Tula road, and trigger at least one autumn-friction check.",
+        germanPressureLimit: "German armor can seize road depth quickly, but must not both close all pockets and exit toward Tula before Soviet roadblocks and friction act.",
+        scoreChannels: [
+            score("bryansk-pocket-delay", "Pocket delay", .player, 4, "Turns 2-7", "Award for keeping 13th or 3rd Army pocket groups active."),
+            score("bryansk-rail-command", "Rail and command preservation", .player, 3, "Turns 1-6", "Award if Bryansk rail or command assets remain active long enough to support exits."),
+            score("bryansk-tula-road", "Tula road protected", .player, 5, "Turns 4-9", "Award if the Orel-Tula road remains Soviet-contested or blocked."),
+            score("bryansk-autumn-friction", "Autumn friction forced", .player, 3, "Any German turn", "Award when German armor outruns rail or infantry support."),
+            score("bryansk-german-typhoon", "Typhoon breakthrough", .guderianAI, 8, "Scenario end", "German score for controlling Bryansk, Orel, and a Tula-road exit."),
+        ],
+        pacingRules: [
+            pacing("bryansk-surprise-axis", "Surprise axis", "Turn 1", "German armor can advance fast but cannot reduce a pocket in the same opening move."),
+            pacing("bryansk-pocket-clock", "Pocket clock", "Turns 3-7", "Pocket attrition increases after Bryansk or Orel falls."),
+            pacing("bryansk-roadblock-window", "Roadblock window", "Turns 3-5", "Soviet roadblocks can deny one Orel-Tula exit before German infantry arrives."),
+            pacing("bryansk-friction-window", "Friction window", "Turns 5+", "German exploitation beyond support triggers autumn supply checks."),
+        ],
+        reinforcements: [
+            reinforcement("bryansk-soviet-roadblocks", .player, "Turns 3-4", "Orel-Tula roadblock detachments", "Enter after Orel is threatened or the unexpected axis is revealed.", "Tula road guard"),
+            reinforcement("bryansk-german-infantry", .guderianAI, "Turns 4-5", "German infantry pocket-reduction columns", "Enter after Bryansk is German-controlled or a pocket route is cut.", "Pocket reduction"),
+        ],
+        outcomeBands: [
+            outcome("bryansk-decisive", .decisive, 12...15, "Soviet forces preserve the Tula road and keep pockets fighting long enough to damage Typhoon tempo."),
+            outcome("bryansk-operational", .operational, 8...11, "Bryansk is pressured, but roadblocks and friction slow the southern approach."),
+            outcome("bryansk-marginal", .marginal, 4...7, "Some pocket delay occurs before Orel and Tula-road pressure build."),
+            outcome("bryansk-historical", .historicalPressure, 0...3, "German forces seize Bryansk and Orel with little delay to the Tula axis."),
         ]
     )
 

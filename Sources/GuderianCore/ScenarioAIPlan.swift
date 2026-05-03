@@ -219,6 +219,61 @@ public enum GermanAIPlanCatalog {
                     order("bialystok-pocket-reduction", "Turns 6+", .assault, "Bialystok salient", "Bring infantry armies forward to reduce trapped formations."),
                 ]
             )
+        case .smolensk:
+            return GermanAIPlan(
+                id: .smolensk,
+                postureName: "Dnieper pocket closure",
+                strategicGoal: "Force the Dnieper and Dvina lines, close the Smolensk pocket, and keep supply columns intact against Soviet reserve counterstrokes.",
+                targetPriorities: ["Dnieper crossing line", "Smolensk", "Yartsevo escape lane", "Smolensk pocket"],
+                orders: [
+                    order("smolensk-dnieper-crossing", "Turn 1", .movement, "Dnieper crossing line", "Use 2nd Panzer Group to open the southern bridgehead."),
+                    order("smolensk-northern-pincer", "Turns 1-2", .movement, "Dvina and Vitebsk line", "Coordinate northern pressure before Soviet reserve armies settle."),
+                    order("smolensk-pocket-close", "Turns 3-5", .reinforcement, "Smolensk pocket", "Push panzer markers toward closure while infantry follow-up is still catching up."),
+                    order("smolensk-counterstroke-response", "Turns 4-6", .shooting, "Yelnya counteroffensive", "Suppress reserve counterstrokes that threaten pincer shoulders."),
+                    order("smolensk-yartsevo-cut", "Turns 5+", .assault, "Yartsevo escape lane", "Cut the Moscow-road escape lane and force trapped armies into attrition."),
+                ]
+            )
+        case .roslavlNovozybkov:
+            return GermanAIPlan(
+                id: .roslavlNovozybkov,
+                postureName: "Southward-turn screen",
+                strategicGoal: "Protect 2nd Panzer Group's road columns from Bryansk Front raids while preserving the southward turn toward Kiev.",
+                targetPriorities: ["2nd Panzer supply columns", "Southward-turn screen", "Bryansk Front assembly", "Soviet tank raid point"],
+                orders: [
+                    order("roslavl-screen-roads", "Turn 1", .movement, "Roslavl-Novozybkov road axis", "Screen the road net without revealing every southward-turn priority."),
+                    order("roslavl-protect-columns", "Turns 2-3", .shooting, "Soviet tank raid point", "Suppress tank groups before they can reach supply-column objectives."),
+                    order("roslavl-turn-continues", "Turns 3-5", .movement, "German southward turn route", "Keep the operational turn moving if the supply columns remain intact."),
+                    order("roslavl-counterpressure", "Turns 4-6", .assault, "Bryansk Front assembly", "Commit counterpressure against Soviet groups that overstay on road objectives."),
+                ]
+            )
+        case .kiev:
+            return GermanAIPlan(
+                id: .kiev,
+                postureName: "Northern pincer closure",
+                strategicGoal: "Drive 2nd Panzer Group south to meet 1st Panzer Group, close the Kiev pocket, and prevent Southwestern Front command evacuation.",
+                targetPriorities: ["Eastern closure corridor", "Southwestern Front command", "Kiev pocket", "Kiev rail junctions"],
+                orders: [
+                    order("kiev-northern-pincer", "Turns 1-2", .movement, "Desna approach line", "Move 2nd Panzer Group through the northern approach before Soviet command exits."),
+                    order("kiev-corridor-pressure", "Turns 2-4", .movement, "Eastern closure corridor", "Narrow breakout routes and threaten command evacuation."),
+                    order("kiev-linkup", "Turns 4-5", .reinforcement, "1st Panzer Group southern pincer", "Coordinate the southern link-up marker with Guderian's northern pincer."),
+                    order("kiev-rail-suppression", "Turns 5-6", .shooting, "Kiev rail junctions", "Suppress rail and command nodes after the corridor narrows."),
+                    order("kiev-pocket-reduction", "Turns 6+", .assault, "Kiev pocket", "Bring infantry pressure forward to reduce trapped Soviet formations."),
+                ]
+            )
+        case .bryansk:
+            return GermanAIPlan(
+                id: .bryansk,
+                postureName: "Typhoon southern approach",
+                strategicGoal: "Attack Bryansk and Orel from an unexpected axis, encircle Soviet formations, then open the road toward Tula.",
+                targetPriorities: ["Bryansk", "Orel", "13th and 3rd Army pockets", "Orel-Tula road"],
+                orders: [
+                    order("bryansk-unexpected-axis", "Turn 1", .movement, "Guderian unexpected axis", "Drive armor toward Bryansk and Orel before Soviet roadblocks consolidate."),
+                    order("bryansk-orel-push", "Turns 2-3", .movement, "Orel", "Push through the Orel gateway if the rail junction is suppressed."),
+                    order("bryansk-pocket-close", "Turns 3-5", .reinforcement, "13th and 3rd Army pockets", "Close pocket markers and bring infantry forward for reduction."),
+                    order("bryansk-tula-road", "Turns 5-6", .assault, "Orel-Tula road", "Attack the Tula road screen after Orel is threatened or captured."),
+                    order("bryansk-friction-check", "Turns 6+", .shooting, "Autumn road friction", "Resolve supply strain before further exploitation if armor outruns support."),
+                ]
+            )
         case .moscowTulaKashira:
             return GermanAIPlan(
                 id: .moscowTulaKashira,

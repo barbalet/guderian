@@ -109,6 +109,14 @@ public enum ScenarioSetupCatalog {
             return fallRot
         case .bialystokMinsk:
             return bialystokMinsk
+        case .smolensk:
+            return smolensk
+        case .roslavlNovozybkov:
+            return roslavlNovozybkov
+        case .kiev:
+            return kiev
+        case .bryansk:
+            return bryansk
         case .moscowTulaKashira:
             return moscowTulaKashira
         default:
@@ -380,6 +388,95 @@ public enum ScenarioSetupCatalog {
             trigger("bialystok-boldin-counterattack", "Mechanized counterattack", "Mechanized assets attack a pincer marker on turns 2-4", "Delay one pincer order and open a temporary escape lane, then mark fuel-low."),
             trigger("bialystok-command-preservation", "Command preservation", "A command post reaches Minsk road or rail control", "Score command-survival points and reduce attrition for one turn."),
             trigger("bialystok-breakout-lane", "Breakout lane", "A road or rail objective remains Soviet-controlled at turn end", "Exit one trapped formation or remove one isolation marker."),
+        ]
+    )
+
+    private static let smolensk = ScenarioSetupScript(
+        id: .smolensk,
+        playerBriefing: "Smolensk is not a static city defense. Hold the Dnieper and Dvina crossings long enough to strain German supply, then counterattack pincer shoulders and move trapped armies through the Yartsevo escape lane.",
+        guderianBriefing: "2nd Panzer Group crosses the Dnieper from the south while Hoth's northern pincer presses through Vitebsk. The German plan is to close the pocket quickly, then survive Soviet reserve counterstrokes.",
+        units: [
+            unit("smolensk-16th-army", "Soviet 16th Army Smolensk defense", .player, "Urban pocket anchor", "Holds the city and Moscow road while escape operations organize."),
+            unit("smolensk-19th-army", "Soviet 19th Army escape group", .player, "Breakout force", "Pocketed force that scores by exiting rather than standing in place."),
+            unit("smolensk-20th-army", "Soviet 20th Army escape group", .player, "Breakout force", "Trapped army elements that can move through Yartsevo if the corridor opens."),
+            unit("smolensk-reserve-armies", "Stavka reserve counterattack armies", .player, "Pincer shoulder pressure", "Fresh but uneven forces committed to blunt the German drive."),
+            unit("smolensk-engineers", "Dnieper and Dvina crossing guards", .player, "River delay", "Engineers and infantry contest bridgeheads and force German supply checks."),
+            unit("smolensk-2nd-panzer", "German 2nd Panzer Group", .guderianAI, "Southern pincer", "Guderian's force crossing the Dnieper and pushing toward Smolensk."),
+            unit("smolensk-3rd-panzer", "German 3rd Panzer Group", .guderianAI, "Northern pincer", "Hoth's pincer closing through Vitebsk and the Dvina line."),
+            unit("smolensk-infantry-followup", "German infantry follow-up armies", .guderianAI, "Pocket reduction", "Slower infantry needed to reduce trapped Soviet formations."),
+            unit("smolensk-supply-columns", "German extended supply columns", .guderianAI, "Logistics strain", "Long supply lines vulnerable to delay and counterattack pressure."),
+        ],
+        triggers: [
+            trigger("smolensk-dnieper-delay", "Dnieper crossing delay", "A Soviet crossing guard contests a Dnieper bridgehead at turn end", "Add one German supply-strain marker and delay southern pincer movement."),
+            trigger("smolensk-reserve-counterstroke", "Reserve counterstroke", "Reserve armies attack a pincer shoulder on turns 2-5", "Reopen one escape lane or cancel one pocket-closure order, then mark the reserve disrupted."),
+            trigger("smolensk-yartsevo-escape", "Yartsevo escape lane", "The Yartsevo objective is Soviet-controlled or contested at turn end", "Exit one trapped army element and reduce pocket attrition."),
+            trigger("smolensk-logistics-crisis", "Logistics crisis", "Two German supply-strain markers are active", "German AI must choose between pincer closure and bridgehead reinforcement."),
+        ]
+    )
+
+    private static let roslavlNovozybkov = ScenarioSetupScript(
+        id: .roslavlNovozybkov,
+        playerBriefing: "Bryansk Front is attacking to spoil Guderian's southward turn. Hit columns and crossing points, reveal the German intent screen, then withdraw tanks before the counterpressure turns the raid into another pocket.",
+        guderianBriefing: "2nd Panzer Group screens Roslavl, protects supply columns, and keeps the southward turn moving despite Soviet attacks from the Bryansk Front.",
+        units: [
+            unit("roslavl-bryansk-front", "Bryansk Front rifle attack groups", .player, "Spoiling offensive", "Rifle formations pressing the Roslavl-Novozybkov axis."),
+            unit("roslavl-tank-groups", "Soviet tank groups", .player, "Column raid", "Limited tank assets used to damage German road and supply columns."),
+            unit("roslavl-recon", "Soviet reconnaissance detachments", .player, "Intent reveal", "Can expose whether German forces are screening, counterattacking, or turning south."),
+            unit("roslavl-reserve-control", "Bryansk Front reserve control", .player, "Withdrawal coordination", "Preserves attack groups after disruption objectives are complete."),
+            unit("roslavl-2nd-panzer", "German 2nd Panzer Group road columns", .guderianAI, "Southward movement", "Mobile elements turning away from Smolensk toward Kiev."),
+            unit("roslavl-2nd-army", "German 2nd Army screen", .guderianAI, "Infantry screen", "Infantry pressure protecting roads and pinning Soviet attacks."),
+            unit("roslavl-supply-columns", "German supply and traffic columns", .guderianAI, "Raid target", "Operational targets whose disruption slows the southward turn."),
+            unit("roslavl-counterattack", "German counterpressure group", .guderianAI, "Trap response", "Arrives after Soviet tanks overstay on road objectives."),
+        ],
+        triggers: [
+            trigger("roslavl-intel-reveal", "Intent screen revealed", "Soviet reconnaissance controls the southward-turn screen", "Reveal German route priorities and unlock full raid scoring."),
+            trigger("roslavl-column-raid", "Column raid", "Soviet tanks control or contest a supply-column objective", "Score panzer attrition and slow German southward-turn tempo."),
+            trigger("roslavl-withdrawal-order", "Tank withdrawal order", "A tank group scores a raid objective", "Allow that unit to exit before German counterpressure if a reserve-control marker is open."),
+            trigger("roslavl-counterpressure", "German counterpressure", "German screen and panzer markers both control the road axis", "Close one Soviet withdrawal lane and threaten reserve cohesion."),
+        ]
+    )
+
+    private static let kiev = ScenarioSetupScript(
+        id: .kiev,
+        playerBriefing: "The Kiev battle is a command-evacuation and breakout problem. Delay Guderian's northern pincer, keep the eastern corridor open, and move headquarters and artillery out before the link-up closes.",
+        guderianBriefing: "2nd Panzer Group drives south as the northern pincer while 1st Panzer Group rises from the south. The German plan is to close the eastern corridor, then reduce the Kiev pocket.",
+        units: [
+            unit("kiev-5th-army", "Soviet 5th Army detachments", .player, "Northern delay", "Defends against Guderian's southward pincer."),
+            unit("kiev-37th-army", "Kiev fortified-area defenders", .player, "Urban defense", "Holds Kiev and nearby Dnieper positions while evacuation begins."),
+            unit("kiev-26th-army", "Soviet 26th Army breakout group", .player, "Breakout force", "Attempts to keep the eastern road corridor open."),
+            unit("kiev-command-hq", "Southwestern Front command posts", .player, "Command evacuation", "High-value headquarters and artillery-control assets."),
+            unit("kiev-rail-control", "Kiev rail and road control teams", .player, "Communications", "Keep routes active for evacuation and breakout operations."),
+            unit("kiev-2nd-panzer", "German 2nd Panzer Group", .guderianAI, "Northern pincer", "Guderian's force driving south into the encirclement."),
+            unit("kiev-1st-panzer", "German 1st Panzer Group link-up marker", .guderianAI, "Southern pincer", "Kleist's force rising to meet the northern pincer."),
+            unit("kiev-infantry-reduction", "German infantry pocket-reduction armies", .guderianAI, "Pocket reduction", "Follow-up forces that collapse the pocket after closure."),
+        ],
+        triggers: [
+            trigger("kiev-northern-pincer", "Northern pincer pressure", "2nd Panzer Group reaches the eastern closure corridor", "Narrow one breakout route and escalate command-evacuation scoring."),
+            trigger("kiev-command-evacuation", "Command evacuation", "A command post exits through the eastern corridor", "Score command points and preserve one future breakout order."),
+            trigger("kiev-pincer-linkup", "Pincer link-up", "Northern and southern pincer markers both control closure objectives", "Close the pocket and shift scoring to breakout survival."),
+            trigger("kiev-breakout-operation", "Breakout operation", "Rifle army assets attack a closure marker while the corridor is contested", "Exit one trapped formation or delay pocket attrition."),
+        ]
+    )
+
+    private static let bryansk = ScenarioSetupScript(
+        id: .bryansk,
+        playerBriefing: "Guderian's Typhoon attack arrives from an unexpected direction. Keep Bryansk and the rail junction useful, delay the 13th and 3rd Army pockets from collapsing, and protect the Orel-Tula road as long as possible.",
+        guderianBriefing: "2nd Panzer Group attacks through Bryansk and Orel with speed, trying to encircle Soviet armies and open the southern approach to Tula before autumn friction and Soviet resistance slow the advance.",
+        units: [
+            unit("bryansk-50th-army", "Soviet 50th Army Tula screen", .player, "Road protection", "Defends the route toward Tula and the southern Moscow approach."),
+            unit("bryansk-13th-army", "Soviet 13th Army pocket group", .player, "Pocket survival", "Encircled force that can keep German infantry tied down."),
+            unit("bryansk-3rd-army", "Soviet 3rd Army pocket group", .player, "Pocket survival", "Trapped formation trying to contest exits and delay reduction."),
+            unit("bryansk-rail-command", "Bryansk rail and command teams", .player, "Evacuation control", "Preserves command and supply through the rail junction."),
+            unit("bryansk-roadblocks", "Orel-Tula roadblock detachments", .player, "Tula road guard", "Improvised defenders protecting the road north."),
+            unit("bryansk-2nd-panzer", "German 2nd Panzer Group/Army", .guderianAI, "Typhoon breakthrough", "Guderian's armored force attacking Bryansk and Orel."),
+            unit("bryansk-infantry", "German infantry reduction columns", .guderianAI, "Pocket reduction", "Follow-up infantry used to destroy encircled armies."),
+            unit("bryansk-supply", "German autumn supply columns", .guderianAI, "Logistics strain", "Columns vulnerable when armor outruns rail and infantry support."),
+        ],
+        triggers: [
+            trigger("bryansk-unexpected-axis", "Unexpected axis", "German armor reaches Orel before turn 4", "Reveal the Tula-road danger and reduce Soviet command flexibility."),
+            trigger("bryansk-pocket-delay", "Pocket delay", "A pocket group contests Bryansk or a road exit at turn end", "Delay German infantry reduction and score time bought."),
+            trigger("bryansk-tula-road-guard", "Tula road guard", "The Orel-Tula road remains Soviet-contested", "Prevent German exit scoring and preserve Moscow campaign readiness."),
+            trigger("bryansk-autumn-friction", "Autumn friction", "German armor advances beyond rail or infantry support", "Add a supply-strain marker before further assault orders."),
         ]
     )
 

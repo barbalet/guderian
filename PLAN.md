@@ -14,6 +14,8 @@ Cycle 150 update: cycles 121-150 are complete. Brzesc Litewski now has fortress/
 
 Cycle 180 update: cycles 151-180 are complete. Boulogne now has harbor evacuation, Haute Ville, destroyer support, air pressure, and port demolition data; Calais now has layered perimeter, supply, citadel/docks, costly assault, and Dunkirk-time scoring data; Dunkirk now has explicit Guderian-adjacent command caveats, canal defense, beach evacuation capacity, rear-guard sacrifice, and air-pressure data; Fall Rot now has crossing denial, fortress-town stands, fuel/congestion pressure, Vosges retreat corridors, and Army Group C link-up data; Eastern Front 1941 systems now cover rifle armies, mechanized counterattacks, command posts, pockets, breakout routes, rail junctions, logistics, and winter friction; Bialystok-Minsk now has Bug/Neman crossing pressure, Bialystok/Novogrudok pockets, Minsk road/rail escape, Soviet command preservation, German pincer AI, balance profiles, proxy-loader coverage, and regression tests.
 
+Cycle 210 update: cycles 181-210 are complete. Smolensk now has Dnieper/Dvina crossing delay, Yartsevo escape, reserve counterstroke, German supply-strain, pocket, balance, AI, and proxy-loader data; Roslavl-Novozybkov now has Bryansk Front spoiling-offensive, reconnaissance, supply-column raid, tank-preservation, intelligence-limit, southward-turn, and counterpressure data; Kiev now has northern-pincer pressure, Southwestern Front command evacuation, Dnieper/Desna delay, eastern corridor, pincer link-up, breakout, and pocket-reduction data; Bryansk now has Operation Typhoon surprise-axis, Bryansk/Orel/Tula road protection, 50th/13th/3rd Army pocket survival, rail-command preservation, autumn logistics friction, balance, AI, proxy-loader coverage, and regression tests.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -135,6 +137,8 @@ Status through cycle 120: completed. Scenario data remains Guderian-owned and se
 Status through cycle 150: completed. The Poland 1939 expansion now includes Brzesc Litewski and Kobryn as hand-authored, proxy-loadable scenarios; the France 1940 expansion has reusable campaign-system profiles for Sedan, Stonne, Montcornet, and Amiens-Abbeville; Stonne, Montcornet, and Amiens-Abbeville are now the first non-demo France scenarios with dedicated map/setup/balance/AI data. No `dzw` files were modified.
 
 Status through cycle 180: completed. The Channel-port and Fall Rot block is implemented as Guderian-owned content; Eastern Front systems are in place for the 1941 scenarios; Bialystok-Minsk is the first hand-authored Eastern Front full-campaign scenario beyond the Moscow/Tula demo. All new scenarios remain proxy-loadable through `DZWScenarioLoader`, and no `dzw` files were modified.
+
+Status through cycle 210: completed. The mid-1941 Eastern Front block now covers Smolensk, Roslavl-Novozybkov, Kiev, and Bryansk as Guderian-owned data with maps, setup scripts, AI plans, balance profiles, event logs, system profiles, source-backed campaign metadata, and proxy loader support. All scenarios in cycles 181-210 remain outside `dzw`; the inherited engine is still used only through `DZWScenarioLoader`.
 
 ## Acceptance Criteria
 

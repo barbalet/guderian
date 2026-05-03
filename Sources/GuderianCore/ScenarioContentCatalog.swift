@@ -42,6 +42,10 @@ public enum ScenarioContentCatalog {
         .dunkirk,
         .fallRot,
         .bialystokMinsk,
+        .smolensk,
+        .roslavlNovozybkov,
+        .kiev,
+        .bryansk,
         .moscowTulaKashira,
     ]
 

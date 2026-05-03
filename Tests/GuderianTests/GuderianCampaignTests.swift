@@ -244,6 +244,8 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.amiensAbbeville))
         XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.fallRot))
         XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.bialystokMinsk))
+        XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.smolensk))
+        XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.bryansk))
 
         for id in ScenarioContentCatalog.handAuthoredScenarioIDs {
             let bundle = try XCTUnwrap(ScenarioContentCatalog.bundle(for: id))
@@ -390,7 +392,7 @@ final class GuderianCampaignTests: XCTestCase {
     func testEasternFrontSystemsExposePocketBreakoutAndLogisticsRules() throws {
         XCTAssertEqual(
             EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs,
-            [.bialystokMinsk, .moscowTulaKashira]
+            [.bialystokMinsk, .smolensk, .roslavlNovozybkov, .kiev, .bryansk, .moscowTulaKashira]
         )
 
         for id in EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs {
@@ -408,6 +410,22 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(bialystok.assets.contains { $0.kind == .mechanizedCorps })
         XCTAssertTrue(bialystok.specialRules.contains { $0.name.contains("Double envelopment") })
         XCTAssertTrue(bialystok.specialRules.contains { $0.name.contains("Command preservation") })
+
+        let smolensk = try XCTUnwrap(EasternFrontCampaignSystemCatalog.profile(for: .smolensk))
+        XCTAssertTrue(smolensk.assets.contains { $0.kind == .riverCrossing && $0.name.contains("Dnieper") })
+        XCTAssertTrue(smolensk.specialRules.contains { $0.name.contains("Logistics crisis") })
+
+        let roslavl = try XCTUnwrap(EasternFrontCampaignSystemCatalog.profile(for: .roslavlNovozybkov))
+        XCTAssertTrue(roslavl.assets.contains { $0.name.contains("southward-turn") || $0.name.contains("southward") })
+        XCTAssertTrue(roslavl.specialRules.contains { $0.name.contains("Intelligence") })
+
+        let kiev = try XCTUnwrap(EasternFrontCampaignSystemCatalog.profile(for: .kiev))
+        XCTAssertTrue(kiev.assets.contains { $0.kind == .commandPost })
+        XCTAssertTrue(kiev.specialRules.contains { $0.name.contains("Pincer link-up") })
+
+        let bryansk = try XCTUnwrap(EasternFrontCampaignSystemCatalog.profile(for: .bryansk))
+        XCTAssertTrue(bryansk.assets.contains { $0.name.contains("Tula") })
+        XCTAssertTrue(bryansk.specialRules.contains { $0.name.contains("Unexpected axis") })
     }
 
     func testBialystokMinskIsHandAuthoredAndProxyLoadable() throws {
@@ -428,6 +446,50 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(bundle.aiPlan.orders.contains { $0.id == "bialystok-pocket-close" })
         XCTAssertTrue(bundle.balance.scoreChannels.contains { $0.name.contains("Breakout") })
         XCTAssertTrue(bundle.balance.reinforcements.contains { $0.unitName.contains("Mechanized") && $0.side == .player })
+    }
+
+    func testCycle210EasternFrontScenariosAreHandAuthoredAndProxyLoadable() throws {
+        for id in [GuderianBattleID.smolensk, .roslavlNovozybkov, .kiev, .bryansk] {
+            let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: id))
+            let bundle = ScenarioContentCatalog.bundle(for: scenario)
+            let loadout = try XCTUnwrap(DZWScenarioLoader.load(id, seed: UInt32(19410000 + scenario.order)))
+
+            XCTAssertEqual(scenario.status, .dzwProxyLoadable)
+            XCTAssertEqual(loadout.playerArmyName, "Soviet")
+            XCTAssertEqual(loadout.opponentArmyName, "German")
+            XCTAssertTrue(loadout.adapterNotes.contains { $0.contains("Eastern Front campaign systems") })
+            XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(id))
+            XCTAssertNotNil(EasternFrontCampaignSystemCatalog.profile(for: id))
+            XCTAssertGreaterThanOrEqual(bundle.balance.maxPlayerScore, 9)
+            XCTAssertFalse(bundle.setup.playerUnits.isEmpty)
+            XCTAssertFalse(bundle.setup.guderianUnits.isEmpty)
+            XCTAssertFalse(bundle.aiPlan.orders.isEmpty)
+            XCTAssertFalse(bundle.logEntries.isEmpty)
+        }
+
+        let smolensk = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .smolensk))
+        XCTAssertTrue(smolensk.mapLayout.elements.contains { $0.name.contains("Yartsevo") })
+        XCTAssertTrue(smolensk.setup.playerUnits.contains { $0.name.contains("reserve") })
+        XCTAssertTrue(smolensk.aiPlan.orders.contains { $0.id == "smolensk-pocket-close" })
+        XCTAssertTrue(smolensk.balance.scoreChannels.contains { $0.name.contains("supply strain") })
+
+        let roslavl = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .roslavlNovozybkov))
+        XCTAssertTrue(roslavl.mapLayout.elements.contains { $0.name.contains("Southward") || $0.name.contains("southward") })
+        XCTAssertTrue(roslavl.setup.playerUnits.contains { $0.name.contains("reconnaissance") })
+        XCTAssertTrue(roslavl.aiPlan.orders.contains { $0.id == "roslavl-counterpressure" })
+        XCTAssertTrue(roslavl.balance.scoreChannels.contains { $0.name.contains("Column") })
+
+        let kiev = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .kiev))
+        XCTAssertTrue(kiev.mapLayout.elements.contains { $0.name.contains("command") || $0.name.contains("Command") })
+        XCTAssertTrue(kiev.setup.playerUnits.contains { $0.name.contains("command") || $0.name.contains("Command") })
+        XCTAssertTrue(kiev.aiPlan.orders.contains { $0.id == "kiev-linkup" })
+        XCTAssertTrue(kiev.balance.scoreChannels.contains { $0.name.contains("Command evacuation") })
+
+        let bryansk = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .bryansk))
+        XCTAssertTrue(bryansk.mapLayout.elements.contains { $0.name.contains("Orel") })
+        XCTAssertTrue(bryansk.setup.playerUnits.contains { $0.name.contains("50th Army") })
+        XCTAssertTrue(bryansk.aiPlan.orders.contains { $0.id == "bryansk-pocket-close" })
+        XCTAssertTrue(bryansk.balance.scoreChannels.contains { $0.name.contains("Tula road") })
     }
 
     func testTucholaForestIsFirstFullCampaignPlayableDataSlice() throws {

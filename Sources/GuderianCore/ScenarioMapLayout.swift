@@ -148,6 +148,14 @@ public enum ScenarioMapCatalog {
             return fallRot
         case .bialystokMinsk:
             return bialystokMinsk
+        case .smolensk:
+            return smolensk
+        case .roslavlNovozybkov:
+            return roslavlNovozybkov
+        case .kiev:
+            return kiev
+        case .bryansk:
+            return bryansk
         case .moscowTulaKashira:
             return moscowTulaKashira
         default:
@@ -403,6 +411,92 @@ public enum ScenarioMapCatalog {
         deploymentZones: [
             zone("bialystok-soviet-front", "Soviet Western Front", .player, p(23, 27), 52, 25, "Soviet rifle armies, command posts, and mechanized counterattack groups start in the salient."),
             zone("bialystok-german-pincers", "German pincer approaches", .guderianAI, p(4, 18), 36, 39, "2nd and 3rd Panzer Group pressure closes from south and north."),
+        ]
+    )
+
+    private static let smolensk = ScenarioMapLayout(
+        id: .smolensk,
+        title: "Smolensk Dnieper Pocket",
+        elements: [
+            line("smolensk-dnieper", "Dnieper crossing line", .river, [p(5, 46), p(25, 42), p(47, 39), p(70, 34), p(95, 31)], width: 5, note: "Main southern crossing line for 2nd Panzer Group."),
+            line("smolensk-dvina", "Dvina and Vitebsk line", .river, [p(10, 20), p(31, 22), p(55, 24), p(79, 21), p(99, 18)], width: 4, note: "Northern pressure line for Hoth's pincer."),
+            line("smolensk-moscow-road", "Smolensk-Moscow road", .road, [p(8, 43), p(30, 39), p(52, 35), p(76, 30), p(98, 26)], note: "Main escape and German pursuit route east."),
+            marker("smolensk-city", "Smolensk", .town, .player, p(56, 35), radius: 7, note: "Urban anchor and pocket center."),
+            marker("smolensk-yartsevo", "Yartsevo escape lane", .objective, .player, p(78, 29), radius: 5, note: "Eastern exit for trapped armies."),
+            marker("smolensk-vitebsk", "Vitebsk reserve entry", .town, .player, p(39, 23), radius: 5, note: "Reserve army and northern counterattack axis."),
+            marker("smolensk-yelnya", "Yelnya counteroffensive", .objective, .player, p(65, 47), radius: 5, note: "Counterattack pressure against German overextension."),
+            marker("smolensk-pocket", "Smolensk pocket", .objective, .neutral, p(61, 36), radius: 7, note: "Encirclement zone around Soviet armies."),
+            marker("smolensk-guderian-pincer", "2nd Panzer Group southern pincer", .objective, .guderianAI, p(35, 44), radius: 5, note: "Guderian's Dnieper crossing pressure."),
+            marker("smolensk-hoth-pincer", "3rd Panzer Group northern pincer", .objective, .guderianAI, p(46, 24), radius: 5, note: "Northern pincer coordination pressure."),
+            marker("smolensk-supply-strain", "German supply strain", .airPressure, .guderianAI, p(31, 53), radius: 4, note: "Extended supply lines after the rapid advance."),
+        ],
+        deploymentZones: [
+            zone("smolensk-soviet-pocket", "Soviet Smolensk defense", .player, p(43, 22), 45, 29, "Soviet 16th, 19th, 20th, and reserve army elements defend crossings and escape lanes."),
+            zone("smolensk-german-pincers", "German panzer pincers", .guderianAI, p(7, 25), 36, 29, "2nd and 3rd Panzer Group markers press from south and north."),
+        ]
+    )
+
+    private static let roslavlNovozybkov = ScenarioMapLayout(
+        id: .roslavlNovozybkov,
+        title: "Roslavl-Novozybkov Spoiling Offensive",
+        elements: [
+            line("roslavl-desna", "Desna and Sozh crossing net", .river, [p(8, 43), p(29, 40), p(52, 37), p(74, 34), p(97, 31)], width: 4, note: "River and bridge net shaping the spoiling attack."),
+            line("roslavl-road-axis", "Roslavl-Novozybkov road axis", .road, [p(6, 51), p(28, 45), p(49, 39), p(71, 33), p(96, 26)], note: "Soviet attack and withdrawal route."),
+            line("roslavl-south-turn", "German southward turn route", .road, [p(39, 28), p(51, 39), p(64, 50), p(78, 60)], width: 2, note: "Operational hinge toward Kiev."),
+            marker("roslavl-town", "Roslavl", .town, .neutral, p(42, 39), radius: 6, note: "Western objective and German traffic node."),
+            marker("novozybkov", "Novozybkov", .town, .player, p(78, 30), radius: 6, note: "Eastern anchor for Bryansk Front pressure."),
+            marker("roslavl-bryansk-front", "Bryansk Front assembly", .objective, .player, p(66, 46), radius: 5, note: "Soviet attack staging area."),
+            marker("roslavl-tank-raid", "Soviet tank raid point", .objective, .player, p(51, 35), radius: 4, note: "Spoiling attack target against German columns."),
+            marker("roslavl-supply-column", "2nd Panzer supply columns", .objective, .guderianAI, p(45, 30), radius: 5, note: "Disruption target and German protection point."),
+            marker("roslavl-intel-screen", "Southward-turn screen", .airPressure, .guderianAI, p(59, 52), radius: 4, note: "Fog-of-war marker hiding German intent."),
+            marker("roslavl-counterpressure", "German counterpressure", .objective, .guderianAI, p(28, 45), radius: 4, note: "Counterattack threat against Soviet withdrawal lanes."),
+        ],
+        deploymentZones: [
+            zone("roslavl-soviet-attack", "Bryansk Front attack groups", .player, p(56, 30), 33, 25, "Soviet rifle, tank, and reconnaissance groups attack from the east and southeast."),
+            zone("roslavl-german-turn", "2nd Panzer Group road columns", .guderianAI, p(22, 25), 35, 29, "German columns screen Roslavl and the southward turn."),
+        ]
+    )
+
+    private static let kiev = ScenarioMapLayout(
+        id: .kiev,
+        title: "Kiev Northern Pincer",
+        elements: [
+            line("kiev-dnieper", "Dnieper defensive arc", .river, [p(9, 48), p(29, 43), p(51, 36), p(73, 31), p(96, 28)], width: 6, note: "Main river and Kiev defensive line."),
+            line("kiev-desna", "Desna approach line", .river, [p(6, 28), p(27, 30), p(48, 32), p(71, 35), p(93, 39)], width: 4, note: "Northern pincer crossing and delay terrain."),
+            line("kiev-escape-road", "Kiev eastern escape corridor", .road, [p(34, 39), p(54, 36), p(74, 35), p(94, 37)], note: "Command evacuation and breakout corridor."),
+            marker("kiev-city", "Kiev", .town, .player, p(34, 40), radius: 7, note: "Southwestern Front urban and command anchor."),
+            marker("kiev-command", "Southwestern Front command", .objective, .player, p(43, 33), radius: 5, note: "High-value evacuation objective."),
+            marker("kiev-lokhvytsia", "Eastern closure corridor", .objective, .neutral, p(78, 35), radius: 6, note: "Pincer closure and breakout route."),
+            marker("kiev-pocket", "Kiev pocket", .objective, .neutral, p(58, 39), radius: 8, note: "Encirclement pressure zone."),
+            marker("kiev-rail", "Kiev rail junctions", .artillery, .player, p(48, 44), radius: 4, note: "Command and evacuation communications."),
+            marker("kiev-guderian", "2nd Panzer Group northern pincer", .objective, .guderianAI, p(46, 25), radius: 5, note: "Guderian's southward pincer."),
+            marker("kiev-kleist", "1st Panzer Group southern pincer", .objective, .guderianAI, p(63, 51), radius: 5, note: "Southern closure pressure."),
+        ],
+        deploymentZones: [
+            zone("kiev-southwestern-front", "Soviet Southwestern Front", .player, p(30, 31), 48, 22, "Soviet armies, headquarters, artillery, and breakout groups start inside the developing pocket."),
+            zone("kiev-panzer-pincers", "German pincer approaches", .guderianAI, p(39, 19), 35, 39, "2nd Panzer Group presses from the north while 1st Panzer Group closes from the south."),
+        ]
+    )
+
+    private static let bryansk = ScenarioMapLayout(
+        id: .bryansk,
+        title: "Bryansk-Orel Typhoon Approach",
+        elements: [
+            line("bryansk-orel-road", "Bryansk-Orel road", .road, [p(7, 43), p(29, 40), p(51, 36), p(74, 30), p(96, 24)], note: "Unexpected German axis and Operation Typhoon route."),
+            line("bryansk-tula-road", "Orel-Tula road", .road, [p(73, 30), p(82, 22), p(92, 14)], width: 2, note: "Southern Moscow approach that must be protected."),
+            line("bryansk-desna", "Desna and forest river line", .river, [p(6, 29), p(27, 32), p(49, 34), p(72, 33), p(96, 36)], width: 4, note: "Wet defensive terrain around Bryansk."),
+            line("bryansk-forest", "Bryansk forest belt", .forest, [p(18, 19), p(39, 22), p(60, 20), p(82, 25)], width: 8, note: "Cover for delaying detachments and pocket breakouts."),
+            marker("bryansk-city", "Bryansk", .town, .player, p(43, 37), radius: 7, note: "Rail and road hub under encirclement pressure."),
+            marker("orel", "Orel", .town, .neutral, p(74, 30), radius: 6, note: "Gateway toward Tula."),
+            marker("bryansk-pocket", "13th and 3rd Army pockets", .objective, .player, p(50, 34), radius: 7, note: "Encircled Soviet formations trying to remain active."),
+            marker("bryansk-50th-army", "50th Army Tula screen", .fortifiedLine, .player, p(70, 22), radius: 5, note: "Defense protecting the road north toward Tula."),
+            marker("bryansk-rail", "Bryansk rail junction", .artillery, .player, p(46, 42), radius: 4, note: "Command and evacuation node."),
+            marker("bryansk-guderian-axis", "Guderian unexpected axis", .objective, .guderianAI, p(23, 41), radius: 5, note: "German armored entry and surprise direction."),
+            marker("bryansk-autumn-friction", "Autumn road friction", .airPressure, .guderianAI, p(62, 47), radius: 4, note: "Supply and road-friction marker for overextended armor."),
+        ],
+        deploymentZones: [
+            zone("bryansk-front-defense", "Soviet Bryansk Front", .player, p(38, 23), 45, 25, "50th, 13th, and 3rd Army detachments defend pockets, roads, and rail exits."),
+            zone("bryansk-panzer-army", "2nd Panzer Group/Army approach", .guderianAI, p(4, 34), 31, 20, "German armor enters from the west and drives toward Bryansk, Orel, and Tula."),
         ]
     )
 
