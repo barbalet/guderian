@@ -38,7 +38,7 @@ The game should avoid celebratory framing. Guderian was a senior Nazi German com
 
 | Order | Date | Battle / Operation | Guderian Command | Opposing Force For Player | Result | Scenario Design Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 1-5 Sep 1939 | [Battle of Tuchola Forest](https://en.wikipedia.org/wiki/Battle_of_Tuchola_Forest) | XIX Panzer Corps under 4th Army | Polish Pomeranian Army elements in the Polish Corridor | German victory | Forest/corridor breakout. Player delays armor with infantry, cavalry, roadblocks, limited anti-tank assets, and withdrawal objectives. |
+| 1 | 1-5 Sep 1939 | [Battle of Tuchola Forest](https://en.wikipedia.org/wiki/Battle_of_Tuchola_Forest) | XIX Panzer Corps under 4th Army | Polish Pomeranian Army elements in the Polish Corridor | German victory | First full-campaign expansion scenario. Player blocks Brda crossings, disrupts Chojnice-Tuchola pursuit, uses Krojanty cavalry screening, and withdraws assets toward Bydgoszcz before encirclement. |
 | 2 | 7-10 Sep 1939 | [Battle of Wizna](https://en.wikipedia.org/wiki/Battle_of_Wizna) | XIX Panzer Corps; Guderian listed with Ferdinand Schaal | Polish fortified line under Wladyslaw Raginis and Stanislaw Brykalski | German victory | Compact tutorial battle. Player holds bunkers, anti-tank guns, and machine-gun positions against overwhelming German armor and artillery. |
 | 3 | 14-17 Sep 1939 | [Battle of Brzesc Litewski](https://en.wikipedia.org/wiki/Battle_of_Brze%C5%9B%C4%87_Litewski) | XIX Panzer Corps, including 10th Panzer, 3rd Panzer, and 20th Infantry Division | Polish Brzesc defense group under Konstanty Plisowski | German victory | Fortress/urban delay. Player uses old FT-17 tanks, armored trains, artillery, and fallback routes to slow mechanized assault. |
 | 4 | 14-18 Sep 1939 | [Battle of Kobryn](https://en.wikipedia.org/wiki/Battle_of_Kobry%C5%84) | XIX Panzer Corps, primarily 2nd Motorized Infantry Division | Polish Operational Group Polesie / 60th Reserve Infantry Division under Adam Epler | Inconclusive | Rearguard battle. Player scores by preserving force cohesion, blocking routes, and escaping before encirclement. |
@@ -73,6 +73,8 @@ Cycle 60 update: campaign progress, briefing workspace, map renderer, custom Wiz
 
 Cycle 90 update: Sedan and Moscow/Tula balance profiles, reinforcement timing, scoring/debrief bands, filtered operation logs, Moscow winter setup data, and expanded demo regression tests are in place.
 
+Cycle 120 update: packaging/demo hardening, the Xcode macOS project, public-domain icon provenance, content bundle catalog, chronological/standalone progression modes, reusable Polish 1939 campaign systems, and the hand-authored Tuchola Forest playable data slice are in place.
+
 ## Run
 
 Build and test from the repository root:
@@ -88,9 +90,11 @@ Run the initial Guderian scenario workspace:
 swift run GuderianApp
 ```
 
+Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme.
+
 ## App Identity
 
-Use an image of Heinz Guderian's face as the app icon only if a suitable public-domain or permissively licensed source image is selected and recorded. The icon should not make the game celebratory; it should read as historical subject identification.
+The app icon uses a face-focused crop of the public-domain Wikimedia Commons portrait documented in `Resources/AppIconSource/README.md`. The crop is intentionally limited to historical subject identification.
 
 ## Contact
 

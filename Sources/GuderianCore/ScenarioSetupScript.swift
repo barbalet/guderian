@@ -83,6 +83,8 @@ public struct ScenarioSetupScript: Identifiable, Codable, Hashable, Sendable {
 public enum ScenarioSetupCatalog {
     public static func setup(for scenario: GuderianScenario) -> ScenarioSetupScript {
         switch scenario.id {
+        case .tucholaForest:
+            return tucholaForest
         case .wizna:
             return wizna
         case .sedan:
@@ -93,6 +95,31 @@ public enum ScenarioSetupCatalog {
             return generic(for: scenario)
         }
     }
+
+    private static let tucholaForest = ScenarioSetupScript(
+        id: .tucholaForest,
+        playerBriefing: "Delay XIX Panzer Corps at the Brda crossings and forest roads, then turn the defense into a disciplined withdrawal toward Bydgoszcz before the German pincer seals the corridor.",
+        guderianBriefing: "The German plan drives armor through the forest road net, repairs blocked bridges, uses motorized infantry to fix Polish strongpoints, and converts delay into encirclement once the pincer pressure appears.",
+        units: [
+            unit("tuchola-9th-infantry", "Polish 9th Infantry Division bridge guards", .player, "Brda crossing defense", "Holds Pruszcz and Pila-Mlyn long enough for demolition teams to work."),
+            unit("tuchola-27th-infantry", "Polish 27th Infantry Division counterattack group", .player, "Piecemeal counterattack", "Can hit the Brda bridgehead but suffers command friction if committed too late."),
+            unit("tuchola-czersk-group", "Czersk Operational Group detachments", .player, "Forest road defense", "Defends Chojnice and Tuchola road hubs before withdrawal."),
+            unit("tuchola-cavalry", "Pomeranian Cavalry Brigade screen", .player, "Reconnaissance disruption", "Covers withdrawal around Krojanty and can cancel a German pursuit order."),
+            unit("tuchola-at-guns", "Polish anti-tank gun sections", .player, "Forest choke fire lanes", "Scarce guns that threaten panzers moving through marked road chokepoints."),
+            unit("tuchola-demolition-parties", "Brda bridge demolition parties", .player, "Crossing denial", "Convert early bridge defense into German engineer delay."),
+            unit("tuchola-3rd-panzer", "German 3rd Panzer Division spearhead", .guderianAI, "Armored breakthrough", "Primary armored pressure along forest roads and bridge approaches."),
+            unit("tuchola-motorized-divisions", "German 2nd and 20th Motorized Divisions", .guderianAI, "Infantry pursuit", "Fixes Polish road hubs and supports panzer bridgehead expansion."),
+            unit("tuchola-engineers", "German bridge engineers", .guderianAI, "Bridge repair", "Reopens blocked Brda crossings after demolition or artillery pressure."),
+            unit("tuchola-pincer", "German pincer pressure from East Prussia", .guderianAI, "Encirclement clock", "Operational pressure marker that forces Polish withdrawal decisions."),
+        ],
+        triggers: [
+            trigger("tuchola-first-contact", "Border contact", "German turn 1 reaches a Brda or Chojnice approach", "Reveal bridge demolition and forest choke objectives."),
+            trigger("tuchola-brda-demolition", "Brda bridge demolition", "Polish demolition parties hold Pruszcz or Pila-Mlyn at turn end", "Block that crossing and delay German panzer movement until engineers act."),
+            trigger("tuchola-krojanty-screen", "Krojanty cavalry screen", "Pomeranian Cavalry Brigade is committed on turns 2-3", "Cancel one German reconnaissance or pursuit order, then require cavalry withdrawal."),
+            trigger("tuchola-pincer-arrival", "Pincer arrival", "German AI controls a bridgehead and the East Prussia marker is active", "Shift scoring emphasis from road defense to Bydgoszcz withdrawal."),
+            trigger("tuchola-withdrawal-window", "Bydgoszcz withdrawal window", "Turns 4-7", "Score surviving infantry, cavalry screen, command, and anti-tank units that exit east."),
+        ]
+    )
 
     private static let wizna = ScenarioSetupScript(
         id: .wizna,

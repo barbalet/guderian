@@ -17,6 +17,7 @@ struct GuderianCampaignView: View {
     private let scenarios = GuderianCampaignCatalog.all.sorted { $0.order < $1.order }
     @State private var selectedID: GuderianBattleID? = GuderianCampaignCatalog.demoIDs.first
     @State private var progress = CampaignProgress()
+    @State private var playMode: CampaignPlayMode = .chronological
 
     private var selectedScenario: GuderianScenario {
         scenarios.first { $0.id == selectedID } ?? scenarios[0]
@@ -29,16 +30,23 @@ struct GuderianCampaignView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("\(progress.completedCount) of \(scenarios.count) complete")
                             .font(.headline)
-                        Text("Demo focus: Wizna, Sedan, Moscow southern approach")
+                        Text("\(progress.availableScenarios(in: playMode, catalog: scenarios).count) available | \(playMode.rawValue)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
+
+                    Picker("Play mode", selection: $playMode) {
+                        Text(CampaignPlayMode.chronological.rawValue).tag(CampaignPlayMode.chronological)
+                        Text(CampaignPlayMode.standalone.rawValue).tag(CampaignPlayMode.standalone)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityLabel("Campaign play mode")
                 }
 
                 Section("Scenarios") {
                     ForEach(scenarios) { scenario in
-                        ScenarioRow(scenario: scenario, progress: progress)
+                        ScenarioRow(scenario: scenario, progress: progress, playMode: playMode)
                             .tag(scenario.id)
                     }
                 }
@@ -48,7 +56,16 @@ struct GuderianCampaignView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Button {
-                            progress.markCompleted(selectedScenario.id)
+                            let balance = ScenarioContentCatalog.bundle(for: selectedScenario).balance
+                            progress.recordCompletion(
+                                CampaignCompletionRecord(
+                                    scenarioID: selectedScenario.id,
+                                    score: balance.maxPlayerScore,
+                                    victoryBand: .operational,
+                                    completedTurn: balance.targetTurns.upperBound,
+                                    note: "Marked complete from the campaign workspace."
+                                )
+                            )
                         } label: {
                             Label("Complete", systemImage: "checkmark.circle")
                         }
@@ -68,7 +85,7 @@ struct GuderianCampaignView: View {
                     .background(.bar)
             }
         } detail: {
-            ScenarioBriefingView(scenario: selectedScenario, progress: progress)
+            ScenarioBriefingView(scenario: selectedScenario, progress: progress, playMode: playMode)
         }
     }
 }
@@ -76,6 +93,7 @@ struct GuderianCampaignView: View {
 struct ScenarioRow: View {
     let scenario: GuderianScenario
     let progress: CampaignProgress
+    let playMode: CampaignPlayMode
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -107,7 +125,7 @@ struct ScenarioRow: View {
         if progress.isCompleted(scenario.id) {
             return "checkmark.circle.fill"
         }
-        if progress.isAvailable(scenario) {
+        if progress.isAvailable(scenario, in: playMode) {
             return "circle.dashed"
         }
         return "lock"
@@ -117,7 +135,7 @@ struct ScenarioRow: View {
         if progress.isCompleted(scenario.id) {
             return .green
         }
-        if progress.isAvailable(scenario) {
+        if progress.isAvailable(scenario, in: playMode) {
             return .accentColor
         }
         return .secondary
@@ -138,30 +156,39 @@ struct RendererStatusView: View {
 struct ScenarioBriefingView: View {
     let scenario: GuderianScenario
     let progress: CampaignProgress
+    let playMode: CampaignPlayMode
     @State private var logCategory: ScenarioLogCategory? = nil
 
     var loadout: DZWScenarioLoadout? {
         DZWScenarioLoader.load(scenario.id)
     }
 
+    var content: ScenarioContentBundle {
+        ScenarioContentCatalog.bundle(for: scenario)
+    }
+
     var layout: ScenarioMapLayout {
-        ScenarioMapCatalog.layout(for: scenario)
+        content.mapLayout
     }
 
     var aiPlan: GermanAIPlan {
-        GermanAIPlanCatalog.plan(for: scenario)
+        content.aiPlan
     }
 
     var setup: ScenarioSetupScript {
-        ScenarioSetupCatalog.setup(for: scenario)
+        content.setup
     }
 
     var balance: ScenarioBalanceProfile {
-        ScenarioBalanceCatalog.profile(for: scenario)
+        content.balance
     }
 
     var logEntries: [ScenarioLogEntry] {
-        ScenarioEventLogCatalog.entries(for: scenario)
+        content.logEntries
+    }
+
+    var polishProfile: PolishScenarioSystemProfile? {
+        PolishCampaignSystemCatalog.profile(for: scenario)
     }
 
     var filteredLogEntries: [ScenarioLogEntry] {
@@ -182,6 +209,7 @@ struct ScenarioBriefingView: View {
                 briefingSection("Guderian Command", scenario.guderianCommand, icon: "bolt.horizontal")
                 briefingSection("Design Intent", scenario.designIntent, icon: "scope")
                 forceOrder
+                polishSystemView
                 objectives
                 balanceView
                 reinforcementsView
@@ -218,6 +246,7 @@ struct ScenarioBriefingView: View {
             Label(scenario.status.rawValue, systemImage: "checklist")
             Label(scenario.playerPosture.rawValue, systemImage: "person.crop.square")
             Label(progress.isCompleted(scenario.id) ? "Complete" : "Open", systemImage: progress.isCompleted(scenario.id) ? "checkmark.circle" : "circle")
+            Label(progress.isAvailable(scenario, in: playMode) ? "Available" : "Locked", systemImage: progress.isAvailable(scenario, in: playMode) ? "lock.open" : "lock")
             if scenario.isDemoScenario {
                 Label("Demo", systemImage: "flag.checkered")
             }
@@ -260,6 +289,58 @@ struct ScenarioBriefingView: View {
                     .padding(10)
                     .background(Color(nsColor: .textBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var polishSystemView: some View {
+        if let polishProfile {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Polish Campaign Systems", systemImage: "shield.righthalf.filled")
+                    .font(.headline)
+                Text(polishProfile.operationalProblem)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Text(polishProfile.playerDoctrine)
+                    .font(.callout)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 10)], alignment: .leading, spacing: 10) {
+                    ForEach(polishProfile.assets) { asset in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label(asset.kind.rawValue, systemImage: "shield")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.blue)
+                            Text(asset.name)
+                                .font(.body.weight(.medium))
+                            Text(asset.battlefieldRole)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(asset.limitation)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(10)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+
+                ForEach(polishProfile.specialRules) { rule in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(rule.name)
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 140, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(rule.trigger)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(rule.effect)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }

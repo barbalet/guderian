@@ -209,4 +209,102 @@ final class GuderianCampaignTests: XCTestCase {
         progress.reset()
         XCTAssertEqual(progress.completedCount, 0)
     }
+
+    func testCampaignProgressSupportsChronologicalAndStandaloneModes() throws {
+        var progress = CampaignProgress()
+        let tuchola = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let brzesc = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .brzescLitewski))
+
+        XCTAssertTrue(progress.isAvailable(tuchola, in: .chronological))
+        XCTAssertFalse(progress.isAvailable(brzesc, in: .chronological))
+        XCTAssertEqual(progress.availableScenarios(in: .standalone).count, GuderianCampaignCatalog.all.count)
+
+        let record = CampaignCompletionRecord(
+            scenarioID: .tucholaForest,
+            score: 10,
+            victoryBand: .operational,
+            completedTurn: 7,
+            note: "Bridges blocked and withdrawal opened."
+        )
+        progress.recordCompletion(record)
+        progress.markCompleted(.wizna)
+
+        XCTAssertEqual(progress.completionRecord(for: .tucholaForest), record)
+        XCTAssertTrue(progress.isAvailable(brzesc, in: .chronological))
+
+        let snapshot = progress.snapshot(mode: .chronological)
+        XCTAssertEqual(snapshot.nextScenarioID, .brzescLitewski)
+        XCTAssertTrue(snapshot.availableScenarioIDs.contains(.brzescLitewski))
+        XCTAssertEqual(snapshot.completedRecords, [record])
+    }
+
+    func testScenarioContentBundlesCollectHandAuthoredData() throws {
+        XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.tucholaForest))
+
+        for id in ScenarioContentCatalog.handAuthoredScenarioIDs {
+            let bundle = try XCTUnwrap(ScenarioContentCatalog.bundle(for: id))
+
+            XCTAssertEqual(bundle.id, id)
+            XCTAssertEqual(bundle.scenario.id, id)
+            XCTAssertEqual(bundle.mapLayout.id, id)
+            XCTAssertEqual(bundle.setup.id, id)
+            XCTAssertEqual(bundle.aiPlan.id, id)
+            XCTAssertEqual(bundle.balance.id, id)
+            XCTAssertFalse(bundle.logEntries.isEmpty)
+        }
+    }
+
+    func testPolishCampaignSystemsExposeReusableEarlyWarAssets() throws {
+        XCTAssertEqual(
+            PolishCampaignSystemCatalog.polishScenarioIDs,
+            [.tucholaForest, .wizna, .brzescLitewski, .kobryn]
+        )
+
+        for id in PolishCampaignSystemCatalog.polishScenarioIDs {
+            let profile = try XCTUnwrap(PolishCampaignSystemCatalog.profile(for: id))
+
+            XCTAssertEqual(profile.id, id)
+            XCTAssertFalse(profile.assets.isEmpty)
+            XCTAssertFalse(profile.specialRules.isEmpty)
+            XCTAssertFalse(profile.operationalProblem.isEmpty)
+            XCTAssertFalse(profile.playerDoctrine.isEmpty)
+        }
+
+        let tuchola = try XCTUnwrap(PolishCampaignSystemCatalog.profile(for: .tucholaForest))
+        XCTAssertTrue(tuchola.assets.contains { $0.kind == .cavalryBrigade && $0.name.contains("Pomeranian") })
+        XCTAssertTrue(tuchola.assets.contains { $0.kind == .demolitionTeam && $0.name.contains("Brda") })
+        XCTAssertTrue(tuchola.assets.contains { $0.kind == .withdrawalRoute && $0.name.contains("Bydgoszcz") })
+        XCTAssertTrue(tuchola.assets.contains { $0.kind == .commandFriction })
+        XCTAssertTrue(tuchola.specialRules.contains { $0.name.contains("Krojanty") })
+    }
+
+    func testTucholaForestIsFirstFullCampaignPlayableDataSlice() throws {
+        let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let bundle = ScenarioContentCatalog.bundle(for: scenario)
+        let loadout = try XCTUnwrap(DZWScenarioLoader.load(.tucholaForest, seed: 19390901))
+
+        XCTAssertEqual(scenario.status, .dzwProxyLoadable)
+        XCTAssertGreaterThanOrEqual(scenario.sourceLinks.count, 3)
+        XCTAssertEqual(loadout.playerArmyName, "British")
+        XCTAssertEqual(loadout.opponentArmyName, "German")
+        XCTAssertTrue(loadout.adapterNotes.contains { $0.contains("Polish campaign systems") })
+
+        XCTAssertTrue(bundle.mapLayout.elements.contains { $0.kind == .river && $0.name.contains("Brda") })
+        XCTAssertTrue(bundle.mapLayout.elements.contains { $0.kind == .forest && $0.name.contains("Tuchola") })
+        XCTAssertTrue(bundle.mapLayout.elements.contains { $0.name.contains("Chojnice") })
+        XCTAssertTrue(bundle.mapLayout.elements.contains { $0.name.contains("Krojanty") })
+        XCTAssertTrue(bundle.mapLayout.elements.contains { $0.name.contains("Bydgoszcz") })
+
+        XCTAssertTrue(bundle.setup.playerUnits.contains { $0.name.contains("9th Infantry") })
+        XCTAssertTrue(bundle.setup.playerUnits.contains { $0.name.contains("Cavalry") })
+        XCTAssertTrue(bundle.setup.playerUnits.contains { $0.name.contains("demolition") })
+        XCTAssertTrue(bundle.setup.guderianUnits.contains { $0.name.contains("engineers") })
+        XCTAssertTrue(bundle.setup.triggers.contains { $0.name.contains("Pincer") })
+
+        XCTAssertTrue(bundle.aiPlan.orders.contains { $0.id == "tuchola-pincer" })
+        XCTAssertTrue(bundle.balance.scoreChannels.contains { $0.name.contains("Brda") })
+        XCTAssertTrue(bundle.balance.scoreChannels.contains { $0.name.contains("Withdraw") })
+        XCTAssertTrue(bundle.balance.reinforcements.contains { $0.unitName.contains("27th Infantry") && $0.side == .player })
+        XCTAssertTrue(bundle.balance.reinforcements.contains { $0.unitName.contains("pincer") && $0.side == .guderianAI })
+    }
 }

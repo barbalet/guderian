@@ -49,6 +49,20 @@ public struct GermanAIPlan: Identifiable, Codable, Hashable, Sendable {
 public enum GermanAIPlanCatalog {
     public static func plan(for scenario: GuderianScenario) -> GermanAIPlan {
         switch scenario.id {
+        case .tucholaForest:
+            return GermanAIPlan(
+                id: .tucholaForest,
+                postureName: "Corridor pincer breakthrough",
+                strategicGoal: "Force the Brda crossings, clear the Chojnice-Tuchola road net, and trap Polish formations before they can withdraw toward Bydgoszcz.",
+                targetPriorities: ["Pruszcz bridge", "Pila-Mlyn bridge", "Chojnice", "Tuchola", "Bydgoszcz withdrawal"],
+                orders: [
+                    order("tuchola-border-contact", "Turn 1", .movement, "Chojnice and Brda approaches", "Push reconnaissance and panzer elements to contact without bypassing active Polish anti-tank lanes."),
+                    order("tuchola-bridge-repair", "Turns 2-3", .reinforcement, "Pruszcz and Pila-Mlyn bridges", "Commit engineers to reopen demolished or blocked crossings."),
+                    order("tuchola-road-hubs", "Turns 2-4", .shooting, "Chojnice-Tuchola road net", "Use motorized infantry to fix Polish strongpoints before armor attempts a deep move."),
+                    order("tuchola-pincer", "Turns 3-5", .movement, "East Prussia pincer marker", "Apply northern/eastern pressure once the Brda bridgehead exists."),
+                    order("tuchola-encirclement", "Turns 5+", .assault, "Bydgoszcz withdrawal", "Attack withdrawal lanes and isolated Polish groups after the pincer alarm triggers."),
+                ]
+            )
         case .wizna:
             return GermanAIPlan(
                 id: .wizna,

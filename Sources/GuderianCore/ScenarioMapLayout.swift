@@ -122,6 +122,8 @@ public struct ScenarioMapLayout: Identifiable, Codable, Hashable, Sendable {
 public enum ScenarioMapCatalog {
     public static func layout(for scenario: GuderianScenario) -> ScenarioMapLayout {
         switch scenario.id {
+        case .tucholaForest:
+            return tucholaForest
         case .wizna:
             return wizna
         case .sedan:
@@ -132,6 +134,29 @@ public enum ScenarioMapCatalog {
             return fallback(for: scenario)
         }
     }
+
+    private static let tucholaForest = ScenarioMapLayout(
+        id: .tucholaForest,
+        title: "Tuchola Forest Corridor",
+        elements: [
+            line("tuchola-corridor-road", "Chojnice-Tuchola-Bydgoszcz road", .road, [p(6, 28), p(21, 31), p(39, 34), p(61, 42), p(93, 54)], note: "Main withdrawal and pursuit route through the corridor."),
+            line("tuchola-rail", "Chojnice rail line", .road, [p(2, 18), p(19, 24), p(42, 29), p(72, 31), p(99, 36)], width: 2, note: "Rail corridor and early Chojnice pressure axis."),
+            line("tuchola-brda", "Brda River", .river, [p(8, 43), p(27, 39), p(47, 37), p(72, 45), p(99, 49)], width: 5, note: "Bridge obstacle and demolition line."),
+            line("tuchola-forest-belt", "Tuchola forest belt", .forest, [p(13, 14), p(32, 20), p(55, 18), p(80, 25), p(94, 33)], width: 9, note: "Dense forest funnels armor onto the road net."),
+            marker("tuchola-chojnice", "Chojnice", .town, .player, p(18, 25), radius: 5, note: "Rail and road hub where German motorized pressure opens."),
+            marker("tuchola-town", "Tuchola", .town, .player, p(43, 33), radius: 5, note: "Infantry strongpoint and midgame delay objective."),
+            marker("tuchola-pruszcz-bridge", "Pruszcz bridge", .bridge, .neutral, p(32, 38), radius: 3, note: "Early bridge fight over the Brda."),
+            marker("tuchola-pila-mlyn", "Pila-Mlyn bridge", .bridge, .neutral, p(49, 37), radius: 3, note: "Demolition site and secondary crossing."),
+            marker("tuchola-krojanty", "Krojanty screen", .objective, .player, p(24, 18), radius: 4, note: "Cavalry screen disrupts pursuit, then must withdraw."),
+            marker("tuchola-bydgoszcz", "Bydgoszcz withdrawal", .objective, .player, p(88, 54), radius: 5, note: "Exit lane for coherent Polish formations."),
+            marker("tuchola-german-pincer", "East Prussia pincer", .airPressure, .guderianAI, p(73, 18), radius: 5, note: "Operational pressure that converts the battle from delay to withdrawal."),
+            marker("tuchola-panzer-entry", "XIX Corps spearhead", .objective, .guderianAI, p(7, 35), radius: 4, note: "German armored entry pressure from Western Pomerania."),
+        ],
+        deploymentZones: [
+            zone("tuchola-polish-corridor", "Pomeranian Army corridor defense", .player, p(16, 20), 44, 29, "Polish infantry, anti-tank guns, demolition teams, and cavalry screens start around the forest road net."),
+            zone("tuchola-german-assembly", "German pincer assembly", .guderianAI, p(0, 11), 30, 36, "XIX Panzer Corps pushes from the west while pincer pressure appears from the north and east."),
+        ]
+    )
 
     private static let wizna = ScenarioMapLayout(
         id: .wizna,

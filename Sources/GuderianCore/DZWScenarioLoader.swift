@@ -84,8 +84,8 @@ public enum DZWScenarioLoader {
                 opponentArmy: TE_ARMY_GERMAN,
                 opponentForceIndex: 0,
                 notes: [
-                    "Uses the inherited British roster as a temporary Allied infantry proxy until Polish 1939 data is added.",
-                    "The scenario remains historically identified by GuderianCore metadata while dzw supplies the playable rules skeleton.",
+                    "Uses the inherited British roster as a temporary Allied infantry proxy until a Polish 1939 C roster is added.",
+                    "Polish campaign systems, scenario identity, and historical objectives are owned by GuderianCore while dzw supplies the playable rules skeleton.",
                 ]
             )
         }

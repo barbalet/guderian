@@ -8,6 +8,8 @@ Cycle 60 update: cycles 31-60 are complete. The app now has campaign progress co
 
 Cycle 90 update: cycles 61-90 are complete. Sedan now has explicit score channels, pacing caps, reinforcement timing, and debrief bands; Moscow/Tula has winter road friction, Tula defensive-belt data, Soviet reserve armor, anti-tank guns, mobile winter reserves, German supply/exhaustion pressure, and balance tuning; the app briefing adds score/debrief sections, reinforcement summaries, and a filtered operation log; tests now cover all three demo scenario proxy loads, scoring, AI plans, reinforcements, and event-log categories.
 
+Cycle 120 update: cycles 91-120 are complete. Packaging and demo hardening now include the Xcode macOS project, shared scheme, public-domain icon source ledger, README run guidance, and successful SwiftPM/Xcode build paths; the full-campaign expansion now has a content bundle facade, chronological/standalone campaign progression modes with completion records, reusable Polish 1939 system profiles, and a hand-authored Tuchola Forest data slice covering Brda crossings, Chojnice/Tuchola road hubs, Krojanty cavalry screening, Bydgoszcz withdrawal, German pincer pressure, balance, reinforcements, AI orders, operation-log entries, and regression coverage.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -87,6 +89,8 @@ Status through cycle 60: completed. No `dzw` files were modified; cycles 31-60 a
 
 Status through cycle 90: completed. No `dzw` files were modified; cycles 61-90 remain data/UI/test work in the root package, with the inherited engine still used only through the proxy loader.
 
+Status through cycle 100: completed. The Xcode macOS project, shared scheme, app icon asset catalog, public-domain portrait source ledger, and README run guidance are in place; demo build/test checks pass through SwiftPM and Xcode without editing `dzw`.
+
 ## Cycles 101-250: Complete Campaign
 
 | Cycles | Focus | Output |
@@ -121,6 +125,8 @@ Status through cycle 90: completed. No `dzw` files were modified; cycles 61-90 r
 | 236-240 | Regression suite | Add full-campaign scenario loading tests, snapshot tests, scoring tests, AI-turn tests, and smoke tests for every battle. |
 | 241-245 | Release polish | Finalize icon, credits, accessibility, performance, save/load, campaign completion screen, and documentation. |
 | 246-250 | Full campaign ship | Run full build/test/review cycle, fix release blockers, tag complete campaign milestone, and update README/PLAN status. |
+
+Status through cycle 120: completed. Scenario data remains Guderian-owned and separate from inherited `dzw` fixtures through `ScenarioContentCatalog`; chronological and standalone progression paths are available; Polish campaign system profiles now cover Tuchola Forest, Wizna, Brzesc Litewski, and Kobryn; Tuchola Forest is the first hand-authored full-campaign scenario beyond the demo set and is loadable through the existing proxy adapter while waiting for a native Polish C roster.
 
 ## Acceptance Criteria
 

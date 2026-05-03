@@ -136,6 +136,8 @@ public struct ScenarioBalanceProfile: Identifiable, Codable, Hashable, Sendable 
 public enum ScenarioBalanceCatalog {
     public static func profile(for scenario: GuderianScenario) -> ScenarioBalanceProfile {
         switch scenario.id {
+        case .tucholaForest:
+            return tucholaForest
         case .wizna:
             return wizna
         case .sedan:
@@ -146,6 +148,39 @@ public enum ScenarioBalanceCatalog {
             return generic(for: scenario)
         }
     }
+
+    private static let tucholaForest = ScenarioBalanceProfile(
+        id: .tucholaForest,
+        targetTurns: 6...8,
+        balanceIntent: "Make the first full-campaign battle a mobile-delay puzzle: the player should feel the German breakthrough forming, but still score by demolishing bridges, disrupting pursuit, and withdrawing coherent forces.",
+        playerWinCondition: "Delay the Brda crossing through the early game and exit at least three Polish assets through the Bydgoszcz withdrawal route before the pincer closes.",
+        germanPressureLimit: "German pincer pressure should not close both the bridgehead and withdrawal lane before the player has had at least three turns to choose between counterattack and withdrawal.",
+        scoreChannels: [
+            score("tuchola-brda-delay", "Brda crossing delay", .player, 4, "Turns 1-3", "Award points for blocked, demolished, or contested Pruszcz and Pila-Mlyn crossings."),
+            score("tuchola-road-net", "Chojnice-Tuchola road net", .player, 3, "Turns 2-5", "Award if at least one forest road hub remains contested through the midgame."),
+            score("tuchola-withdrawal", "Withdraw Pomeranian Army elements", .player, 5, "Turns 4-8", "Award for exiting infantry, cavalry screen, command, and anti-tank assets toward Bydgoszcz."),
+            score("tuchola-krojanty-screen", "Krojanty screen disruption", .player, 2, "Turns 2-3", "Award if cavalry cancels or delays a German reconnaissance or pursuit order."),
+            score("tuchola-german-corridor", "German corridor breakthrough", .guderianAI, 7, "Scenario end", "German score for clearing the Brda line and blocking the Bydgoszcz withdrawal route."),
+        ],
+        pacingRules: [
+            pacing("tuchola-opening-contact", "Opening contact cap", "Turn 1", "German armor may reach bridge approaches but cannot both repair a crossing and score exit pressure in the same turn."),
+            pacing("tuchola-demolition-window", "Demolition window", "Turns 1-2", "Polish demolition parties must get a meaningful chance to block at least one Brda crossing."),
+            pacing("tuchola-counterattack-choice", "Counterattack choice", "Turns 2-4", "The 27th Infantry Division can counterattack the bridgehead, but committing it delays withdrawal scoring."),
+            pacing("tuchola-pincer-pressure", "Pincer pressure", "Turns 3-6", "East Prussia pressure grows only after a bridgehead is open or a road hub falls."),
+            pacing("tuchola-exit-race", "Exit race", "Turns 4-8", "German pursuit focuses on withdrawal lanes while Polish scoring shifts to preservation."),
+        ],
+        reinforcements: [
+            reinforcement("tuchola-polish-27th", .player, "Turns 2-3", "27th Infantry Division counterattack group", "Enter if a Brda bridgehead is German-controlled or contested.", "Limited counterattack"),
+            reinforcement("tuchola-german-engineers", .guderianAI, "Turns 2-3", "German bridge engineers", "Enter when a Brda crossing is blocked or demolished.", "Bridge repair"),
+            reinforcement("tuchola-german-pincer", .guderianAI, "Turns 3-5", "East Prussia pincer pressure", "Enter once German forces hold a Brda bridgehead or Chojnice road hub.", "Encirclement clock"),
+        ],
+        outcomeBands: [
+            outcome("tuchola-decisive", .decisive, 12...14, "The Polish defense turns the corridor fight into a disciplined escape with bridges blocked and key assets withdrawn."),
+            outcome("tuchola-operational", .operational, 8...11, "The Brda line and cavalry screen buy time, though German pressure still breaks the corridor."),
+            outcome("tuchola-tactical", .tactical, 4...7, "Some local delay is achieved, but too many formations are caught before Bydgoszcz."),
+            outcome("tuchola-historical", .historicalPressure, 0...3, "German tempo tracks the historical corridor breakthrough and Polish formations are badly disorganized."),
+        ]
+    )
 
     private static let wizna = ScenarioBalanceProfile(
         id: .wizna,
