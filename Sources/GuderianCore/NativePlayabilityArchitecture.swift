@@ -4,6 +4,7 @@ public enum NativePlayabilityStatus: String, Codable, Hashable, Sendable {
     case architectureReady = "Architecture ready"
     case nativeInstanceMissing = "Native instance missing"
     case nativeLoaderMissing = "Native loader missing"
+    case nativeBoardHookMissing = "Native board hook missing"
     case nativePlayable = "Native playable"
 }
 
@@ -170,14 +171,13 @@ public enum NativePlayabilityArchitectureCatalog {
             }
         }.count
 
-        let instance = NativeBattleInstanceCatalog.instance(for: scenario)
-        let blueprint = instance.engineBlueprint(seed: UInt32(80_000 + scenario.order))
+        let loadout = NativeScenarioLoader.load(scenario, seed: UInt32(80_000 + scenario.order))
         let requiredHookIDs = architecture.requiredEngineHooks.map(\.id)
         var notes = [
-            blueprint.isCompleteForScenarioLoader
-                ? "Native battle instance model and engine blueprint are present."
-                : "Authored scenario data is present but the native battle instance model is incomplete.",
-            "Current executable gameplay still uses DZWScenarioLoader proxy force presets until the scenario-instance loader hook is implemented.",
+            loadout.canCreateSkirmishBridge
+                ? "Native loader creates an army-list skirmish bridge and deploys units from the Guderian blueprint."
+                : "Authored scenario data is present but the native loader cannot create a skirmish bridge.",
+            "The remaining guarded engine hook is scenario-defined terrain, objectives, mission target score, and event triggers.",
         ]
         if scenario.isDemoScenario {
             notes.append("Demo parity target: cycle \(architecture.demoPlayableTargetCycle).")
@@ -186,7 +186,7 @@ public enum NativePlayabilityArchitectureCatalog {
         return NativeBattleReadinessReport(
             id: scenario.id,
             title: scenario.title,
-            status: blueprint.isCompleteForScenarioLoader ? .nativeLoaderMissing : .nativeInstanceMissing,
+            status: loadout.canCreateSkirmishBridge ? .nativeBoardHookMissing : .nativeLoaderMissing,
             authoredUnitCount: bundle.setup.units.count,
             authoredObjectiveCount: scenario.objectives.count,
             authoredTerrainElementCount: terrainCount,

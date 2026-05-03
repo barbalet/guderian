@@ -708,7 +708,7 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(architecture.requiredEngineHooks.allSatisfy { $0.owner == .dzwEngine })
     }
 
-    func testCycle270EveryBattleHasNativeReadinessInputsAndBlueprintButStillNeedsLoader() throws {
+    func testCycle280EveryBattleHasNativeLoaderButStillNeedsBoardHook() throws {
         let reports = NativePlayabilityArchitectureCatalog.allReadinessReports
         let orderedIDs = GuderianCampaignCatalog.all
             .sorted { $0.order < $1.order }
@@ -719,10 +719,10 @@ final class GuderianCampaignTests: XCTestCase {
 
         for report in reports {
             XCTAssertTrue(report.hasMinimumAuthoredInputs, "\(report.title): \(report.summary)")
-            XCTAssertEqual(report.status, .nativeLoaderMissing)
+            XCTAssertEqual(report.status, .nativeBoardHookMissing)
             XCTAssertTrue(report.requiredHookIDs.contains("scenario-instance-loader"))
-            XCTAssertTrue(report.notes.contains { $0.contains("Native battle instance model") })
-            XCTAssertTrue(report.notes.contains { $0.contains("DZWScenarioLoader") })
+            XCTAssertTrue(report.notes.contains { $0.contains("skirmish bridge") })
+            XCTAssertTrue(report.notes.contains { $0.contains("remaining guarded engine hook") })
         }
 
         let demoReports = reports.filter { GuderianCampaignCatalog.demoIDs.contains($0.id) }
@@ -789,6 +789,46 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(moscow.victory.targetTurns.upperBound >= 7)
     }
 
+    func testCycle280NativeScenarioLoaderCreatesSkirmishBridgeForEveryBattle() throws {
+        XCTAssertEqual(NativeScenarioLoader.cycleRange, 271...280)
+
+        for scenario in GuderianCampaignCatalog.all {
+            let loadout = NativeScenarioLoader.load(scenario, seed: UInt32(100_000 + scenario.order))
+            let loadedGame = try XCTUnwrap(loadout.makeGame(), "\(scenario.title) should create a native-loader skirmish bridge")
+
+            XCTAssertEqual(loadout.scenario.id, scenario.id)
+            XCTAssertFalse(loadout.usesForcePresetProxy)
+            XCTAssertEqual(loadout.gameCreationMode, .nativeBlueprintSkirmishBridge)
+            XCTAssertTrue(loadout.canCreateSkirmishBridge, scenario.title)
+            XCTAssertFalse(loadout.playerEntries.isEmpty, "\(scenario.title) needs player army-list entries")
+            XCTAssertFalse(loadout.opponentEntries.isEmpty, "\(scenario.title) needs opponent army-list entries")
+            XCTAssertTrue(loadout.playerEntries.allSatisfy { $0.count > 0 })
+            XCTAssertTrue(loadout.opponentEntries.allSatisfy { $0.count > 0 })
+            XCTAssertTrue(loadout.warnings.contains { $0.id.contains("board-hook") })
+
+            XCTAssertGreaterThan(Int(game_unit_count(loadedGame.handle)), 0)
+            XCTAssertGreaterThan(Int(game_objective_count(loadedGame.handle)), 0)
+            XCTAssertGreaterThan(loadedGame.deploymentReport.attempted, 0, "\(scenario.title) should attempt scenario deployments")
+            XCTAssertTrue(loadedGame.deploymentReport.placedAnyScenarioUnit, "\(scenario.title) should place at least one native blueprint unit")
+        }
+    }
+
+    func testCycle280DemoNativeLoaderUsesScenarioBlueprintPositions() throws {
+        for id in GuderianCampaignCatalog.demoIDs {
+            let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: id))
+            let loadout = NativeScenarioLoader.load(scenario, seed: UInt32(110_000 + scenario.order))
+            let loadedGame = try XCTUnwrap(loadout.makeGame())
+            let firstPlayerSpawn = try XCTUnwrap(loadout.blueprint.units.first { $0.side == .player })
+            let playerUnit = try XCTUnwrap((0..<Int(game_unit_count(loadedGame.handle))).lazy
+                .map { game_unit_view(loadedGame.handle, Int32($0)) }
+                .first { $0.owner == TE_PLAYER_ONE && !$0.embarked })
+
+            XCTAssertLessThanOrEqual(abs(Double(playerUnit.x) - firstPlayerSpawn.x), 8.5, scenario.title)
+            XCTAssertLessThanOrEqual(abs(Double(playerUnit.y) - firstPlayerSpawn.y), 8.5, scenario.title)
+            XCTAssertNotEqual(game_mission_view(loadedGame.handle).target_score, Int32(loadout.blueprint.missionTargetScore), "The guarded board/mission C hook should still be visible as pending.")
+        }
+    }
+
     func testGuderianTestAutomationRunsEveryBattleAndSurfacesDiagnostics() throws {
         let report = CampaignAutomationRunner.runCampaign()
         let orderedIDs = GuderianCampaignCatalog.all
@@ -806,8 +846,10 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertGreaterThan(battle.engineUnitCount, 0, "\(battle.title) should load engine units")
             XCTAssertGreaterThan(battle.engineObjectiveCount, 0, "\(battle.title) should load engine objectives")
             XCTAssertFalse(battle.steps.isEmpty, "\(battle.title) should expose an automation timeline")
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native Loader" })
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native Playability" })
             XCTAssertTrue(battle.issues.contains { $0.stage == "Native Playability" && $0.kind == .warning })
+            XCTAssertTrue(battle.issues.contains { $0.stage == "Native Loader" && $0.kind == .warning })
             XCTAssertFalse(battle.playerArmy.isEmpty)
             XCTAssertFalse(battle.opponentArmy.isEmpty)
         }

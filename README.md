@@ -91,6 +91,8 @@ Cycle 260 update: native playability architecture is now in place. Guderian owns
 
 Cycle 270 update: every battle now converts into a native Guderian battle instance with units, weapon roles, deployment zones, terrain, objectives, reinforcements, event triggers, AI profiles, victory data, and an engine-blueprint payload. The remaining blocker is the guarded native loader that turns those blueprints into executable board games.
 
+Cycle 280 update: the native scenario loader now builds custom dzw army-list skirmishes from Guderian battle blueprints and deploys units to scenario-derived positions, so automation no longer depends on fixed force presets. The remaining blocker is the guarded scenario board/mission hook for custom terrain, objectives, mission target score, and scripted events.
+
 ## Run
 
 Build and test from the repository root:
@@ -110,7 +112,7 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 
 ## Ship Status
 
-The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 270 completes native battle-instance modeling for all battles; executable battles still run through the proxy loader until the cycle 271-300 native demo work adds the guarded scenario loader and board flow.
+The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 280 completes the native scenario-loader bridge for all battles; executable battles now use scenario-derived army-list skirmishes and deployment positions, while custom terrain/objectives/missions still wait on the guarded board hook and board flow.
 
 ## App Identity
 

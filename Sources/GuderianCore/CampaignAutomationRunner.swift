@@ -173,34 +173,39 @@ public enum CampaignAutomationRunner {
             }
         }
 
-        guard let loadout = DZWScenarioLoader.load(scenario.id, seed: seed(for: scenario)) else {
-            accumulator.issue(.blocker, "Engine Load", "Missing dzw loadout", "No dzw force mapping exists for \(scenario.title).")
-            accumulator.step("Engine Load", .blocked, "Loadout unavailable", "The battle cannot create a gameplay proxy.")
-            return accumulator.finalize(loadout: nil, game: nil)
-        }
-
+        let loadout = NativeScenarioLoader.load(scenario, seed: seed(for: scenario))
         accumulator.step(
-            "Engine Load",
+            "Native Loader",
             .passed,
-            "Mapped proxy forces",
-            "\(loadout.playerArmyName) force \(loadout.playerForceIndex) vs \(loadout.opponentArmyName) force \(loadout.opponentForceIndex)."
+            "Built scenario skirmish bridge",
+            "\(loadout.playerArmyName) \(loadout.playerEntries.map { "\($0.catalogName) x\($0.count)" }.joined(separator: ", ")) vs \(loadout.opponentArmyName) \(loadout.opponentEntries.map { "\($0.catalogName) x\($0.count)" }.joined(separator: ", "))."
         )
-        for note in loadout.adapterNotes {
-            accumulator.step("Adapter Note", .passed, "Proxy mapping", note)
+        for warning in loadout.warnings {
+            accumulator.issue(.warning, "Native Loader", warning.title, warning.detail)
+            accumulator.step("Native Loader", .warning, warning.title, warning.detail)
         }
 
-        guard let game = loadout.makeGame() else {
-            accumulator.issue(.blocker, "Engine Load", "dzw game allocation failed", "game_create_demo_with_forces returned nil for \(scenario.title).")
-            accumulator.step("Engine Load", .blocked, "Game creation failed", "No engine instance was returned.")
-            return accumulator.finalize(loadout: loadout, game: nil)
+        guard let loadedGame = loadout.makeGame() else {
+            accumulator.issue(.blocker, "Native Loader", "dzw skirmish allocation failed", "game_create_skirmish returned nil for \(scenario.title).")
+            accumulator.step("Native Loader", .blocked, "Game creation failed", "No engine instance was returned.")
+            return accumulator.finalize(loadout: loadout.summary, game: nil)
         }
-        defer { game_destroy(game) }
+        let game = loadedGame.handle
+        accumulator.step(
+            "Native Loader",
+            loadedGame.deploymentReport.placedAnyScenarioUnit ? .passed : .warning,
+            "Applied scenario deployments",
+            "\(loadedGame.deploymentReport.succeeded)/\(loadedGame.deploymentReport.attempted) skirmish units placed from native blueprint."
+        )
+        for note in loadedGame.deploymentReport.notes {
+            accumulator.step("Native Loader", .warning, "Deployment note", note)
+        }
 
         validateScenarioData(scenario, accumulator: &accumulator)
         validateEngineState(game, scenario: scenario, accumulator: &accumulator)
         playEngineBattle(game, scenario: scenario, accumulator: &accumulator, options: options)
 
-        let report = accumulator.finalize(loadout: loadout, game: game)
+        let report = accumulator.finalize(loadout: loadout.summary, game: game)
         if report.status == .passed || (report.status == .warning && options.completeWarningRuns) {
             let balance = ScenarioBalanceCatalog.profile(for: scenario)
             progress.recordCompletion(
@@ -670,7 +675,7 @@ private struct AutomationAccumulator {
         )
     }
 
-    func finalize(loadout: DZWScenarioLoadout?, game: OpaquePointer?) -> CampaignAutomationBattleReport {
+    func finalize(loadout: AutomationLoadoutSummary?, game: OpaquePointer?) -> CampaignAutomationBattleReport {
         let gameView = game.map { game_view($0) }
         let mission = game.map { game_mission_view($0) }
         let status: CampaignAutomationStatus
@@ -745,6 +750,20 @@ private struct AutomationAccumulator {
             }
             return String(cString: line)
         }
+    }
+}
+
+private struct AutomationLoadoutSummary {
+    let playerArmyName: String
+    let opponentArmyName: String
+}
+
+private extension NativeScenarioLoadout {
+    var summary: AutomationLoadoutSummary {
+        AutomationLoadoutSummary(
+            playerArmyName: playerArmyName,
+            opponentArmyName: opponentArmyName
+        )
     }
 }
 
