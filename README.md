@@ -64,6 +64,8 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 
 - Cycles 1-100: playable demo, centered on a fortified-delay tutorial plus two famous command-scope scenarios: Sedan/Meuse and Moscow/Tula.
 - Cycles 101-250: complete campaign, expanding to every battle listed above and shipping all scenarios as playable, tested, historically annotated missions.
+- Cycles 251-300: native playable demo, replacing proxy forces/maps with real Guderian battle instances for Wizna, Sedan, and Moscow/Tula/Kashira.
+- Cycles 301-400: native full campaign, converting all 19 battles to scenario-specific units, terrain, actions, AI pressure, scoring, and debriefs.
 
 Cycle 0 update: initial repository review, `dzw` engine review, and Wikipedia battle-scope research completed on 2026-05-03.
 
@@ -85,6 +87,10 @@ Cycle 240 update: Mtsensk is now a hand-authored, proxy-loadable armored ambush 
 
 Cycle 250 update: the complete campaign milestone is in place. Release polish now includes versioned campaign save/load state, a full-campaign completion summary, ship-readiness reporting, credits, accessibility and performance audit data, final regression coverage, and verified SwiftPM/Xcode build paths while `dzw` remains untouched.
 
+Cycle 260 update: native playability architecture is now in place. Guderian owns the scenario-instance data, campaign flow, board shell, and full-campaign automation; `dzw` remains the guarded rules engine for turns, movement, combat, objectives, and snapshots. The demo target is cycle 300, and the full native campaign target is cycle 400.
+
+Cycle 270 update: every battle now converts into a native Guderian battle instance with units, weapon roles, deployment zones, terrain, objectives, reinforcements, event triggers, AI profiles, victory data, and an engine-blueprint payload. The remaining blocker is the guarded native loader that turns those blueprints into executable board games.
+
 ## Run
 
 Build and test from the repository root:
@@ -104,7 +110,7 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 
 ## Ship Status
 
-The cycle 250 full-campaign target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks.
+The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 270 completes native battle-instance modeling for all battles; executable battles still run through the proxy loader until the cycle 271-300 native demo work adds the guarded scenario loader and board flow.
 
 ## App Identity
 

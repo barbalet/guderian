@@ -20,6 +20,10 @@ Cycle 240 update: cycles 211-240 are complete. Mtsensk now has Katukov-style arm
 
 Cycle 250 update: cycles 241-250 are complete. Release polish now includes a versioned campaign save envelope, app-level save/load controls, a full-campaign completion summary, ship-readiness reporting, credits, accessibility audit items, performance budgets, release checklist data, final documentation, and regression coverage for the completed campaign. The full-campaign ship pass now verifies all 19 scenarios as hand-authored, historically annotated, balance-audited, AI-snapshotted, and proxy-loadable without editing `dzw`.
 
+Cycle 260 update: cycles 251-260 are complete. Native playability architecture now defines the boundary between reused `dzw` rules and Guderian-owned scenario instances, records the guarded `HEINZ_GUDERIAN_GAME` engine hooks needed for scenario-defined boards/missions, and adds readiness diagnostics showing every battle has authored inputs but still needs a native scenario-instance loader before it qualifies as playable.
+
+Cycle 270 update: cycles 261-270 are complete. Guderian now has a native battle instance model for all 19 battles, including unit mobility/weapon roles, deployment zones, terrain, objectives, reinforcements, event triggers, AI profiles, victory profiles, and deterministic engine-blueprint conversion. Readiness has advanced from "native instance missing" to "native loader missing": the data payloads exist, but the guarded engine scenario loader is still the next block.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -148,6 +152,37 @@ Status through cycle 240: completed. The final 1941 scope block now covers Mtsen
 
 Status through cycle 250: completed. The complete campaign milestone is reached. Save/load, credits, accessibility, performance, completion summary, release checklist, ship-readiness report, final docs, SwiftPM tests, SwiftPM build, and Xcode project build are part of the release gate; no `dzw` files were modified.
 
+## Native Playability Gap
+
+Cycle 250 completed the historical campaign shell: every scenario is hand-authored, annotated, balance-audited, AI-snapshotted, and proxy-loadable through the inherited `dzw` demo rules. It did not yet make Guderian a full playable battlefield game at the same level as DerZweiteWeltkrieg.
+
+The remaining milestone is native Guderian playability: each campaign battle must launch into an interactive board with scenario-specific units, deployment zones, terrain, objectives, victory logic, reinforcements, event triggers, AI behavior, battle logs, and debriefs. The current `DZWScenarioLoader` is useful as a rules bridge, but it still maps Guderian scenarios onto inherited dzw force presets and the shared bocage-style proxy battlefield. That proxy must be replaced or extended with Guderian-owned scenario instances.
+
+## Cycles 251-400: Native Playable Guderian
+
+| Cycles | Focus | Output |
+| --- | --- | --- |
+| 251-260 | Playability architecture | Decide the boundary between reused dzw engine rules and Guderian-specific scenario instancing; define guarded `HEINZ_GUDERIAN_GAME` hooks only where the C engine needs scenario-defined boards, rosters, or missions. |
+| 261-270 | Battle instance model | Add Guderian-owned playable unit, weapon, transport, terrain, objective, deployment, event, and reinforcement data models that can be converted into engine-ready battle instances. |
+| 271-280 | Engine scenario loader | Replace force-preset proxy loading with a native loader that creates a dzw game from Guderian scenario data: map zones, objectives, unit rosters, starting positions, mission score, and scripted triggers. |
+| 281-290 | Board shell | Build a Guderian board view equivalent to DerZweiteWeltkrieg's playable board: unit selection, movement, range/target inspection, objective control, phase controls, action errors, pending choices, and log display. |
+| 291-300 | Demo parity battles | Make Wizna, Sedan, and Moscow/Tula/Kashira playable from campaign row to board, through turns, scoring, debrief, and completion records without using generic proxy maps or generic proxy forces. |
+| 301-310 | GuderianTest upgrade | Move `GuderianTest` from metadata/proxy diagnostics to real board diagnostics: launch every battle instance, execute legal board actions, flag blocked phases, invalid targets, impossible reinforcements, and unwinnable gates. |
+| 311-325 | Poland native pack | Implement native Polish 1939 units, terrain, objectives, and battlefields for Tuchola Forest, Wizna, Brzesc Litewski, and Kobryn, including withdrawal and fortress/urban rules. |
+| 326-345 | France native pack | Implement native France 1940 units and battlefields for Sedan, Stonne, Montcornet, Amiens-Abbeville, Boulogne, Calais, Dunkirk, and Fall Rot, including river crossings, heavy tanks, evacuation, siege, and air-pressure systems. |
+| 346-370 | Eastern Front native pack | Implement native 1941 Soviet/German units and battlefields for Bialystok-Minsk, Smolensk, Roslavl-Novozybkov, Kiev, Bryansk, Mtsensk, and Moscow/Tula/Kashira, including pockets, breakout lanes, T-34/KV shock, logistics, and winter friction. |
+| 371-380 | AI and event pass | Add battle-specific German AI priorities, fallback behavior, reinforcement timing, event triggers, and deterministic AI snapshots that operate on real board state rather than metadata. |
+| 381-390 | Balance and UX pass | Tune every battle for playable pacing, agency, victory bands, readable unit density, accessible controls, save/load continuity, and clear failure/debrief reporting. |
+| 391-400 | Native campaign ship | Run full SwiftPM/Xcode builds, full GuderianTest campaign automation, manual smoke passes, docs updates, and release-blocker fixes; tag the milestone where all 19 battles are playable as real Guderian battlefields. |
+
+Native playable demo target: cycle 300. At that point the three demo battles should be playable like DerZweiteWeltkrieg, but the rest of the campaign may still be in conversion.
+
+Native full-campaign target: cycle 400. At that point all 19 campaign battles should launch into real Guderian battlefields with scenario-specific units, terrain, actions, AI pressure, scoring, and debriefs.
+
+Status through cycle 260: completed. The native playability boundary is now represented in code and tests; `GuderianTest` surfaces a native-playability warning for each battle while it still runs the inherited proxy loader. No `dzw` files were modified. The next implementation block is cycles 261-270: Guderian-owned playable battle instance models.
+
+Status through cycle 270: completed. Every campaign battle converts from the authored scenario bundle into a native Guderian battle instance and an engine-ready blueprint with scenario-specific units, terrain, objectives, events, AI, and victory data. No `dzw` files were modified. The next implementation block is cycles 271-280: the guarded scenario-defined game creation hook that consumes these blueprints instead of proxy force presets.
+
 ## Acceptance Criteria
 
 - `dzw` remains cleanly updatable because Guderian-specific engine hooks are guarded or externalized.
@@ -155,3 +190,4 @@ Status through cycle 250: completed. The complete campaign milestone is reached.
 - The full campaign ships with every battle in the README chronology playable.
 - Every battle has source links, scenario notes, force data, objectives, balance status, and test coverage.
 - The app clearly frames the player as opposing Guderian and treats the historical subject with sober context.
+- "Playable" means a real Guderian battle instance on a board with scenario-specific units, terrain, objectives, legal actions, scoring, AI pressure, and debriefs; proxy-loadable metadata alone no longer satisfies the playable milestone.

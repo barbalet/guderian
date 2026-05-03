@@ -680,6 +680,139 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(report.buildCommands.contains { $0.contains("xcodebuild") })
     }
 
+    func testCycle260NativePlayabilityArchitectureDefinesGuardedDZWBoundary() throws {
+        let architecture = NativePlayabilityArchitectureCatalog.architecture
+
+        XCTAssertEqual(architecture.cycleRange, 251...260)
+        XCTAssertEqual(architecture.guardMacro, "HEINZ_GUDERIAN_GAME")
+        XCTAssertEqual(architecture.guardMacro, NativePlayabilityArchitectureCatalog.guardMacro)
+        XCTAssertEqual(architecture.demoPlayableTargetCycle, 300)
+        XCTAssertEqual(architecture.fullCampaignPlayableTargetCycle, 400)
+        XCTAssertFalse(architecture.dzwEditsRequiredDuringArchitectureCycle)
+
+        let reusedIDs = Set(architecture.reusedEngineSystems.map(\.id))
+        XCTAssertTrue(reusedIDs.isSuperset(of: ["turn-phases", "movement-rules", "combat-rules", "objective-scoring", "snapshots"]))
+        XCTAssertTrue(architecture.reusedEngineSystems.allSatisfy { $0.owner == .dzwEngine })
+
+        let guderianOwnedIDs = Set(architecture.guderianOwnedSystems.map(\.id))
+        XCTAssertTrue(guderianOwnedIDs.isSuperset(of: ["scenario-instance-data", "historical-campaign-flow", "battle-board-ui", "campaign-automation"]))
+        XCTAssertTrue(architecture.guderianOwnedSystems.contains { $0.owner == .guderianCore })
+        XCTAssertTrue(architecture.guderianOwnedSystems.contains { $0.owner == .guderianApp })
+        XCTAssertTrue(architecture.guderianOwnedSystems.contains { $0.owner == .guderianTest })
+
+        let hooks = Dictionary(uniqueKeysWithValues: architecture.requiredEngineHooks.map { ($0.id, $0) })
+        XCTAssertEqual(Set(hooks.keys), ["scenario-instance-loader", "scenario-mission-state", "scenario-event-triggers", "scenario-ai-controls"])
+        XCTAssertEqual(hooks["scenario-instance-loader"]?.firstNeededCycles, 271...280)
+        XCTAssertEqual(hooks["scenario-mission-state"]?.firstNeededCycles, 271...300)
+        XCTAssertTrue(architecture.requiredEngineHooks.allSatisfy { $0.guardMacro == "HEINZ_GUDERIAN_GAME" })
+        XCTAssertTrue(architecture.requiredEngineHooks.allSatisfy { $0.owner == .dzwEngine })
+    }
+
+    func testCycle270EveryBattleHasNativeReadinessInputsAndBlueprintButStillNeedsLoader() throws {
+        let reports = NativePlayabilityArchitectureCatalog.allReadinessReports
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(reports.map(\.id), orderedIDs)
+        XCTAssertEqual(reports.count, GuderianCampaignCatalog.all.count)
+
+        for report in reports {
+            XCTAssertTrue(report.hasMinimumAuthoredInputs, "\(report.title): \(report.summary)")
+            XCTAssertEqual(report.status, .nativeLoaderMissing)
+            XCTAssertTrue(report.requiredHookIDs.contains("scenario-instance-loader"))
+            XCTAssertTrue(report.notes.contains { $0.contains("Native battle instance model") })
+            XCTAssertTrue(report.notes.contains { $0.contains("DZWScenarioLoader") })
+        }
+
+        let demoReports = reports.filter { GuderianCampaignCatalog.demoIDs.contains($0.id) }
+        XCTAssertEqual(demoReports.count, GuderianCampaignCatalog.demoIDs.count)
+        XCTAssertTrue(demoReports.allSatisfy { $0.notes.contains { $0.contains("cycle 300") } })
+    }
+
+    func testCycle270NativeBattleInstancesConvertEveryScenarioIntoEngineBlueprints() throws {
+        XCTAssertEqual(NativeBattleInstanceCatalog.modelCycleRange, 261...270)
+
+        let instances = NativeBattleInstanceCatalog.allInstances
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(instances.map(\.id), orderedIDs)
+        XCTAssertEqual(instances.count, GuderianCampaignCatalog.all.count)
+
+        for instance in instances {
+            let bundle = try XCTUnwrap(ScenarioContentCatalog.bundle(for: instance.id))
+            let deploymentZoneIDs = Set(instance.deploymentZones.map(\.id))
+            let blueprint = instance.engineBlueprint(seed: UInt32(90_000 + instance.order))
+
+            XCTAssertTrue(instance.isModeledForNativeGameplay, instance.title)
+            XCTAssertTrue(instance.requiresNativeScenarioLoader)
+            XCTAssertEqual(instance.units.count, bundle.setup.units.count)
+            XCTAssertEqual(instance.terrain.count, bundle.mapLayout.elements.count)
+            XCTAssertEqual(instance.objectives.count, bundle.scenario.objectives.count)
+            XCTAssertEqual(instance.reinforcements.count, bundle.balance.reinforcements.count)
+            XCTAssertGreaterThanOrEqual(instance.events.count, bundle.setup.triggers.count + bundle.balance.reinforcements.count + bundle.balance.pacingRules.count)
+            XCTAssertTrue(instance.units.allSatisfy { deploymentZoneIDs.contains($0.deploymentZoneID) })
+            XCTAssertTrue(instance.units.allSatisfy { !$0.weapons.isEmpty })
+            XCTAssertTrue(instance.objectives.allSatisfy { $0.position.x >= 0 && $0.position.x <= instance.frame.width })
+            XCTAssertTrue(instance.objectives.allSatisfy { $0.position.y >= 0 && $0.position.y <= instance.frame.height })
+
+            XCTAssertTrue(blueprint.isCompleteForScenarioLoader, instance.title)
+            XCTAssertEqual(blueprint.units.count, instance.units.count)
+            XCTAssertEqual(blueprint.objectives.count, instance.objectives.count)
+            XCTAssertEqual(blueprint.terrain.count, instance.terrain.count)
+            XCTAssertEqual(blueprint.missionTargetScore, instance.victory.missionTargetScore)
+            XCTAssertTrue(blueprint.units.allSatisfy { $0.x >= 0 && $0.x <= blueprint.engineBoardFrame.width })
+            XCTAssertTrue(blueprint.units.allSatisfy { $0.y >= 0 && $0.y <= blueprint.engineBoardFrame.height })
+            XCTAssertTrue(blueprint.objectives.allSatisfy { $0.victoryPoints > 0 })
+        }
+    }
+
+    func testCycle270DemoInstancesExposePlayableClassesAndScenarioEvents() throws {
+        let wizna = try XCTUnwrap(NativeBattleInstanceCatalog.instance(for: .wizna))
+        XCTAssertTrue(wizna.terrain.contains { $0.kind == .bunker })
+        XCTAssertTrue(wizna.units.contains { unit in unit.weapons.contains { $0.role == .antiTank } })
+        XCTAssertTrue(wizna.events.contains { $0.kind == .tutorial })
+
+        let sedan = try XCTUnwrap(NativeBattleInstanceCatalog.instance(for: .sedan))
+        XCTAssertTrue(sedan.terrain.contains { $0.kind == .river })
+        XCTAssertTrue(sedan.terrain.contains { $0.kind == .bridge })
+        XCTAssertTrue(sedan.units.contains { $0.mobility == .engineer })
+        XCTAssertTrue(sedan.units.contains { unit in unit.weapons.contains { $0.role == .airSupport } })
+        XCTAssertTrue(sedan.events.contains { $0.kind == .reinforcement })
+
+        let moscow = try XCTUnwrap(NativeBattleInstanceCatalog.instance(for: .moscowTulaKashira))
+        XCTAssertTrue(moscow.terrain.contains { $0.name.contains("Tula") })
+        XCTAssertTrue(moscow.units.contains { $0.side == .player && $0.mobility == .armor })
+        XCTAssertTrue(moscow.events.contains { $0.kind == .reinforcement })
+        XCTAssertTrue(moscow.victory.targetTurns.upperBound >= 7)
+    }
+
+    func testGuderianTestAutomationRunsEveryBattleAndSurfacesDiagnostics() throws {
+        let report = CampaignAutomationRunner.runCampaign()
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(report.reports.map(\.id), orderedIDs)
+        XCTAssertEqual(report.reports.count, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(report.completionSummary.completedScenarios, GuderianCampaignCatalog.all.count)
+        XCTAssertGreaterThan(report.reports.reduce(0) { $0 + $1.actionsAttempted }, 0)
+        XCTAssertGreaterThan(report.reports.reduce(0) { $0 + $1.phaseAdvances }, 0)
+
+        for battle in report.reports {
+            XCTAssertFalse(battle.status.isTerminalProblem, "\(battle.title): \(battle.issues.map(\.detail).joined(separator: "\n"))")
+            XCTAssertGreaterThan(battle.engineUnitCount, 0, "\(battle.title) should load engine units")
+            XCTAssertGreaterThan(battle.engineObjectiveCount, 0, "\(battle.title) should load engine objectives")
+            XCTAssertFalse(battle.steps.isEmpty, "\(battle.title) should expose an automation timeline")
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native Playability" })
+            XCTAssertTrue(battle.issues.contains { $0.stage == "Native Playability" && $0.kind == .warning })
+            XCTAssertFalse(battle.playerArmy.isEmpty)
+            XCTAssertFalse(battle.opponentArmy.isEmpty)
+        }
+    }
+
     func testTucholaForestIsFirstFullCampaignPlayableDataSlice() throws {
         let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .tucholaForest))
         let bundle = ScenarioContentCatalog.bundle(for: scenario)
