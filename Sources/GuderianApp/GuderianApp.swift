@@ -86,6 +86,7 @@ struct GuderianCampaignView: View {
                             Label("Complete", systemImage: "checkmark.circle")
                         }
                         .accessibilityLabel("Mark selected scenario complete")
+                        .accessibilityIdentifier("complete-scenario-button")
 
                         Button {
                             markAllScenariosComplete()
@@ -93,6 +94,7 @@ struct GuderianCampaignView: View {
                             Label("Complete All", systemImage: "checkmark.seal")
                         }
                         .accessibilityLabel("Mark full campaign complete")
+                        .accessibilityIdentifier("complete-all-scenarios-button")
 
                         Button {
                             progress.reset()
@@ -100,6 +102,7 @@ struct GuderianCampaignView: View {
                             Label("Reset", systemImage: "arrow.counterclockwise")
                         }
                         .accessibilityLabel("Reset campaign progress")
+                        .accessibilityIdentifier("reset-campaign-button")
                     }
                     .buttonStyle(.borderless)
 
@@ -110,6 +113,7 @@ struct GuderianCampaignView: View {
                             Label("Save", systemImage: "tray.and.arrow.down")
                         }
                         .accessibilityLabel("Save campaign progress")
+                        .accessibilityIdentifier("save-campaign-button")
 
                         Button {
                             loadSavedCampaignState(force: true)
@@ -117,6 +121,7 @@ struct GuderianCampaignView: View {
                             Label("Load", systemImage: "tray.and.arrow.up")
                         }
                         .accessibilityLabel("Load campaign progress")
+                        .accessibilityIdentifier("load-campaign-button")
                     }
                     .buttonStyle(.borderless)
 
@@ -218,6 +223,7 @@ struct ScenarioRow: View {
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(scenario.order). \(scenario.title), \(scenario.dateLabel), \(scenario.theater.rawValue), \(progress.isCompleted(scenario.id) ? "complete" : progress.isAvailable(scenario, in: playMode) ? "available" : "locked")")
+        .accessibilityIdentifier("scenario-row-\(scenario.id.rawValue)")
     }
 
     private var iconName: String {
@@ -431,6 +437,7 @@ struct ScenarioBriefingView: View {
         .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("campaign-completion-panel")
     }
 
     private var shipReadinessView: some View {
@@ -503,6 +510,7 @@ struct ScenarioBriefingView: View {
             }
         }
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ship-readiness-panel")
     }
 
     private func briefingSection(_ title: String, _ value: String, icon: String) -> some View {
