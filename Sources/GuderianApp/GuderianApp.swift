@@ -191,6 +191,14 @@ struct ScenarioBriefingView: View {
         PolishCampaignSystemCatalog.profile(for: scenario)
     }
 
+    var franceProfile: FranceScenarioSystemProfile? {
+        FranceCampaignSystemCatalog.profile(for: scenario)
+    }
+
+    var easternFrontProfile: EasternFrontScenarioSystemProfile? {
+        EasternFrontCampaignSystemCatalog.profile(for: scenario)
+    }
+
     var filteredLogEntries: [ScenarioLogEntry] {
         guard let logCategory else {
             return logEntries
@@ -210,6 +218,8 @@ struct ScenarioBriefingView: View {
                 briefingSection("Design Intent", scenario.designIntent, icon: "scope")
                 forceOrder
                 polishSystemView
+                franceSystemView
+                easternFrontSystemView
                 objectives
                 balanceView
                 reinforcementsView
@@ -328,6 +338,110 @@ struct ScenarioBriefingView: View {
                 }
 
                 ForEach(polishProfile.specialRules) { rule in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(rule.name)
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 140, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(rule.trigger)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(rule.effect)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var franceSystemView: some View {
+        if let franceProfile {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("France 1940 Systems", systemImage: "tank")
+                    .font(.headline)
+                Text(franceProfile.operationalProblem)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Text(franceProfile.playerDoctrine)
+                    .font(.callout)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 10)], alignment: .leading, spacing: 10) {
+                    ForEach(franceProfile.assets) { asset in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label(asset.kind.rawValue, systemImage: "shield")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.blue)
+                            Text(asset.name)
+                                .font(.body.weight(.medium))
+                            Text(asset.battlefieldRole)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(asset.limitation)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(10)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+
+                ForEach(franceProfile.specialRules) { rule in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(rule.name)
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 140, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(rule.trigger)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(rule.effect)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var easternFrontSystemView: some View {
+        if let easternFrontProfile {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Eastern Front Systems", systemImage: "map")
+                    .font(.headline)
+                Text(easternFrontProfile.operationalProblem)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Text(easternFrontProfile.playerDoctrine)
+                    .font(.callout)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 10)], alignment: .leading, spacing: 10) {
+                    ForEach(easternFrontProfile.assets) { asset in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label(asset.kind.rawValue, systemImage: "shield")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.blue)
+                            Text(asset.name)
+                                .font(.body.weight(.medium))
+                            Text(asset.battlefieldRole)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(asset.limitation)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(10)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+
+                ForEach(easternFrontProfile.specialRules) { rule in
                     HStack(alignment: .firstTextBaseline) {
                         Text(rule.name)
                             .font(.caption.weight(.semibold))

@@ -10,6 +10,10 @@ Cycle 90 update: cycles 61-90 are complete. Sedan now has explicit score channel
 
 Cycle 120 update: cycles 91-120 are complete. Packaging and demo hardening now include the Xcode macOS project, shared scheme, public-domain icon source ledger, README run guidance, and successful SwiftPM/Xcode build paths; the full-campaign expansion now has a content bundle facade, chronological/standalone campaign progression modes with completion records, reusable Polish 1939 system profiles, and a hand-authored Tuchola Forest data slice covering Brda crossings, Chojnice/Tuchola road hubs, Krojanty cavalry screening, Bydgoszcz withdrawal, German pincer pressure, balance, reinforcements, AI orders, operation-log entries, and regression coverage.
 
+Cycle 150 update: cycles 121-150 are complete. Brzesc Litewski now has fortress/citadel, rail, armored-train, FT-17, fallback-gate, and German isolation data; Kobryn now has rearguard, 60th Reserve Infantry, roadblock, eastern-exit, cohesion-withdrawal, and motorized-fixation data; France 1940 systems now cover river crossings, Char B1 heavy-tank shock, armored raid doctrine, air-pressure timing, road/Channel objectives, and withdrawal rules; Stonne, Montcornet, and Amiens-Abbeville now have hand-authored maps, setup scripts, balance profiles, German AI orders, event-log coverage, proxy-loader notes, and regression tests.
+
+Cycle 180 update: cycles 151-180 are complete. Boulogne now has harbor evacuation, Haute Ville, destroyer support, air pressure, and port demolition data; Calais now has layered perimeter, supply, citadel/docks, costly assault, and Dunkirk-time scoring data; Dunkirk now has explicit Guderian-adjacent command caveats, canal defense, beach evacuation capacity, rear-guard sacrifice, and air-pressure data; Fall Rot now has crossing denial, fortress-town stands, fuel/congestion pressure, Vosges retreat corridors, and Army Group C link-up data; Eastern Front 1941 systems now cover rifle armies, mechanized counterattacks, command posts, pockets, breakout routes, rail junctions, logistics, and winter friction; Bialystok-Minsk now has Bug/Neman crossing pressure, Bialystok/Novogrudok pockets, Minsk road/rail escape, Soviet command preservation, German pincer AI, balance profiles, proxy-loader coverage, and regression tests.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -127,6 +131,10 @@ Status through cycle 100: completed. The Xcode macOS project, shared scheme, app
 | 246-250 | Full campaign ship | Run full build/test/review cycle, fix release blockers, tag complete campaign milestone, and update README/PLAN status. |
 
 Status through cycle 120: completed. Scenario data remains Guderian-owned and separate from inherited `dzw` fixtures through `ScenarioContentCatalog`; chronological and standalone progression paths are available; Polish campaign system profiles now cover Tuchola Forest, Wizna, Brzesc Litewski, and Kobryn; Tuchola Forest is the first hand-authored full-campaign scenario beyond the demo set and is loadable through the existing proxy adapter while waiting for a native Polish C roster.
+
+Status through cycle 150: completed. The Poland 1939 expansion now includes Brzesc Litewski and Kobryn as hand-authored, proxy-loadable scenarios; the France 1940 expansion has reusable campaign-system profiles for Sedan, Stonne, Montcornet, and Amiens-Abbeville; Stonne, Montcornet, and Amiens-Abbeville are now the first non-demo France scenarios with dedicated map/setup/balance/AI data. No `dzw` files were modified.
+
+Status through cycle 180: completed. The Channel-port and Fall Rot block is implemented as Guderian-owned content; Eastern Front systems are in place for the 1941 scenarios; Bialystok-Minsk is the first hand-authored Eastern Front full-campaign scenario beyond the Moscow/Tula demo. All new scenarios remain proxy-loadable through `DZWScenarioLoader`, and no `dzw` files were modified.
 
 ## Acceptance Criteria
 

@@ -126,8 +126,28 @@ public enum ScenarioMapCatalog {
             return tucholaForest
         case .wizna:
             return wizna
+        case .brzescLitewski:
+            return brzescLitewski
+        case .kobryn:
+            return kobryn
         case .sedan:
             return sedan
+        case .stonne:
+            return stonne
+        case .montcornet:
+            return montcornet
+        case .amiensAbbeville:
+            return amiensAbbeville
+        case .boulogne:
+            return boulogne
+        case .calais:
+            return calais
+        case .dunkirk:
+            return dunkirk
+        case .fallRot:
+            return fallRot
+        case .bialystokMinsk:
+            return bialystokMinsk
         case .moscowTulaKashira:
             return moscowTulaKashira
         default:
@@ -155,6 +175,45 @@ public enum ScenarioMapCatalog {
         deploymentZones: [
             zone("tuchola-polish-corridor", "Pomeranian Army corridor defense", .player, p(16, 20), 44, 29, "Polish infantry, anti-tank guns, demolition teams, and cavalry screens start around the forest road net."),
             zone("tuchola-german-assembly", "German pincer assembly", .guderianAI, p(0, 11), 30, 36, "XIX Panzer Corps pushes from the west while pincer pressure appears from the north and east."),
+        ]
+    )
+
+    private static let brzescLitewski = ScenarioMapLayout(
+        id: .brzescLitewski,
+        title: "Brzesc Fortress Defense",
+        elements: [
+            line("brzesc-bug", "Bug River", .river, [p(8, 18), p(31, 24), p(55, 25), p(87, 18)], width: 5, note: "River edge and fortress approach."),
+            line("brzesc-muchawiec", "Muchawiec River", .river, [p(23, 56), p(41, 45), p(58, 35), p(73, 26)], width: 4, note: "Secondary obstacle dividing the town and fortress approaches."),
+            line("brzesc-rail", "Rail line", .road, [p(4, 46), p(29, 42), p(49, 38), p(78, 34), p(97, 29)], width: 2, note: "Armored-train support and German approach lane."),
+            marker("brzesc-citadel", "Brzesc Citadel", .fortifiedLine, .player, p(52, 32), radius: 7, note: "Central fortress objective."),
+            marker("brzesc-town", "Brzesc town", .town, .player, p(43, 43), radius: 6, note: "Urban delay zone before the citadel."),
+            marker("brzesc-armored-train", "Armored train track", .artillery, .player, p(35, 40), radius: 4, note: "Rail-bound fire support and evacuation cover."),
+            marker("brzesc-ft17", "FT-17 tank park", .objective, .player, p(59, 45), radius: 4, note: "Obsolete tanks used as mobile strongpoints."),
+            marker("brzesc-panzer-entry", "XIX Corps west entry", .objective, .guderianAI, p(7, 44), radius: 4, note: "German panzer and motorized assault approach."),
+            marker("brzesc-south-exit", "South fallback gate", .objective, .player, p(78, 55), radius: 4, note: "Withdrawal route after citadel delay."),
+        ],
+        deploymentZones: [
+            zone("brzesc-polish-fortress", "Polish fortress defense", .player, p(34, 24), 43, 28, "Improvised infantry battalions, engineers, artillery, armored trains, and FT-17 tanks defend the town and citadel."),
+            zone("brzesc-german-assault", "XIX Corps assault columns", .guderianAI, p(0, 35), 29, 22, "German panzer, motorized infantry, and artillery pressure the west and rail approaches."),
+        ]
+    )
+
+    private static let kobryn = ScenarioMapLayout(
+        id: .kobryn,
+        title: "Kobryn Rearguard",
+        elements: [
+            line("kobryn-road-west", "Brzesc-Kobryn road", .road, [p(3, 37), p(25, 35), p(47, 34), p(70, 31), p(96, 28)], note: "German motorized infantry approach and Polish withdrawal route."),
+            line("kobryn-eastern-road", "Eastern withdrawal road", .road, [p(46, 39), p(63, 48), p(82, 54), p(99, 58)], width: 2, note: "Exit path for Operational Group Polesie."),
+            line("kobryn-canal", "Mukhavets marsh/canal line", .river, [p(4, 51), p(27, 48), p(53, 51), p(79, 46), p(100, 42)], width: 4, note: "Wet terrain and partial obstacle around Kobryn."),
+            marker("kobryn-town", "Kobryn", .town, .player, p(47, 35), radius: 7, note: "Road hub and rearguard anchor."),
+            marker("kobryn-reserve-line", "60th Reserve Infantry line", .fortifiedLine, .player, p(57, 42), radius: 5, note: "Improvised defensive line covering eastern exits."),
+            marker("kobryn-west-roadblock", "Western roadblock", .objective, .player, p(29, 35), radius: 4, note: "Delay motorized pressure before the town fight."),
+            marker("kobryn-east-exit", "Eastern exit", .objective, .player, p(87, 55), radius: 5, note: "Force-preservation scoring route."),
+            marker("kobryn-german-fix", "2nd Motorized pressure", .objective, .guderianAI, p(12, 38), radius: 4, note: "German effort to fix and envelop the rearguard."),
+        ],
+        deploymentZones: [
+            zone("kobryn-polish-rearguard", "Operational Group Polesie", .player, p(34, 28), 42, 25, "Polish reserve infantry, guns, and rearguard detachments start around Kobryn and the eastern road."),
+            zone("kobryn-german-entry", "German motorized entry", .guderianAI, p(0, 27), 28, 25, "German 2nd Motorized Infantry Division attacks from the west."),
         ]
     )
 
@@ -192,6 +251,158 @@ public enum ScenarioMapCatalog {
         deploymentZones: [
             zone("french-bank", "French near-bank defense", .player, p(34, 30), 52, 27, "French infantry, guns, and observers defend the east bank and artillery parks."),
             zone("german-west-bank", "German west-bank assembly", .guderianAI, p(0, 7), 32, 35, "German engineers, infantry, and panzers prepare the forced crossing."),
+        ]
+    )
+
+    private static let stonne = ScenarioMapLayout(
+        id: .stonne,
+        title: "Stonne Heights Counterattack",
+        elements: [
+            line("stonne-sedan-road", "Sedan-Stonne road", .road, [p(6, 54), p(25, 44), p(45, 34), p(70, 22), p(93, 14)], note: "German bridgehead flank route."),
+            line("stonne-mont-dieu-woods", "Mont-Dieu woods", .forest, [p(18, 21), p(38, 20), p(58, 18), p(82, 24)], width: 8, note: "Concealment and approach cover."),
+            marker("stonne-village", "Stonne village", .town, .neutral, p(52, 33), radius: 7, note: "Repeatedly contested village objective."),
+            marker("stonne-heights", "Stonne heights", .ridge, .player, p(58, 25), radius: 6, note: "Observation and bridgehead threat."),
+            marker("stonne-char-b1", "Char B1 shock point", .objective, .player, p(44, 39), radius: 4, note: "French heavy-tank counterattack start."),
+            marker("stonne-bridgehead-risk", "Bridgehead risk line", .objective, .player, p(69, 25), radius: 4, note: "Player scores by threatening the Sedan bridgehead flank."),
+            marker("stonne-german-support", "German support line", .artillery, .guderianAI, p(31, 48), radius: 5, note: "Motorized infantry, anti-tank, and artillery support."),
+        ],
+        deploymentZones: [
+            zone("stonne-french-counterattack", "French armor and infantry", .player, p(37, 23), 32, 24, "French heavy tanks and infantry stage to contest Stonne and the heights."),
+            zone("stonne-german-bridgehead", "German bridgehead flank", .guderianAI, p(8, 40), 32, 18, "German Grossdeutschland and panzer support protect the bridgehead flank."),
+        ]
+    )
+
+    private static let montcornet = ScenarioMapLayout(
+        id: .montcornet,
+        title: "Montcornet Armored Raid",
+        elements: [
+            line("montcornet-road-net", "Montcornet road net", .road, [p(4, 40), p(27, 37), p(48, 32), p(72, 30), p(96, 23)], note: "German rear-area movement and French raid path."),
+            line("montcornet-withdrawal", "French withdrawal lane", .road, [p(43, 53), p(33, 44), p(21, 35), p(8, 28)], width: 2, note: "Armor exit route after raid objectives are hit."),
+            marker("montcornet-town", "Montcornet", .town, .neutral, p(52, 32), radius: 6, note: "Raid center and German road hub."),
+            marker("montcornet-column", "German column park", .objective, .guderianAI, p(66, 28), radius: 5, note: "Transport, command, and supply disruption target."),
+            marker("montcornet-4dcr", "4e DCR attack group", .objective, .player, p(34, 43), radius: 4, note: "French armored raid start."),
+            marker("montcornet-air", "Luftwaffe reaction lane", .airPressure, .guderianAI, p(62, 15), radius: 6, note: "Late air-pressure source."),
+            marker("montcornet-exit", "Armor disengagement", .objective, .player, p(12, 29), radius: 4, note: "Exit point for surviving French tanks."),
+        ],
+        deploymentZones: [
+            zone("montcornet-french-armor", "4e Division cuirassee", .player, p(22, 35), 30, 22, "French armor enters for a time-limited raid."),
+            zone("montcornet-german-column", "German column security", .guderianAI, p(55, 18), 34, 22, "German road guards, reserves, and air-pressure markers defend the road net."),
+        ]
+    )
+
+    private static let amiensAbbeville = ScenarioMapLayout(
+        id: .amiensAbbeville,
+        title: "Amiens-Abbeville Channel Race",
+        elements: [
+            line("amiens-somme", "Somme River", .river, [p(4, 42), p(25, 39), p(49, 41), p(73, 36), p(98, 34)], width: 6, note: "River line for blocking and bridge denial."),
+            line("amiens-channel-road", "Amiens-Abbeville road", .road, [p(11, 50), p(32, 43), p(54, 38), p(77, 31), p(96, 24)], note: "German race to the Channel."),
+            marker("amiens", "Amiens", .town, .player, p(33, 43), radius: 7, note: "Central road hub captured in the Channel dash."),
+            marker("abbeville", "Abbeville", .town, .player, p(78, 31), radius: 7, note: "Channel cut objective."),
+            marker("somme-bridges", "Somme bridges", .bridge, .neutral, p(55, 40), radius: 4, note: "Crossing contest for Allied delay."),
+            marker("allied-roadblocks", "Allied roadblocks", .objective, .player, p(51, 33), radius: 4, note: "Blocking detachments buy evacuation time."),
+            marker("channel-exit", "Channel exit", .objective, .guderianAI, p(94, 24), radius: 5, note: "German operational finish line."),
+            marker("panzer-race", "Panzer race column", .objective, .guderianAI, p(14, 50), radius: 4, note: "XIX Corps armored entry."),
+        ],
+        deploymentZones: [
+            zone("amiens-allied-block", "Allied blocking line", .player, p(30, 28), 52, 24, "French and British blocking detachments defend Somme bridges and road hubs."),
+            zone("amiens-german-race", "XIX Corps road columns", .guderianAI, p(2, 42), 28, 18, "German panzer divisions race from the west toward Amiens and Abbeville."),
+        ]
+    )
+
+    private static let boulogne = ScenarioMapLayout(
+        id: .boulogne,
+        title: "Boulogne Port Defense",
+        elements: [
+            line("boulogne-liane", "River Liane harbor channel", .river, [p(15, 54), p(31, 44), p(47, 34), p(67, 27), p(90, 22)], width: 5, note: "Harbor channel and urban crossing obstacle."),
+            line("boulogne-coast-road", "Channel coast road", .road, [p(4, 48), p(24, 42), p(45, 36), p(68, 29), p(96, 18)], note: "2nd Panzer approach toward the port."),
+            marker("boulogne-harbor", "Harbor evacuation", .objective, .player, p(70, 28), radius: 7, note: "Embarkation and destroyer docking objective."),
+            marker("boulogne-haute-ville", "Haute Ville perimeter", .fortifiedLine, .player, p(55, 36), radius: 6, note: "Old-town defensive anchor above the port."),
+            marker("boulogne-destroyers", "Destroyer fire lane", .artillery, .player, p(82, 17), radius: 5, note: "Naval support window for re-embarkation."),
+            marker("boulogne-demolition", "Port demolition party", .objective, .player, p(73, 37), radius: 4, note: "Port denial after evacuation scoring."),
+            marker("boulogne-mont-lambert", "Mont St. Lambert ridge", .ridge, .guderianAI, p(37, 23), radius: 5, note: "German observation and assault approach."),
+            marker("boulogne-panzer-entry", "2nd Panzer entry", .objective, .guderianAI, p(9, 48), radius: 4, note: "German armor closes on the port."),
+        ],
+        deploymentZones: [
+            zone("boulogne-allied-port", "Allied port perimeter", .player, p(48, 23), 38, 25, "French, British, and Belgian defenders hold harbor and old-town positions."),
+            zone("boulogne-german-coast", "2nd Panzer assault area", .guderianAI, p(0, 34), 34, 22, "German armor and infantry enter along the coast road and ridge approaches."),
+        ]
+    )
+
+    private static let calais = ScenarioMapLayout(
+        id: .calais,
+        title: "Calais Siege Perimeter",
+        elements: [
+            line("calais-coast-road", "Boulogne-Calais road", .road, [p(5, 45), p(25, 40), p(46, 36), p(70, 31), p(95, 26)], note: "German 10th Panzer approach."),
+            line("calais-dunkirk-road", "Dunkirk road", .road, [p(66, 18), p(79, 14), p(94, 10)], width: 2, note: "Strategic delay axis toward Dunkirk."),
+            marker("calais-outer-perimeter", "Outer perimeter", .fortifiedLine, .player, p(50, 35), radius: 8, note: "Layered town defenses."),
+            marker("calais-citadel", "Citadel", .fortifiedLine, .player, p(61, 29), radius: 6, note: "Inner siege objective."),
+            marker("calais-docks", "Docks and harbor", .objective, .player, p(72, 24), radius: 5, note: "Final port objective and supply route."),
+            marker("calais-supply", "Garrison supply point", .artillery, .player, p(56, 43), radius: 4, note: "Ammunition and command endurance."),
+            marker("calais-10th-panzer", "10th Panzer pressure", .objective, .guderianAI, p(14, 43), radius: 4, note: "German siege assault force."),
+            marker("calais-air-pressure", "Air and artillery pressure", .airPressure, .guderianAI, p(37, 24), radius: 5, note: "Supply and perimeter suppression."),
+        ],
+        deploymentZones: [
+            zone("calais-garrison", "Calais garrison", .player, p(47, 22), 36, 27, "British, French, and Belgian defenders hold layered port defenses."),
+            zone("calais-german-siege", "10th Panzer siege line", .guderianAI, p(0, 31), 34, 22, "German armor, infantry, artillery, and air pressure reduce the port."),
+        ]
+    )
+
+    private static let dunkirk = ScenarioMapLayout(
+        id: .dunkirk,
+        title: "Dunkirk Evacuation Perimeter",
+        elements: [
+            line("dunkirk-beach", "Beach evacuation line", .road, [p(58, 13), p(70, 11), p(84, 12), p(98, 15)], width: 4, note: "Embarkation sectors along the beach."),
+            line("dunkirk-canal", "Canal defensive line", .river, [p(8, 43), p(28, 38), p(51, 35), p(75, 30), p(100, 28)], width: 5, note: "Perimeter obstacle and breach line."),
+            line("dunkirk-road", "Dunkirk perimeter road", .road, [p(12, 53), p(35, 46), p(58, 36), p(82, 22)], note: "Rear-guard withdrawal route."),
+            marker("dunkirk-beach-sector", "Beach sector", .objective, .player, p(78, 13), radius: 7, note: "Evacuation capacity objective."),
+            marker("dunkirk-harbor", "Dunkirk harbor", .town, .player, p(72, 24), radius: 6, note: "Harbor evacuation and perimeter anchor."),
+            marker("dunkirk-canal-gate", "Canal gate", .bridge, .player, p(55, 35), radius: 4, note: "Key perimeter crossing."),
+            marker("dunkirk-rearguard", "Rear-guard line", .fortifiedLine, .player, p(45, 42), radius: 5, note: "Force left behind to protect evacuation lanes."),
+            marker("dunkirk-air", "Air attack lane", .airPressure, .guderianAI, p(68, 8), radius: 6, note: "Evacuation-capacity pressure."),
+            marker("dunkirk-german-pressure", "German pressure front", .objective, .guderianAI, p(17, 47), radius: 5, note: "Campaign-pressure marker compressing the perimeter."),
+        ],
+        deploymentZones: [
+            zone("dunkirk-allied-perimeter", "Allied evacuation perimeter", .player, p(43, 16), 45, 31, "Allied rear guards defend canals, harbor, and beach sectors."),
+            zone("dunkirk-german-front", "German perimeter pressure", .guderianAI, p(0, 35), 34, 23, "German pressure forces advance against canal and road exits."),
+        ]
+    )
+
+    private static let fallRot = ScenarioMapLayout(
+        id: .fallRot,
+        title: "Fall Rot Swiss-Border Drive",
+        elements: [
+            line("fallrot-drive-road", "Panzergruppe Guderian drive", .road, [p(5, 48), p(23, 43), p(42, 36), p(63, 29), p(86, 18)], note: "Deep exploitation route toward the Swiss border."),
+            line("fallrot-canal", "Aisne and Marne-Rhine crossings", .river, [p(9, 36), p(31, 34), p(55, 31), p(77, 27), p(98, 25)], width: 5, note: "Crossing and demolition line."),
+            line("fallrot-vosges", "Vosges retreat corridor", .ridge, [p(55, 54), p(68, 48), p(82, 39), p(95, 32)], width: 5, note: "French withdrawal corridor and trap line."),
+            marker("fallrot-langres", "Langres road hub", .town, .player, p(41, 36), radius: 5, note: "Mid-route delay point."),
+            marker("fallrot-belfort", "Belfort fortress town", .fortifiedLine, .player, p(78, 30), radius: 6, note: "Late fortress-town stand."),
+            marker("fallrot-epinal", "Epinal fortress town", .fortifiedLine, .player, p(72, 46), radius: 5, note: "Northern fortress and retreat hinge."),
+            marker("fallrot-fuel", "Fuel denial point", .objective, .player, p(50, 33), radius: 4, note: "Road congestion and fuel friction scoring."),
+            marker("fallrot-swiss-border", "Swiss-border cut line", .objective, .guderianAI, p(89, 19), radius: 5, note: "German encirclement finish line."),
+        ],
+        deploymentZones: [
+            zone("fallrot-french-delay", "French late-campaign defense", .player, p(36, 27), 46, 28, "French bridge, fortress, and retreat-corridor defenders."),
+            zone("fallrot-panzergruppe", "Panzergruppe Guderian columns", .guderianAI, p(0, 38), 30, 19, "German deep exploitation columns enter from the west."),
+        ]
+    )
+
+    private static let bialystokMinsk = ScenarioMapLayout(
+        id: .bialystokMinsk,
+        title: "Bialystok-Minsk Pocket",
+        elements: [
+            line("bialystok-minsk-road", "Bialystok-Minsk road and rail", .road, [p(7, 44), p(28, 39), p(51, 34), p(76, 28), p(96, 23)], note: "Main communications and breakout route."),
+            line("bialystok-bug", "Bug River crossing line", .river, [p(4, 54), p(24, 48), p(44, 44), p(66, 41)], width: 5, note: "Southern penetration line for 2nd Panzer Group."),
+            line("bialystok-neman", "Neman crossing line", .river, [p(17, 20), p(38, 24), p(61, 27), p(83, 24)], width: 4, note: "Northern pincer crossing pressure."),
+            marker("bialystok-salient", "Bialystok salient", .objective, .player, p(31, 38), radius: 7, note: "Forward Soviet pocket risk."),
+            marker("bialystok-novogrudok", "Novogrudok pocket", .objective, .neutral, p(55, 35), radius: 6, note: "Larger encirclement zone."),
+            marker("bialystok-minsk", "Minsk rail junction", .town, .player, p(83, 25), radius: 7, note: "Command and breakout objective."),
+            marker("bialystok-boldin", "Mechanized counterattack", .objective, .player, p(43, 30), radius: 4, note: "Counterattack marker to reopen escape lanes."),
+            marker("bialystok-guderian", "2nd Panzer Group pincer", .objective, .guderianAI, p(23, 50), radius: 5, note: "Southern German pincer."),
+            marker("bialystok-hoth", "3rd Panzer Group pincer", .objective, .guderianAI, p(43, 23), radius: 5, note: "Northern German pincer."),
+        ],
+        deploymentZones: [
+            zone("bialystok-soviet-front", "Soviet Western Front", .player, p(23, 27), 52, 25, "Soviet rifle armies, command posts, and mechanized counterattack groups start in the salient."),
+            zone("bialystok-german-pincers", "German pincer approaches", .guderianAI, p(4, 18), 36, 39, "2nd and 3rd Panzer Group pressure closes from south and north."),
         ]
     )
 

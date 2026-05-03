@@ -31,7 +31,17 @@ public enum ScenarioContentCatalog {
     public static let handAuthoredScenarioIDs: Set<GuderianBattleID> = [
         .tucholaForest,
         .wizna,
+        .brzescLitewski,
+        .kobryn,
         .sedan,
+        .stonne,
+        .montcornet,
+        .amiensAbbeville,
+        .boulogne,
+        .calais,
+        .dunkirk,
+        .fallRot,
+        .bialystokMinsk,
         .moscowTulaKashira,
     ]
 

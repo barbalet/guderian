@@ -240,6 +240,10 @@ final class GuderianCampaignTests: XCTestCase {
 
     func testScenarioContentBundlesCollectHandAuthoredData() throws {
         XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.tucholaForest))
+        XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.brzescLitewski))
+        XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.amiensAbbeville))
+        XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.fallRot))
+        XCTAssertTrue(ScenarioContentCatalog.handAuthoredScenarioIDs.contains(.bialystokMinsk))
 
         for id in ScenarioContentCatalog.handAuthoredScenarioIDs {
             let bundle = try XCTUnwrap(ScenarioContentCatalog.bundle(for: id))
@@ -276,6 +280,154 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(tuchola.assets.contains { $0.kind == .withdrawalRoute && $0.name.contains("Bydgoszcz") })
         XCTAssertTrue(tuchola.assets.contains { $0.kind == .commandFriction })
         XCTAssertTrue(tuchola.specialRules.contains { $0.name.contains("Krojanty") })
+    }
+
+    func testPolandExpansionScenariosAreHandAuthoredAndProxyLoadable() throws {
+        let brzesc = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .brzescLitewski))
+        let kobryn = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .kobryn))
+        let brzescBundle = ScenarioContentCatalog.bundle(for: brzesc)
+        let kobrynBundle = ScenarioContentCatalog.bundle(for: kobryn)
+
+        XCTAssertEqual(brzesc.status, .dzwProxyLoadable)
+        XCTAssertEqual(kobryn.status, .dzwProxyLoadable)
+        XCTAssertNotNil(PolishCampaignSystemCatalog.profile(for: brzesc))
+        XCTAssertNotNil(PolishCampaignSystemCatalog.profile(for: kobryn))
+
+        XCTAssertTrue(brzescBundle.mapLayout.elements.contains { $0.name.contains("Citadel") })
+        XCTAssertTrue(brzescBundle.mapLayout.elements.contains { $0.name.contains("Armored train") })
+        XCTAssertTrue(brzescBundle.setup.playerUnits.contains { $0.name.contains("Armored trains") })
+        XCTAssertTrue(brzescBundle.setup.playerUnits.contains { $0.name.contains("FT-17") })
+        XCTAssertTrue(brzescBundle.balance.scoreChannels.contains { $0.name.contains("Citadel") })
+        XCTAssertTrue(brzescBundle.aiPlan.orders.contains { $0.id == "brzesc-citadel-ring" })
+
+        XCTAssertTrue(kobrynBundle.mapLayout.elements.contains { $0.name.contains("Eastern exit") })
+        XCTAssertTrue(kobrynBundle.setup.playerUnits.contains { $0.name.contains("60th Reserve") })
+        XCTAssertTrue(kobrynBundle.setup.guderianUnits.contains { $0.name.contains("2nd Motorized") })
+        XCTAssertTrue(kobrynBundle.balance.scoreChannels.contains { $0.name.contains("Cohesion") })
+        XCTAssertTrue(kobrynBundle.aiPlan.orders.contains { $0.id == "kobryn-exit-threat" })
+    }
+
+    func testFranceCampaignSystemsExposeArmorAirAndChannelRules() throws {
+        XCTAssertEqual(
+            FranceCampaignSystemCatalog.franceScenarioIDs,
+            [.sedan, .stonne, .montcornet, .amiensAbbeville, .boulogne, .calais, .dunkirk, .fallRot]
+        )
+
+        for id in FranceCampaignSystemCatalog.franceScenarioIDs {
+            let profile = try XCTUnwrap(FranceCampaignSystemCatalog.profile(for: id))
+
+            XCTAssertEqual(profile.id, id)
+            XCTAssertFalse(profile.assets.isEmpty)
+            XCTAssertFalse(profile.specialRules.isEmpty)
+            XCTAssertFalse(profile.operationalProblem.isEmpty)
+            XCTAssertFalse(profile.playerDoctrine.isEmpty)
+        }
+
+        let stonne = try XCTUnwrap(FranceCampaignSystemCatalog.profile(for: .stonne))
+        let montcornet = try XCTUnwrap(FranceCampaignSystemCatalog.profile(for: .montcornet))
+        let amiens = try XCTUnwrap(FranceCampaignSystemCatalog.profile(for: .amiensAbbeville))
+        let boulogne = try XCTUnwrap(FranceCampaignSystemCatalog.profile(for: .boulogne))
+        let calais = try XCTUnwrap(FranceCampaignSystemCatalog.profile(for: .calais))
+        let dunkirk = try XCTUnwrap(FranceCampaignSystemCatalog.profile(for: .dunkirk))
+        let fallRot = try XCTUnwrap(FranceCampaignSystemCatalog.profile(for: .fallRot))
+
+        XCTAssertTrue(stonne.assets.contains { $0.kind == .heavyTank && $0.name.contains("Char B1") })
+        XCTAssertTrue(montcornet.assets.contains { $0.kind == .airPressure && $0.name.contains("Luftwaffe") })
+        XCTAssertTrue(amiens.assets.contains { $0.kind == .riverCrossing && $0.name.contains("Somme") })
+        XCTAssertTrue(amiens.specialRules.contains { $0.name.contains("Channel cut") })
+        XCTAssertTrue(boulogne.assets.contains { $0.kind == .navalSupport && $0.name.contains("destroyer") })
+        XCTAssertTrue(calais.assets.contains { $0.name.contains("Dunkirk time") })
+        XCTAssertTrue(dunkirk.specialRules.contains { $0.name.contains("Command-scope caveat") })
+        XCTAssertTrue(fallRot.assets.contains { $0.kind == .withdrawalRoute && $0.name.contains("Retreat") })
+    }
+
+    func testFranceExpansionScenariosAreHandAuthoredAndProxyLoadable() throws {
+        for id in [GuderianBattleID.stonne, .montcornet, .amiensAbbeville, .boulogne, .calais, .dunkirk, .fallRot] {
+            let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: id))
+            let bundle = ScenarioContentCatalog.bundle(for: scenario)
+            let loadout = try XCTUnwrap(DZWScenarioLoader.load(id, seed: UInt32(19400500 + scenario.order)))
+
+            XCTAssertEqual(scenario.status, .dzwProxyLoadable)
+            XCTAssertEqual(loadout.playerArmyName, "British")
+            XCTAssertTrue(loadout.adapterNotes.contains { $0.contains("France 1940 campaign systems") })
+            XCTAssertGreaterThanOrEqual(bundle.balance.maxPlayerScore, 8)
+            XCTAssertFalse(bundle.setup.playerUnits.isEmpty)
+            XCTAssertFalse(bundle.setup.guderianUnits.isEmpty)
+            XCTAssertFalse(bundle.aiPlan.orders.isEmpty)
+        }
+
+        let stonne = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .stonne))
+        XCTAssertTrue(stonne.mapLayout.elements.contains { $0.name.contains("Stonne") })
+        XCTAssertTrue(stonne.setup.playerUnits.contains { $0.name.contains("Char B1") })
+        XCTAssertTrue(stonne.balance.scoreChannels.contains { $0.name.contains("Heavy-tank") })
+
+        let montcornet = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .montcornet))
+        XCTAssertTrue(montcornet.mapLayout.elements.contains { $0.name.contains("German column") })
+        XCTAssertTrue(montcornet.balance.reinforcements.contains { $0.unitName.contains("Luftwaffe") })
+
+        let amiens = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .amiensAbbeville))
+        XCTAssertTrue(amiens.mapLayout.elements.contains { $0.name.contains("Abbeville") })
+        XCTAssertTrue(amiens.balance.scoreChannels.contains { $0.name.contains("Evacuation") })
+
+        let boulogne = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .boulogne))
+        XCTAssertTrue(boulogne.mapLayout.elements.contains { $0.name.contains("Harbor") })
+        XCTAssertTrue(boulogne.setup.playerUnits.contains { $0.name.contains("destroyer") })
+        XCTAssertTrue(boulogne.balance.scoreChannels.contains { $0.name.contains("Port denial") })
+
+        let calais = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .calais))
+        XCTAssertTrue(calais.setup.playerUnits.contains { $0.name.contains("supply") })
+        XCTAssertTrue(calais.balance.scoreChannels.contains { $0.name.contains("Dunkirk time") })
+
+        let dunkirk = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .dunkirk))
+        XCTAssertTrue(dunkirk.setup.triggers.contains { $0.name.contains("Command-scope caveat") })
+        XCTAssertTrue(dunkirk.balance.scoreChannels.contains { $0.name.contains("Evacuated") })
+
+        let fallRot = try XCTUnwrap(ScenarioContentCatalog.bundle(for: .fallRot))
+        XCTAssertTrue(fallRot.mapLayout.elements.contains { $0.name.contains("Belfort") })
+        XCTAssertTrue(fallRot.balance.reinforcements.contains { $0.unitName.contains("Army Group C") })
+    }
+
+    func testEasternFrontSystemsExposePocketBreakoutAndLogisticsRules() throws {
+        XCTAssertEqual(
+            EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs,
+            [.bialystokMinsk, .moscowTulaKashira]
+        )
+
+        for id in EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs {
+            let profile = try XCTUnwrap(EasternFrontCampaignSystemCatalog.profile(for: id))
+
+            XCTAssertEqual(profile.id, id)
+            XCTAssertFalse(profile.assets.isEmpty)
+            XCTAssertFalse(profile.specialRules.isEmpty)
+            XCTAssertFalse(profile.operationalProblem.isEmpty)
+            XCTAssertFalse(profile.playerDoctrine.isEmpty)
+        }
+
+        let bialystok = try XCTUnwrap(EasternFrontCampaignSystemCatalog.profile(for: .bialystokMinsk))
+        XCTAssertTrue(bialystok.assets.contains { $0.kind == .pocket && $0.name.contains("pockets") })
+        XCTAssertTrue(bialystok.assets.contains { $0.kind == .mechanizedCorps })
+        XCTAssertTrue(bialystok.specialRules.contains { $0.name.contains("Double envelopment") })
+        XCTAssertTrue(bialystok.specialRules.contains { $0.name.contains("Command preservation") })
+    }
+
+    func testBialystokMinskIsHandAuthoredAndProxyLoadable() throws {
+        let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .bialystokMinsk))
+        let bundle = ScenarioContentCatalog.bundle(for: scenario)
+        let loadout = try XCTUnwrap(DZWScenarioLoader.load(.bialystokMinsk, seed: 19410622))
+
+        XCTAssertEqual(scenario.status, .dzwProxyLoadable)
+        XCTAssertEqual(loadout.playerArmyName, "Soviet")
+        XCTAssertEqual(loadout.opponentArmyName, "German")
+        XCTAssertTrue(loadout.adapterNotes.contains { $0.contains("Eastern Front campaign systems") })
+
+        XCTAssertTrue(bundle.mapLayout.elements.contains { $0.name.contains("Minsk") })
+        XCTAssertTrue(bundle.mapLayout.elements.contains { $0.name.contains("2nd Panzer") })
+        XCTAssertTrue(bundle.setup.playerUnits.contains { $0.name.contains("10th Army") })
+        XCTAssertTrue(bundle.setup.playerUnits.contains { $0.name.contains("mechanized") })
+        XCTAssertTrue(bundle.setup.guderianUnits.contains { $0.name.contains("2nd Panzer Group") })
+        XCTAssertTrue(bundle.aiPlan.orders.contains { $0.id == "bialystok-pocket-close" })
+        XCTAssertTrue(bundle.balance.scoreChannels.contains { $0.name.contains("Breakout") })
+        XCTAssertTrue(bundle.balance.reinforcements.contains { $0.unitName.contains("Mechanized") && $0.side == .player })
     }
 
     func testTucholaForestIsFirstFullCampaignPlayableDataSlice() throws {

@@ -63,7 +63,7 @@ public enum DZWScenarioLoader {
                 opponentForceIndex: 1,
                 notes: [
                     "Uses the inherited Soviet and German dzw rosters until Guderian-specific 1941 data tables exist.",
-                    "Scenario terrain and mission identity remain metadata-owned in GuderianCore during cycles 1-30.",
+                    "Eastern Front campaign systems, terrain, objectives, and mission identity remain metadata-owned in GuderianCore while dzw supplies the playable rules skeleton.",
                 ]
             )
         case .france1940:
@@ -73,7 +73,8 @@ public enum DZWScenarioLoader {
                 opponentArmy: TE_ARMY_GERMAN,
                 opponentForceIndex: 0,
                 notes: [
-                    "Uses the inherited British roster as a Western Allied proxy until French 1940 data is added.",
+                    "Uses the inherited British roster as a Western Allied unit-stat proxy until a native French 1940 C roster is added.",
+                    "France 1940 campaign systems, objectives, and balance data are owned by GuderianCore while dzw supplies the playable rules skeleton.",
                     "The dzw C engine is loaded through game_create_demo_with_forces without modifying the submodule.",
                 ]
             )

@@ -87,8 +87,28 @@ public enum ScenarioSetupCatalog {
             return tucholaForest
         case .wizna:
             return wizna
+        case .brzescLitewski:
+            return brzescLitewski
+        case .kobryn:
+            return kobryn
         case .sedan:
             return sedan
+        case .stonne:
+            return stonne
+        case .montcornet:
+            return montcornet
+        case .amiensAbbeville:
+            return amiensAbbeville
+        case .boulogne:
+            return boulogne
+        case .calais:
+            return calais
+        case .dunkirk:
+            return dunkirk
+        case .fallRot:
+            return fallRot
+        case .bialystokMinsk:
+            return bialystokMinsk
         case .moscowTulaKashira:
             return moscowTulaKashira
         default:
@@ -118,6 +138,48 @@ public enum ScenarioSetupCatalog {
             trigger("tuchola-krojanty-screen", "Krojanty cavalry screen", "Pomeranian Cavalry Brigade is committed on turns 2-3", "Cancel one German reconnaissance or pursuit order, then require cavalry withdrawal."),
             trigger("tuchola-pincer-arrival", "Pincer arrival", "German AI controls a bridgehead and the East Prussia marker is active", "Shift scoring emphasis from road defense to Bydgoszcz withdrawal."),
             trigger("tuchola-withdrawal-window", "Bydgoszcz withdrawal window", "Turns 4-7", "Score surviving infantry, cavalry screen, command, and anti-tank units that exit east."),
+        ]
+    )
+
+    private static let brzescLitewski = ScenarioSetupScript(
+        id: .brzescLitewski,
+        playerBriefing: "Turn the old fortress, rail line, and improvised garrison into a three-day delay. Hold Brzesc long enough to protect fallback routes, then extract mobile assets before the citadel is isolated.",
+        guderianBriefing: "The German plan fixes the town with motorized infantry, drives armor along road and rail approaches, and uses artillery/engineers to isolate the citadel.",
+        units: [
+            unit("brzesc-plisowski-hq", "Plisowski defense headquarters", .player, "Fortress command", "Improvised command group coordinating three infantry battalions and engineers."),
+            unit("brzesc-infantry", "Brzesc infantry battalions", .player, "Urban defense", "Reservists and march battalions holding town and fortress sectors."),
+            unit("brzesc-engineers", "Polish engineer battalion", .player, "Fortress works", "Maintains gates, demolitions, and fallback routes inside the fortress."),
+            unit("brzesc-armored-trains", "Armored trains PP55 and PP53", .player, "Rail fire support", "Rail-bound support that can cover town defense or withdrawal."),
+            unit("brzesc-ft17", "FT-17 training tank companies", .player, "Obsolete armor", "Old tanks used as mobile pillboxes rather than panzer duelists."),
+            unit("brzesc-10th-panzer", "German 10th Panzer Division", .guderianAI, "Armored assault", "Panzer force attacking road and fortress approaches."),
+            unit("brzesc-3rd-panzer", "German 3rd Panzer Division", .guderianAI, "Encirclement pressure", "Armored pressure that can cut fallback gates."),
+            unit("brzesc-20th-motorized", "German 20th Motorized Division", .guderianAI, "Infantry reduction", "Motorized infantry and artillery used to reduce town sectors."),
+        ],
+        triggers: [
+            trigger("brzesc-rail-support", "Rail support", "A Polish armored train controls a rail objective", "Fire support can pin one German approach or cover a fallback."),
+            trigger("brzesc-ft17-strongpoint", "FT-17 strongpoint", "Old tanks defend from town or fortress cover", "Ignore one German light-armor breakthrough result before checking isolation."),
+            trigger("brzesc-citadel-isolation", "Citadel isolation", "German forces control town and rail approaches", "Shift scoring from town defense to inner-fortress survival and fallback."),
+            trigger("brzesc-fallback-gate", "Fallback gate", "Turns 4-7", "Score surviving command, train, and infantry assets that exit through the south gate."),
+        ]
+    )
+
+    private static let kobryn = ScenarioSetupScript(
+        id: .kobryn,
+        playerBriefing: "Hold Kobryn as a rearguard, keep Operational Group Polesie coherent, and withdraw the 60th Reserve Infantry before German motorized pressure closes both exits.",
+        guderianBriefing: "The German plan uses the 2nd Motorized Infantry Division to fix Kobryn, threaten both eastern exits, and turn an inconclusive fight into encirclement.",
+        units: [
+            unit("kobryn-epler-hq", "Adam Epler command group", .player, "Rearguard command", "Keeps reserve infantry and guns coordinated during withdrawal."),
+            unit("kobryn-60th-reserve", "60th Reserve Infantry Division", .player, "Town defense", "Main Polish force holding Kobryn and covering exits."),
+            unit("kobryn-field-guns", "Polish field and anti-tank guns", .player, "Road denial", "Covers western roadblocks and must limber to score preservation."),
+            unit("kobryn-rearguard", "Polish rearguard companies", .player, "Withdrawal cover", "Detachments that trade ground for time around Kobryn."),
+            unit("kobryn-2nd-motorized", "German 2nd Motorized Infantry Division", .guderianAI, "Fixing attack", "Motorized infantry pressure from XIX Corps."),
+            unit("kobryn-flank-patrols", "German flank patrols", .guderianAI, "Exit threat", "Markers that can close eastern withdrawal lanes."),
+        ],
+        triggers: [
+            trigger("kobryn-roadblock", "Western roadblock", "Polish guns or infantry contest the western road", "Delay the German fixing attack by one order."),
+            trigger("kobryn-rearguard-window", "Rearguard window", "Kobryn remains contested through turn 3", "Unlock eastern withdrawal scoring."),
+            trigger("kobryn-exit-threat", "Exit threat", "German flank patrols control one eastern road", "Force the player to choose between town defense and cohesion scoring."),
+            trigger("kobryn-cohesion-exit", "Cohesion exit", "Three or more Polish units exit through the same lane", "Award operational success despite the town being lost or contested."),
         ]
     )
 
@@ -164,6 +226,160 @@ public enum ScenarioSetupCatalog {
             trigger("sedan-engineer-crossing", "Engineer crossing", "German engineers control a bridge site", "Unlock bridgehead objective scoring and panzer follow-up."),
             trigger("sedan-french-counterattack", "French counterattack", "Bridgehead perimeter is German-controlled or artillery control is lost", "Release French reserve counterattack group."),
             trigger("sedan-panzer-release", "Panzer release", "German bridgehead survives a full player turn", "Allow German armor to move east along the Sedan-Gaulier road."),
+        ]
+    )
+
+    private static let stonne = ScenarioSetupScript(
+        id: .stonne,
+        playerBriefing: "Use French heavy tanks and infantry to contest Stonne and the heights. The goal is to threaten the Sedan bridgehead flank, not to hold every street forever.",
+        guderianBriefing: "German forces must keep the bridgehead flank secure by pinning French infantry, flanking heavy tanks, and retaking Stonne after each French thrust.",
+        units: [
+            unit("stonne-char-b1", "Char B1 bis shock group", .player, "Heavy-tank counterattack", "French heavy tanks can dominate frontal fights when supported."),
+            unit("stonne-french-infantry", "French infantry around Stonne", .player, "Village control", "Infantry needed to convert tank shock into objective control."),
+            unit("stonne-artillery", "French artillery observers", .player, "Bridgehead threat", "Observation from the heights pressures German support lines."),
+            unit("stonne-grossdeutschland", "Grossdeutschland assault group", .guderianAI, "Village assault", "German infantry pressure in the repeated fight for Stonne."),
+            unit("stonne-panzer-support", "10th Panzer support elements", .guderianAI, "Bridgehead guard", "Armor and anti-tank support trying to contain Char B1 attacks."),
+            unit("stonne-artillery-support", "German artillery support", .guderianAI, "Suppression", "Pressure source that makes repeated village control costly."),
+        ],
+        triggers: [
+            trigger("stonne-heavy-tank-shock", "Heavy-tank shock", "A Char B1 attacks from village or ridge cover", "Cancel one unsupported German anti-tank result."),
+            trigger("stonne-village-flip", "Village changes hands", "Control of Stonne changes during a turn", "Score contested objective points and escalate reinforcement pressure."),
+            trigger("stonne-flank-risk", "Flank risk", "French tanks advance without adjacent infantry", "German support can mark heavy tanks as isolated."),
+        ]
+    )
+
+    private static let montcornet = ScenarioSetupScript(
+        id: .montcornet,
+        playerBriefing: "Strike German columns around Montcornet with 4e Division cuirassee, destroy or disorder road assets, then withdraw armor before German reserve and air pressure peaks.",
+        guderianBriefing: "German forces absorb the raid, hold road junctions, call air pressure, and try to trap French armor after the first attacks lose momentum.",
+        units: [
+            unit("montcornet-4dcr-tanks", "4e Division cuirassee tank groups", .player, "Armored raid", "Strong tank groups that can smash road columns during the early raid window."),
+            unit("montcornet-french-support", "French limited support detachments", .player, "Raid support", "Sparse infantry and artillery support that cannot hold ground alone."),
+            unit("montcornet-withdrawal-group", "French withdrawal control", .player, "Disengagement", "Preserves armored force after disruption objectives are met."),
+            unit("montcornet-column-guards", "German road column guards", .guderianAI, "Column security", "Protect command, supply, and transport assets."),
+            unit("montcornet-reserves", "German reserve reaction", .guderianAI, "Counterattack", "Arrives after the French raid window opens."),
+            unit("montcornet-air-pressure", "Luftwaffe reaction", .guderianAI, "Air pressure", "Late pressure that punishes French armor that remains too long."),
+        ],
+        triggers: [
+            trigger("montcornet-raid-window", "Raid window", "Turns 1-3", "French tanks score disruption before German reserves fully react."),
+            trigger("montcornet-column-disruption", "Column disruption", "French armor controls a German road objective", "Reduce German pursuit or reinforcement tempo."),
+            trigger("montcornet-air-peak", "Air-pressure peak", "Turns 4-6", "French armor still on road objectives risks loss unless withdrawing."),
+        ]
+    )
+
+    private static let amiensAbbeville = ScenarioSetupScript(
+        id: .amiensAbbeville,
+        playerBriefing: "Hold Somme bridges and road hubs long enough to buy evacuation time. The Germans will likely reach the Channel; your success is measured in delays and preserved blocking forces.",
+        guderianBriefing: "XIX Corps races through Amiens toward Abbeville, then spreads along the Somme to secure the Channel cut and guard against counterattacks.",
+        units: [
+            unit("amiens-french-blocking", "French blocking detachments", .player, "Road defense", "Holds Amiens and Somme crossings against German armored movement."),
+            unit("amiens-british-elements", "British blocking elements", .player, "Evacuation time", "Detachments whose survival represents time bought for northern Allied forces."),
+            unit("amiens-demolition-teams", "Bridge demolition teams", .player, "Crossing delay", "Can deny a Somme crossing for one German order window."),
+            unit("amiens-1st-panzer", "German 1st Panzer Division", .guderianAI, "Amiens thrust", "Central armored drive through Amiens."),
+            unit("amiens-2nd-panzer", "German 2nd Panzer Division", .guderianAI, "Abbeville thrust", "Northern armored drive toward Abbeville and the Channel."),
+            unit("amiens-10th-panzer", "German 10th Panzer Division flank", .guderianAI, "Somme guard", "Southern flank security along the river line."),
+        ],
+        triggers: [
+            trigger("amiens-bridge-delay", "Bridge delay", "A bridge is contested or demolished at turn end", "Prevent German exit scoring through that crossing next turn."),
+            trigger("amiens-abbeville-race", "Abbeville race", "German armor controls Amiens road hub", "Advance 2nd Panzer pressure toward the Channel exit."),
+            trigger("amiens-channel-cut", "Channel cut", "German armor controls Abbeville and the Channel exit", "Switch player scoring to evacuation time and force preservation."),
+        ]
+    )
+
+    private static let boulogne = ScenarioSetupScript(
+        id: .boulogne,
+        playerBriefing: "Hold Boulogne's harbor and old town long enough for destroyers to embark troops and land demolition parties. The port may fall; the player wins by evacuation, naval support timing, and denial.",
+        guderianBriefing: "2nd Panzer Division presses from the coast road and ridge approaches, tries to split the old town from the harbor, and calls air/artillery pressure once destroyers enter.",
+        units: [
+            unit("boulogne-french-garrison", "French naval and fortress garrison", .player, "Old-town defense", "Defenders in the Haute Ville and port forts."),
+            unit("boulogne-guards", "20th Guards Brigade detachments", .player, "Harbor perimeter", "British defenders holding Irish and Welsh Guards sectors around the port."),
+            unit("boulogne-destroyers", "Royal Navy destroyer support", .player, "Naval fire and embarkation", "Ships enter under tank, artillery, and air pressure to extract troops."),
+            unit("boulogne-demolitions", "Navy demolition party", .player, "Port denial", "Can deny harbor facilities after evacuation scoring."),
+            unit("boulogne-2nd-panzer", "German 2nd Panzer Division", .guderianAI, "Urban assault", "Primary German assault force against the port."),
+            unit("boulogne-air-pressure", "German air and artillery pressure", .guderianAI, "Harbor disruption", "Pressure that reduces embarkation capacity."),
+        ],
+        triggers: [
+            trigger("boulogne-destroyer-fire", "Destroyer fire support", "A destroyer support marker reaches the harbor", "Pin one German assault order and unlock embarkation scoring."),
+            trigger("boulogne-embarkation", "Harbor embarkation", "The harbor objective is player-controlled or contested at turn end", "Evacuate one Allied formation or wounded/non-combatant marker."),
+            trigger("boulogne-port-denial", "Port denial", "Demolition parties survive after an evacuation score", "Deny one German harbor-control point even if the port falls."),
+        ]
+    )
+
+    private static let calais = ScenarioSetupScript(
+        id: .calais,
+        playerBriefing: "Hold Calais in layers. The garrison is not expected to keep the port indefinitely; every turn that 10th Panzer remains fixed here supports the wider Dunkirk evacuation.",
+        guderianBriefing: "10th Panzer Division reduces outer defenses, cuts supply, then drives on the citadel and docks to end the strategic delay.",
+        units: [
+            unit("calais-british-garrison", "British Calais garrison", .player, "Layered defense", "Core garrison under siege pressure."),
+            unit("calais-french-belgian", "French and Belgian defenders", .player, "Perimeter support", "Local defenders holding town and dock sectors."),
+            unit("calais-supply", "Garrison supply and command points", .player, "Siege endurance", "Keeps fire support and command active under bombardment."),
+            unit("calais-10th-panzer", "German 10th Panzer Division", .guderianAI, "Siege assault", "German armor and infantry assigned to reduce Calais."),
+            unit("calais-artillery-air", "German artillery and air pressure", .guderianAI, "Supply reduction", "Suppresses perimeter layers and garrison supply."),
+        ],
+        triggers: [
+            trigger("calais-strategic-delay", "Strategic delay", "Any inner perimeter objective is held at turn end", "Score Dunkirk-time points regardless of eventual port control."),
+            trigger("calais-supply-pressure", "Supply pressure", "Air and assault pressure target the same layer", "Reduce garrison fire support unless supply remains held."),
+            trigger("calais-citadel-fight", "Citadel fight", "Outer perimeter falls", "Move scoring focus to citadel/docks and costly German attacks."),
+        ]
+    )
+
+    private static let dunkirk = ScenarioSetupScript(
+        id: .dunkirk,
+        playerBriefing: "Keep the evacuation perimeter open. This scenario is marked as Guderian-adjacent campaign pressure rather than direct Guderian command; score by moving formations off the beaches while rear guards hold canals.",
+        guderianBriefing: "German pressure compresses canal lines and roads, reducing beach capacity each time a perimeter gate or air-pressure marker breaks through.",
+        units: [
+            unit("dunkirk-bef-rearguard", "BEF rear-guard detachments", .player, "Canal defense", "Hold crossings long enough to keep evacuation lanes open."),
+            unit("dunkirk-french-perimeter", "French perimeter forces", .player, "Beachhead defense", "Defenders around harbor and canal sectors."),
+            unit("dunkirk-evacuation-control", "Evacuation control parties", .player, "Embarkation", "Convert open beach sectors into evacuated formations."),
+            unit("dunkirk-german-pressure", "German perimeter pressure", .guderianAI, "Compression", "Campaign-pressure force attacking canal and road exits."),
+            unit("dunkirk-air-pressure", "German air pressure", .guderianAI, "Evacuation disruption", "Reduces beach capacity and damages exposed sectors."),
+        ],
+        triggers: [
+            trigger("dunkirk-command-caveat", "Command-scope caveat", "Scenario briefing opens", "Display that this is a Guderian-adjacent pressure scenario."),
+            trigger("dunkirk-evacuation", "Evacuation capacity", "A beach sector remains open at turn end", "Evacuate one formation, reduced by air-pressure and canal-breach markers."),
+            trigger("dunkirk-rearguard-sacrifice", "Rear-guard sacrifice", "A rear-guard unit holds a canal gate while isolated", "Score time bought even if the unit cannot withdraw."),
+        ]
+    )
+
+    private static let fallRot = ScenarioSetupScript(
+        id: .fallRot,
+        playerBriefing: "Slow Panzergruppe Guderian's late drive with bridge demolitions, fortress-town stands, fuel denial, and retreat corridors. Once Belfort and Epinal are threatened, preservation matters more than holding every crossing.",
+        guderianBriefing: "Panzergruppe Guderian forces crossings, exploits road gaps, captures fortress towns, and connects with Army Group C to trap French forces near the Vosges and Maginot rear.",
+        units: [
+            unit("fallrot-bridge-guards", "French bridge and canal guards", .player, "Crossing denial", "Defenders around Aisne and Marne-Rhine crossing points."),
+            unit("fallrot-fortress-garrisons", "Belfort and Epinal fortress garrisons", .player, "Fortress-town delay", "Late-campaign strongpoints that can force urban fights."),
+            unit("fallrot-retreat-columns", "French retreat columns", .player, "Preservation", "Forces trying to escape through Vosges corridors."),
+            unit("fallrot-demolitions", "Fuel and bridge demolition teams", .player, "Tempo denial", "Can create congestion and fuel friction for panzers."),
+            unit("fallrot-panzergruppe", "Panzergruppe Guderian columns", .guderianAI, "Deep exploitation", "German armored columns driving toward the Swiss border."),
+            unit("fallrot-engineers", "German bridge engineers", .guderianAI, "Crossing repair", "Reopen demolished or contested crossings."),
+            unit("fallrot-army-group-c", "Army Group C link-up marker", .guderianAI, "Encirclement", "Represents the eastern link closing behind French forces."),
+        ],
+        triggers: [
+            trigger("fallrot-bridge-denial", "Bridge denial", "A demolition team holds a crossing at turn end", "Force German engineers or congestion before panzer exit scoring."),
+            trigger("fallrot-fortress-stand", "Fortress-town stand", "Belfort or Epinal remains contested", "Score delay and slow Army Group C link-up pressure."),
+            trigger("fallrot-vosges-trap", "Vosges trap", "German forces control Belfort and an eastern road marker", "Switch scoring from position defense to retreat-corridor preservation."),
+        ]
+    )
+
+    private static let bialystokMinsk = ScenarioSetupScript(
+        id: .bialystokMinsk,
+        playerBriefing: "Western Front is in danger of double envelopment. Use mechanized counterattacks to delay one pincer, keep Minsk road/rail communications open, and evacuate command posts before the pockets close.",
+        guderianBriefing: "2nd Panzer Group drives across the Bug as the southern pincer while 3rd Panzer Group closes from the north; the German plan is to seal Bialystok and Minsk pockets before Soviet formations can withdraw.",
+        units: [
+            unit("bialystok-3rd-army", "Soviet 3rd Army detachments", .player, "Northern pocket defense", "Forward army elements threatened by the northern pincer."),
+            unit("bialystok-10th-army", "Soviet 10th Army salient force", .player, "Breakout force", "Large forward force that must choose between counterattack and withdrawal."),
+            unit("bialystok-4th-army", "Soviet 4th Army remnants", .player, "Southern screen", "Screen against Guderian's Bug River penetration."),
+            unit("bialystok-mechanized", "Soviet mechanized counterattack groups", .player, "Pincer delay", "Fuel-limited counterattack force for reopening escape lanes."),
+            unit("bialystok-command", "Western Front command posts", .player, "Command preservation", "High-value headquarters and artillery control assets."),
+            unit("bialystok-2nd-panzer", "German 2nd Panzer Group", .guderianAI, "Southern pincer", "Guderian's force driving toward Minsk."),
+            unit("bialystok-3rd-panzer", "German 3rd Panzer Group", .guderianAI, "Northern pincer", "Hoth's force closing the double envelopment."),
+            unit("bialystok-infantry-armies", "German 4th and 9th Army pressure", .guderianAI, "Pocket reduction", "Infantry pressure that destroys pockets after panzer closure."),
+        ],
+        triggers: [
+            trigger("bialystok-double-envelopment", "Double envelopment", "Northern and southern pincer markers both advance east", "Close one breakout route and add pocket attrition."),
+            trigger("bialystok-boldin-counterattack", "Mechanized counterattack", "Mechanized assets attack a pincer marker on turns 2-4", "Delay one pincer order and open a temporary escape lane, then mark fuel-low."),
+            trigger("bialystok-command-preservation", "Command preservation", "A command post reaches Minsk road or rail control", "Score command-survival points and reduce attrition for one turn."),
+            trigger("bialystok-breakout-lane", "Breakout lane", "A road or rail objective remains Soviet-controlled at turn end", "Exit one trapped formation or remove one isolation marker."),
         ]
     )
 
