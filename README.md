@@ -83,6 +83,8 @@ Cycle 210 update: Smolensk, Roslavl-Novozybkov, Kiev, and Bryansk now have hand-
 
 Cycle 240 update: Mtsensk is now a hand-authored, proxy-loadable armored ambush scenario; Moscow/Tula/Kashira now covers the full southern-pincer chain through Venev, Kashira, and Mordves; every campaign battle now has a historical overlay, AI refinement snapshot, balance audit, proxy-loader smoke coverage, and regression tests while `dzw` remains untouched.
 
+Cycle 250 update: the complete campaign milestone is in place. Release polish now includes versioned campaign save/load state, a full-campaign completion summary, ship-readiness reporting, credits, accessibility and performance audit data, final regression coverage, and verified SwiftPM/Xcode build paths while `dzw` remains untouched.
+
 ## Run
 
 Build and test from the repository root:
@@ -99,6 +101,10 @@ swift run GuderianApp
 ```
 
 Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme.
+
+## Ship Status
+
+The cycle 250 full-campaign target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks.
 
 ## App Identity
 

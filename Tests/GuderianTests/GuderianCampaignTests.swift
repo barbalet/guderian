@@ -588,6 +588,98 @@ final class GuderianCampaignTests: XCTestCase {
         }
     }
 
+    func testCycle250CampaignSaveStateRoundTripsProgressAndSelection() throws {
+        var progress = CampaignProgress()
+        let record = CampaignCompletionRecord(
+            scenarioID: .tucholaForest,
+            score: 12,
+            victoryBand: .decisive,
+            completedTurn: 6,
+            note: "Release save/load regression."
+        )
+        progress.recordCompletion(record)
+
+        let state = CampaignSaveState(
+            selectedScenarioID: .sedan,
+            playMode: .standalone,
+            progress: progress,
+            savedAt: Date(timeIntervalSince1970: 1_941)
+        )
+        let data = try CampaignSaveCodec.encode(state)
+        let decoded = try CampaignSaveCodec.decode(data)
+
+        XCTAssertEqual(decoded, state)
+        XCTAssertEqual(CampaignSaveCodec.decodeIfCurrent(data), state)
+        XCTAssertEqual(decoded.progress.completionRecord(for: .tucholaForest), record)
+        XCTAssertEqual(decoded.selectedScenarioID, .sedan)
+        XCTAssertEqual(decoded.playMode, .standalone)
+
+        let stale = CampaignSaveState(
+            selectedScenarioID: .wizna,
+            playMode: .chronological,
+            progress: progress,
+            savedAt: Date(timeIntervalSince1970: 1_942),
+            schemaVersion: 0
+        )
+        XCTAssertNil(CampaignSaveCodec.decodeIfCurrent(try CampaignSaveCodec.encode(stale)))
+    }
+
+    func testCycle250CampaignCompletionSummaryUnlocksFinalScreen() throws {
+        var progress = CampaignProgress()
+        var expectedScore = 0
+
+        XCTAssertFalse(progress.completionSummary().isComplete)
+        XCTAssertEqual(progress.completionSummary().nextScenarioID, .tucholaForest)
+
+        for scenario in GuderianCampaignCatalog.all {
+            let balance = ScenarioBalanceCatalog.profile(for: scenario)
+            expectedScore += balance.maxPlayerScore
+            progress.recordCompletion(
+                CampaignCompletionRecord(
+                    scenarioID: scenario.id,
+                    score: balance.maxPlayerScore,
+                    victoryBand: .operational,
+                    completedTurn: balance.targetTurns.upperBound,
+                    note: "Cycle 250 full-campaign completion regression."
+                )
+            )
+        }
+
+        let summary = progress.completionSummary()
+        XCTAssertTrue(summary.isComplete)
+        XCTAssertTrue(progress.isComplete())
+        XCTAssertEqual(summary.completedScenarios, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(summary.remainingScenarioIDs, [])
+        XCTAssertNil(summary.nextScenarioID)
+        XCTAssertEqual(summary.totalScore, expectedScore)
+        XCTAssertEqual(summary.victoryBands[.operational], GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(summary.completionTitle, "Full Campaign Complete")
+    }
+
+    func testCycle250FullCampaignShipReportIsReadyCreditedAndBudgeted() throws {
+        let report = FullCampaignShipReportCatalog.report()
+
+        XCTAssertTrue(report.isShipReady, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.cycleRange, 241...250)
+        XCTAssertEqual(report.scenarioCount, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(report.proxyLoadableCount, report.scenarioCount)
+        XCTAssertEqual(report.handAuthoredCount, report.scenarioCount)
+        XCTAssertEqual(report.historicalOverlayCount, report.scenarioCount)
+        XCTAssertEqual(report.aiSnapshotCount, report.scenarioCount)
+        XCTAssertEqual(report.balanceAuditCount, report.scenarioCount)
+        XCTAssertTrue(report.blockers.isEmpty)
+        XCTAssertTrue(report.releaseChecklist.allSatisfy { $0.status == .passed })
+        XCTAssertTrue(report.releaseChecklist.contains { $0.id == "save-load" })
+        XCTAssertTrue(report.releaseChecklist.contains { $0.id == "completion" })
+        XCTAssertTrue(report.credits.contains { $0.id == "engine" && $0.sourcePathOrURL == "dzw/" })
+        XCTAssertTrue(report.credits.contains { $0.id == "icon" && $0.sourcePathOrURL.contains("AppIconSource") })
+        XCTAssertGreaterThanOrEqual(report.accessibilityItems.count, 4)
+        XCTAssertGreaterThanOrEqual(report.performanceBudgets.count, 4)
+        XCTAssertTrue(report.performanceBudgets.allSatisfy(\.isPassing))
+        XCTAssertTrue(report.buildCommands.contains("swift test"))
+        XCTAssertTrue(report.buildCommands.contains { $0.contains("xcodebuild") })
+    }
+
     func testTucholaForestIsFirstFullCampaignPlayableDataSlice() throws {
         let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .tucholaForest))
         let bundle = ScenarioContentCatalog.bundle(for: scenario)

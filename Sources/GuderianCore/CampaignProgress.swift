@@ -46,6 +46,50 @@ public struct CampaignProgressionSnapshot: Codable, Hashable, Sendable {
     }
 }
 
+public struct CampaignCompletionSummary: Codable, Hashable, Sendable {
+    public let totalScenarios: Int
+    public let completedScenarios: Int
+    public let remainingScenarioIDs: [GuderianBattleID]
+    public let nextScenarioID: GuderianBattleID?
+    public let totalScore: Int
+    public let victoryBands: [VictoryBand: Int]
+
+    public init(
+        totalScenarios: Int,
+        completedScenarios: Int,
+        remainingScenarioIDs: [GuderianBattleID],
+        nextScenarioID: GuderianBattleID?,
+        totalScore: Int,
+        victoryBands: [VictoryBand: Int]
+    ) {
+        self.totalScenarios = totalScenarios
+        self.completedScenarios = completedScenarios
+        self.remainingScenarioIDs = remainingScenarioIDs
+        self.nextScenarioID = nextScenarioID
+        self.totalScore = totalScore
+        self.victoryBands = victoryBands
+    }
+
+    public var isComplete: Bool {
+        completedScenarios == totalScenarios && totalScenarios > 0
+    }
+
+    public var progressLabel: String {
+        "\(completedScenarios) of \(totalScenarios) complete"
+    }
+
+    public var completionTitle: String {
+        isComplete ? "Full Campaign Complete" : "Campaign In Progress"
+    }
+
+    public var completionMessage: String {
+        if isComplete {
+            return "Every command-scope battle in the Guderian campaign has a completion record."
+        }
+        return "\(remainingScenarioIDs.count) scenarios remain before the full campaign completion screen is unlocked."
+    }
+}
+
 public struct CampaignProgress: Codable, Hashable, Sendable {
     public private(set) var completedScenarioIDs: Set<GuderianBattleID>
     public private(set) var completionRecords: [GuderianBattleID: CampaignCompletionRecord]
@@ -104,6 +148,21 @@ public struct CampaignProgress: Codable, Hashable, Sendable {
         completionRecords[id]
     }
 
+    public func isComplete(
+        in catalog: [GuderianScenario] = GuderianCampaignCatalog.all
+    ) -> Bool {
+        catalog.allSatisfy { completedScenarioIDs.contains($0.id) }
+    }
+
+    public func remainingScenarioIDs(
+        in catalog: [GuderianScenario] = GuderianCampaignCatalog.all
+    ) -> [GuderianBattleID] {
+        catalog
+            .sorted { $0.order < $1.order }
+            .filter { !completedScenarioIDs.contains($0.id) }
+            .map(\.id)
+    }
+
     public mutating func markCompleted(_ id: GuderianBattleID) {
         completedScenarioIDs.insert(id)
     }
@@ -127,6 +186,27 @@ public struct CampaignProgress: Codable, Hashable, Sendable {
             completedRecords: catalog.compactMap { completionRecords[$0.id] },
             availableScenarioIDs: availableScenarios(in: mode, catalog: catalog).map(\.id),
             nextScenarioID: nextScenario(in: catalog)?.id
+        )
+    }
+
+    public func completionSummary(
+        catalog: [GuderianScenario] = GuderianCampaignCatalog.all
+    ) -> CampaignCompletionSummary {
+        let ordered = catalog.sorted { $0.order < $1.order }
+        let remaining = ordered
+            .filter { !completedScenarioIDs.contains($0.id) }
+            .map(\.id)
+        let records = ordered.compactMap { completionRecords[$0.id] }
+        let bands = Dictionary(grouping: records, by: \.victoryBand)
+            .mapValues(\.count)
+
+        return CampaignCompletionSummary(
+            totalScenarios: ordered.count,
+            completedScenarios: ordered.filter { completedScenarioIDs.contains($0.id) }.count,
+            remainingScenarioIDs: remaining,
+            nextScenarioID: remaining.first,
+            totalScore: records.reduce(0) { $0 + $1.score },
+            victoryBands: bands
         )
     }
 

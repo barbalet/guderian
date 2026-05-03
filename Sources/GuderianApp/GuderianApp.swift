@@ -1,4 +1,5 @@
 import GuderianCore
+import Foundation
 import Metal
 import SwiftUI
 
@@ -18,9 +19,19 @@ struct GuderianCampaignView: View {
     @State private var selectedID: GuderianBattleID? = GuderianCampaignCatalog.demoIDs.first
     @State private var progress = CampaignProgress()
     @State private var playMode: CampaignPlayMode = .chronological
+    @State private var hasLoadedSaveState = false
+    @AppStorage("guderian.campaignSaveState.v1") private var savedCampaignStateData = Data()
 
     private var selectedScenario: GuderianScenario {
         scenarios.first { $0.id == selectedID } ?? scenarios[0]
+    }
+
+    private var completionSummary: CampaignCompletionSummary {
+        progress.completionSummary(catalog: scenarios)
+    }
+
+    private var shipReport: FullCampaignShipReport {
+        FullCampaignShipReportCatalog.report(catalog: scenarios)
     }
 
     var body: some View {
@@ -28,13 +39,18 @@ struct GuderianCampaignView: View {
             List(selection: $selectedID) {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(progress.completedCount) of \(scenarios.count) complete")
+                        Text(completionSummary.progressLabel)
                             .font(.headline)
                         Text("\(progress.availableScenarios(in: playMode, catalog: scenarios).count) available | \(playMode.rawValue)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        Text(shipReport.isShipReady ? "Full campaign ship-ready" : "\(shipReport.blockers.count) ship blockers")
+                            .font(.caption)
+                            .foregroundStyle(shipReport.isShipReady ? .green : .orange)
                     }
                     .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(completionSummary.progressLabel), \(progress.availableScenarios(in: playMode, catalog: scenarios).count) available, \(shipReport.isShipReady ? "ship ready" : "ship blockers present")")
 
                     Picker("Play mode", selection: $playMode) {
                         Text(CampaignPlayMode.chronological.rawValue).tag(CampaignPlayMode.chronological)
@@ -69,12 +85,38 @@ struct GuderianCampaignView: View {
                         } label: {
                             Label("Complete", systemImage: "checkmark.circle")
                         }
+                        .accessibilityLabel("Mark selected scenario complete")
+
+                        Button {
+                            markAllScenariosComplete()
+                        } label: {
+                            Label("Complete All", systemImage: "checkmark.seal")
+                        }
+                        .accessibilityLabel("Mark full campaign complete")
 
                         Button {
                             progress.reset()
                         } label: {
                             Label("Reset", systemImage: "arrow.counterclockwise")
                         }
+                        .accessibilityLabel("Reset campaign progress")
+                    }
+                    .buttonStyle(.borderless)
+
+                    HStack {
+                        Button {
+                            persistCampaignState()
+                        } label: {
+                            Label("Save", systemImage: "tray.and.arrow.down")
+                        }
+                        .accessibilityLabel("Save campaign progress")
+
+                        Button {
+                            loadSavedCampaignState(force: true)
+                        } label: {
+                            Label("Load", systemImage: "tray.and.arrow.up")
+                        }
+                        .accessibilityLabel("Load campaign progress")
                     }
                     .buttonStyle(.borderless)
 
@@ -85,7 +127,62 @@ struct GuderianCampaignView: View {
                     .background(.bar)
             }
         } detail: {
-            ScenarioBriefingView(scenario: selectedScenario, progress: progress, playMode: playMode)
+            ScenarioBriefingView(scenario: selectedScenario, progress: progress, playMode: playMode, shipReport: shipReport)
+        }
+        .onAppear {
+            loadSavedCampaignState()
+        }
+        .onChange(of: selectedID) { _, _ in
+            persistCampaignState()
+        }
+        .onChange(of: progress) { _, _ in
+            persistCampaignState()
+        }
+        .onChange(of: playMode) { _, _ in
+            persistCampaignState()
+        }
+    }
+
+    private func markAllScenariosComplete() {
+        for scenario in scenarios {
+            let balance = ScenarioContentCatalog.bundle(for: scenario).balance
+            progress.recordCompletion(
+                CampaignCompletionRecord(
+                    scenarioID: scenario.id,
+                    score: balance.maxPlayerScore,
+                    victoryBand: .operational,
+                    completedTurn: balance.targetTurns.upperBound,
+                    note: "Marked complete during full-campaign ship polish."
+                )
+            )
+        }
+    }
+
+    private func persistCampaignState() {
+        let state = CampaignSaveState(
+            selectedScenarioID: selectedScenario.id,
+            playMode: playMode,
+            progress: progress
+        )
+        if let data = try? CampaignSaveCodec.encode(state) {
+            savedCampaignStateData = data
+        }
+    }
+
+    private func loadSavedCampaignState(force: Bool = false) {
+        guard force || !hasLoadedSaveState else {
+            return
+        }
+        hasLoadedSaveState = true
+        guard let state = CampaignSaveCodec.decodeIfCurrent(savedCampaignStateData) else {
+            persistCampaignState()
+            return
+        }
+
+        progress = state.progress
+        playMode = state.playMode
+        if scenarios.contains(where: { $0.id == state.selectedScenarioID }) {
+            selectedID = state.selectedScenarioID
         }
     }
 }
@@ -119,6 +216,8 @@ struct ScenarioRow: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(scenario.order). \(scenario.title), \(scenario.dateLabel), \(scenario.theater.rawValue), \(progress.isCompleted(scenario.id) ? "complete" : progress.isAvailable(scenario, in: playMode) ? "available" : "locked")")
     }
 
     private var iconName: String {
@@ -157,6 +256,7 @@ struct ScenarioBriefingView: View {
     let scenario: GuderianScenario
     let progress: CampaignProgress
     let playMode: CampaignPlayMode
+    let shipReport: FullCampaignShipReport
     @State private var logCategory: ScenarioLogCategory? = nil
 
     var loadout: DZWScenarioLoadout? {
@@ -195,6 +295,10 @@ struct ScenarioBriefingView: View {
         ScenarioBalanceAuditCatalog.audit(for: scenario)
     }
 
+    var completionSummary: CampaignCompletionSummary {
+        progress.completionSummary()
+    }
+
     var logEntries: [ScenarioLogEntry] {
         content.logEntries
     }
@@ -223,6 +327,10 @@ struct ScenarioBriefingView: View {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 statusStrip
+                if completionSummary.isComplete {
+                    campaignCompletionView
+                }
+                shipReadinessView
                 ScenarioMapView(layout: layout)
                     .frame(maxWidth: 860)
                 briefingSection("Player Force", scenario.playerForceSummary, icon: "shield.lefthalf.filled")
@@ -303,6 +411,98 @@ struct ScenarioBriefingView: View {
         }
         .font(.callout)
         .foregroundStyle(.secondary)
+    }
+
+    private var campaignCompletionView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(completionSummary.completionTitle, systemImage: "rosette")
+                .font(.headline)
+            Text(completionSummary.completionMessage)
+                .font(.callout)
+            HStack {
+                Label(completionSummary.progressLabel, systemImage: "checkmark.circle")
+                Label("\(completionSummary.totalScore) campaign VP", systemImage: "sum")
+                Label("\(completionSummary.victoryBands.values.reduce(0, +)) recorded results", systemImage: "chart.bar")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var shipReadinessView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Full Campaign Ship", systemImage: shipReport.isShipReady ? "checkmark.seal" : "exclamationmark.triangle")
+                .font(.headline)
+                .foregroundStyle(shipReport.isShipReady ? .green : .orange)
+            HStack {
+                Label(shipReport.cycleLabel, systemImage: "calendar")
+                Label("\(shipReport.scenarioCount) scenarios", systemImage: "list.number")
+                Label("\(shipReport.proxyLoadableCount) proxy loads", systemImage: "gearshape.2")
+                Label("\(shipReport.handAuthoredCount) hand-authored", systemImage: "square.and.pencil")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            ForEach(shipReport.releaseChecklist) { item in
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: item.status == .passed ? "checkmark.circle" : "exclamationmark.triangle")
+                        .foregroundStyle(item.status == .passed ? .green : .orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.title)
+                            .font(.body.weight(.medium))
+                        Text(item.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Label("Release Budgets", systemImage: "speedometer")
+                .font(.subheadline.weight(.semibold))
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(shipReport.performanceBudgets) { budget in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label("\(budget.measuredCount)/\(budget.limit)", systemImage: budget.isPassing ? "checkmark.circle" : "exclamationmark.triangle")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(budget.isPassing ? .green : .orange)
+                        Text(budget.title)
+                            .font(.caption)
+                        Text(budget.detail)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            Label("Accessibility", systemImage: "accessibility")
+                .font(.subheadline.weight(.semibold))
+            ForEach(shipReport.accessibilityItems) { item in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.caption.weight(.semibold))
+                    Text(item.coverage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Label("Credits", systemImage: "text.book.closed")
+                .font(.subheadline.weight(.semibold))
+            ForEach(shipReport.credits) { credit in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(credit.title)
+                        .font(.caption.weight(.semibold))
+                    Text("\(credit.detail) \(credit.sourcePathOrURL)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 
     private func briefingSection(_ title: String, _ value: String, icon: String) -> some View {
