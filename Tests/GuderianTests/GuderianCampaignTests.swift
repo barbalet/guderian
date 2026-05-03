@@ -708,28 +708,58 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(architecture.requiredEngineHooks.allSatisfy { $0.owner == .dzwEngine })
     }
 
-    func testCycle290EveryBattleHasNativeBoardShellButStillNeedsEventAndAIHooks() throws {
+    func testCycle375AllBattlesAreNativePlayableWithAIEventReadiness() throws {
         let reports = NativePlayabilityArchitectureCatalog.allReadinessReports
         let orderedIDs = GuderianCampaignCatalog.all
             .sorted { $0.order < $1.order }
             .map(\.id)
+        let nativePlayableIDs = Set(GuderianCampaignCatalog.demoIDs + PolishCampaignSystemCatalog.polishScenarioIDs + FranceCampaignSystemCatalog.franceScenarioIDs + EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs)
+        let polishIDs = Set(PolishCampaignSystemCatalog.polishScenarioIDs)
+        let franceIDs = Set(FranceCampaignSystemCatalog.franceScenarioIDs)
+        let easternFrontIDs = Set(EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs)
 
         XCTAssertEqual(reports.map(\.id), orderedIDs)
         XCTAssertEqual(reports.count, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(nativePlayableIDs.count, GuderianCampaignCatalog.all.count)
 
         for report in reports {
             XCTAssertTrue(report.hasMinimumAuthoredInputs, "\(report.title): \(report.summary)")
-            XCTAssertEqual(report.status, .nativeBoardShellReady)
             XCTAssertFalse(report.requiredHookIDs.contains("scenario-instance-loader"))
-            XCTAssertTrue(report.requiredHookIDs.contains("scenario-event-triggers"))
-            XCTAssertTrue(report.requiredHookIDs.contains("scenario-ai-controls"))
             XCTAssertTrue(report.notes.contains { $0.contains("scenario-specific terrain/objectives/mission target") })
-            XCTAssertTrue(report.notes.contains { $0.contains("Remaining native work") })
+            XCTAssertTrue(report.notes.contains { $0.contains("Cycle 375 native AI/event pass") })
+
+            if nativePlayableIDs.contains(report.id) {
+                XCTAssertEqual(report.status, .nativePlayable)
+                XCTAssertFalse(report.requiredHookIDs.contains("scenario-mission-state"))
+                XCTAssertTrue(report.requiredHookIDs.contains("scenario-event-triggers"))
+                XCTAssertTrue(report.requiredHookIDs.contains("scenario-ai-controls"))
+                if easternFrontIDs.contains(report.id) {
+                    XCTAssertTrue(report.notes.contains { $0.contains("Cycle 370 native Eastern Front pack") })
+                } else if franceIDs.contains(report.id) {
+                    XCTAssertTrue(report.notes.contains { $0.contains("Cycle 345 native France pack") })
+                } else if polishIDs.contains(report.id) {
+                    XCTAssertTrue(report.notes.contains { $0.contains("Cycle 325 native Poland pack") })
+                } else {
+                    XCTAssertTrue(report.notes.contains { $0.contains("Cycle 300 demo parity") })
+                }
+            }
         }
 
         let demoReports = reports.filter { GuderianCampaignCatalog.demoIDs.contains($0.id) }
         XCTAssertEqual(demoReports.count, GuderianCampaignCatalog.demoIDs.count)
-        XCTAssertTrue(demoReports.allSatisfy { $0.notes.contains { $0.contains("cycle 300") } })
+        XCTAssertTrue(demoReports.allSatisfy { $0.notes.contains { $0.contains("cycles 291-300") } })
+
+        let polishReports = reports.filter { polishIDs.contains($0.id) }
+        XCTAssertEqual(polishReports.count, PolishCampaignSystemCatalog.polishScenarioIDs.count)
+        XCTAssertTrue(polishReports.allSatisfy { $0.notes.contains { $0.contains("Cycle 325 native Poland pack") } })
+
+        let franceReports = reports.filter { franceIDs.contains($0.id) }
+        XCTAssertEqual(franceReports.count, FranceCampaignSystemCatalog.franceScenarioIDs.count)
+        XCTAssertTrue(franceReports.allSatisfy { $0.notes.contains { $0.contains("Cycle 345 native France pack") } })
+
+        let easternFrontReports = reports.filter { easternFrontIDs.contains($0.id) }
+        XCTAssertEqual(easternFrontReports.count, EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs.count)
+        XCTAssertTrue(easternFrontReports.allSatisfy { $0.notes.contains { $0.contains("Cycle 370 native Eastern Front pack") } })
     }
 
     func testCycle270NativeBattleInstancesConvertEveryScenarioIntoEngineBlueprints() throws {
@@ -873,15 +903,334 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertFalse(afterFire.logLines.isEmpty)
     }
 
+    func testCycle300DemoParityCompletesDemoBattlesFromNativeBoardToDebrief() throws {
+        XCTAssertEqual(NativeDemoParityRunner.cycleRange, 291...300)
+        XCTAssertEqual(NativeDemoParityRunner.playableBattleIDs, GuderianCampaignCatalog.demoIDs)
+
+        for id in GuderianCampaignCatalog.demoIDs {
+            let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: id))
+            let balance = ScenarioBalanceCatalog.profile(for: scenario)
+            let completion = try NativeDemoParityRunner.runBattle(
+                scenario,
+                seed: UInt32(150_000 + scenario.order)
+            )
+
+            XCTAssertEqual(completion.id, id)
+            XCTAssertEqual(completion.cycleStart, 291)
+            XCTAssertEqual(completion.cycleEnd, 300)
+            XCTAssertTrue(completion.completedFromNativeBoardToDebrief, scenario.title)
+            XCTAssertTrue(completion.completedWithoutGenericProxies, scenario.title)
+            XCTAssertEqual(completion.openingSnapshot.scenarioID, id)
+            XCTAssertEqual(completion.openingSnapshot.mission.name, scenario.title)
+            XCTAssertTrue(completion.openingSnapshot.isScenarioBoardPlayable)
+            XCTAssertTrue(completion.finalSnapshot.isScenarioBoardPlayable)
+            XCTAssertTrue(completion.openingSnapshot.deploymentReport.placedAnyScenarioUnit)
+            XCTAssertEqual(completion.score, balance.maxPlayerScore)
+            XCTAssertEqual(completion.score, completion.scoreAwards.filter(\.awarded).reduce(0) { $0 + $1.victoryPoints })
+            XCTAssertTrue(balance.outcomeBands.contains { $0.grade == completion.victoryBand && $0.scoreRange.contains(completion.score) })
+            XCTAssertEqual(completion.completionRecord.scenarioID, id)
+            XCTAssertEqual(completion.completionRecord.score, completion.score)
+            XCTAssertEqual(completion.completionRecord.victoryBand, completion.victoryBand)
+            XCTAssertGreaterThan(completion.phaseAdvances, 0)
+            XCTAssertFalse(completion.steps.isEmpty)
+            XCTAssertTrue(completion.steps.contains { $0.phase == .movement })
+            XCTAssertTrue(completion.steps.contains { $0.phase == .shooting })
+            XCTAssertTrue(completion.steps.contains { $0.phase == .assault })
+            XCTAssertTrue(completion.debriefSummary.contains("\(completion.score)/\(balance.maxPlayerScore) VP"))
+        }
+    }
+
+    func testCycle300DemoParityCampaignProgressRecordsAllDemoCompletions() throws {
+        let suite = try NativeDemoParityRunner.runDemoCampaign()
+
+        XCTAssertEqual(suite.battleIDs, GuderianCampaignCatalog.demoIDs)
+        XCTAssertEqual(suite.completions.map(\.id), GuderianCampaignCatalog.demoIDs)
+        XCTAssertTrue(suite.completedAllDemoBattles)
+        XCTAssertTrue(suite.summary.isComplete)
+        XCTAssertEqual(suite.summary.completedScenarios, GuderianCampaignCatalog.demoIDs.count)
+        XCTAssertEqual(suite.summary.remainingScenarioIDs, [])
+        XCTAssertNil(suite.summary.nextScenarioID)
+        XCTAssertEqual(suite.progress.completedCount, GuderianCampaignCatalog.demoIDs.count)
+        XCTAssertTrue(suite.completions.allSatisfy { suite.progress.completionRecord(for: $0.id) == $0.completionRecord })
+    }
+
+    func testCycle310NativeBoardDiagnosticsRunEveryBattleThroughRealBoardActions() throws {
+        XCTAssertEqual(NativeBoardDiagnosticsRunner.cycleRange, 301...310)
+
+        let suite = NativeBoardDiagnosticsRunner.runCampaign()
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(suite.cycleStart, 301)
+        XCTAssertEqual(suite.cycleEnd, 310)
+        XCTAssertEqual(suite.reports.map(\.id), orderedIDs)
+        XCTAssertEqual(suite.passedCount, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(suite.blockingFindingCount, 0)
+
+        for diagnostic in suite.reports {
+            XCTAssertTrue(diagnostic.openedNativeSession, diagnostic.title)
+            XCTAssertTrue(diagnostic.passedRealBoardDiagnostics, "\(diagnostic.title): \(diagnostic.findings.map(\.detail).joined(separator: "\n"))")
+            XCTAssertTrue(diagnostic.openingSnapshot?.isScenarioBoardPlayable == true, diagnostic.title)
+            XCTAssertTrue(diagnostic.finalSnapshot?.isScenarioBoardPlayable == true, diagnostic.title)
+            XCTAssertGreaterThan(diagnostic.legalActionsAttempted, 0, diagnostic.title)
+            XCTAssertGreaterThan(diagnostic.legalActionsSucceeded, 0, diagnostic.title)
+            XCTAssertGreaterThanOrEqual(diagnostic.phaseAdvances, 2, diagnostic.title)
+            XCTAssertFalse(diagnostic.steps.isEmpty, diagnostic.title)
+            XCTAssertTrue(diagnostic.steps.contains { $0.phase == .movement }, diagnostic.title)
+            XCTAssertTrue(diagnostic.steps.contains { $0.phase == .shooting }, diagnostic.title)
+            XCTAssertTrue(diagnostic.steps.contains { $0.phase == .assault }, diagnostic.title)
+            XCTAssertFalse(diagnostic.findings.contains { $0.kind == .blockedPhase })
+            XCTAssertFalse(diagnostic.findings.contains { $0.kind == .impossibleReinforcement })
+            XCTAssertFalse(diagnostic.findings.contains { $0.kind == .unwinnableGate })
+        }
+    }
+
+    func testCycle325NativePolandPackCoversFour1939BattlesAndCompletesThem() throws {
+        XCTAssertEqual(NativePolandBattlefieldPackCatalog.cycleRange, 311...325)
+        XCTAssertEqual(
+            NativePolandBattlefieldPackCatalog.playableBattleIDs,
+            [.tucholaForest, .wizna, .brzescLitewski, .kobryn]
+        )
+
+        let packs = NativePolandBattlefieldPackCatalog.allPacks
+        XCTAssertEqual(packs.map(\.id), NativePolandBattlefieldPackCatalog.playableBattleIDs)
+        XCTAssertTrue(packs.allSatisfy(\.isNativePolandPackReady))
+
+        let tuchola = try XCTUnwrap(NativePolandBattlefieldPackCatalog.pack(for: .tucholaForest))
+        XCTAssertTrue(tuchola.hasRule(.withdrawal))
+        XCTAssertTrue(tuchola.hasRule(.demolition))
+        XCTAssertTrue(tuchola.hasRule(.cavalryScreen))
+        XCTAssertTrue(tuchola.hasRule(.antiTankLane))
+        XCTAssertTrue(tuchola.objectiveKinds.contains(.withdraw))
+        XCTAssertTrue(tuchola.playerMobilities.contains(.cavalry))
+
+        let wizna = try XCTUnwrap(NativePolandBattlefieldPackCatalog.pack(for: .wizna))
+        XCTAssertTrue(wizna.hasRule(.bunker))
+        XCTAssertTrue(wizna.terrainKinds.contains(.bunker))
+        XCTAssertTrue(wizna.terrainKinds.contains(.fortifiedLine))
+
+        let brzesc = try XCTUnwrap(NativePolandBattlefieldPackCatalog.pack(for: .brzescLitewski))
+        XCTAssertTrue(brzesc.hasRule(.railSupport))
+        XCTAssertTrue(brzesc.hasRule(.fortressUrban))
+        XCTAssertTrue(brzesc.hasRule(.obsoleteArmor))
+        XCTAssertTrue(brzesc.playerMobilities.contains(.armoredTrain))
+        XCTAssertTrue(brzesc.playerMobilities.contains(.armor))
+
+        let kobryn = try XCTUnwrap(NativePolandBattlefieldPackCatalog.pack(for: .kobryn))
+        XCTAssertTrue(kobryn.hasRule(.withdrawal))
+        XCTAssertTrue(kobryn.hasRule(.roadblock))
+        XCTAssertTrue(kobryn.objectiveKinds.contains(.withdraw))
+
+        let campaign = try NativePolandPackRunner.runCampaign()
+        XCTAssertTrue(campaign.completedAllPolishBattles)
+        XCTAssertEqual(campaign.summary.completedScenarios, NativePolandBattlefieldPackCatalog.playableBattleIDs.count)
+        XCTAssertTrue(campaign.completions.allSatisfy(\.completedFromNativePolandBattlefield))
+        XCTAssertTrue(campaign.completions.allSatisfy { $0.completionRecord.score > 0 })
+        XCTAssertTrue(campaign.completions.allSatisfy { $0.phaseAdvances > 0 })
+        XCTAssertTrue(campaign.completions.allSatisfy { !$0.steps.isEmpty })
+    }
+
+    func testCycle345NativeFrancePackCoversFrance1940BattlesAndCompletesThem() throws {
+        XCTAssertEqual(NativeFranceBattlefieldPackCatalog.cycleRange, 326...345)
+        XCTAssertEqual(
+            NativeFranceBattlefieldPackCatalog.playableBattleIDs,
+            [.sedan, .stonne, .montcornet, .amiensAbbeville, .boulogne, .calais, .dunkirk, .fallRot]
+        )
+
+        let packs = NativeFranceBattlefieldPackCatalog.allPacks
+        XCTAssertEqual(packs.map(\.id), NativeFranceBattlefieldPackCatalog.playableBattleIDs)
+        XCTAssertTrue(packs.allSatisfy(\.isNativeFrancePackReady))
+
+        let sedan = try XCTUnwrap(NativeFranceBattlefieldPackCatalog.pack(for: .sedan))
+        XCTAssertTrue(sedan.hasRule(.riverCrossing))
+        XCTAssertTrue(sedan.hasRule(.bridgehead))
+        XCTAssertTrue(sedan.hasRule(.airPressure))
+        XCTAssertTrue(sedan.terrainKinds.contains(.river))
+        XCTAssertTrue(sedan.terrainKinds.contains(.bridge))
+
+        let stonne = try XCTUnwrap(NativeFranceBattlefieldPackCatalog.pack(for: .stonne))
+        XCTAssertTrue(stonne.hasRule(.heavyTankShock))
+        XCTAssertTrue(stonne.terrainKinds.contains(.town))
+        XCTAssertTrue(stonne.playerMobilities.contains(.armor))
+
+        let montcornet = try XCTUnwrap(NativeFranceBattlefieldPackCatalog.pack(for: .montcornet))
+        XCTAssertTrue(montcornet.hasRule(.armoredRaid))
+        XCTAssertTrue(montcornet.hasRule(.airPressure))
+        XCTAssertTrue(montcornet.hasRule(.withdrawal))
+
+        let amiens = try XCTUnwrap(NativeFranceBattlefieldPackCatalog.pack(for: .amiensAbbeville))
+        XCTAssertTrue(amiens.hasRule(.riverCrossing))
+        XCTAssertTrue(amiens.hasRule(.channelDelay))
+
+        let boulogne = try XCTUnwrap(NativeFranceBattlefieldPackCatalog.pack(for: .boulogne))
+        XCTAssertTrue(boulogne.hasRule(.evacuation))
+        XCTAssertTrue(boulogne.hasRule(.navalSupport))
+        XCTAssertTrue(boulogne.hasRule(.portDenial))
+
+        let calais = try XCTUnwrap(NativeFranceBattlefieldPackCatalog.pack(for: .calais))
+        XCTAssertTrue(calais.hasRule(.siegeSupply))
+        XCTAssertTrue(calais.hasRule(.channelDelay))
+
+        let dunkirk = try XCTUnwrap(NativeFranceBattlefieldPackCatalog.pack(for: .dunkirk))
+        XCTAssertTrue(dunkirk.hasRule(.evacuation))
+        XCTAssertTrue(dunkirk.hasRule(.channelDelay))
+
+        let fallRot = try XCTUnwrap(NativeFranceBattlefieldPackCatalog.pack(for: .fallRot))
+        XCTAssertTrue(fallRot.hasRule(.fortressFallback))
+        XCTAssertTrue(fallRot.hasRule(.withdrawal))
+
+        let campaign = try NativeFrancePackRunner.runCampaign()
+        XCTAssertTrue(campaign.completedAllFranceBattles)
+        XCTAssertEqual(campaign.summary.completedScenarios, NativeFranceBattlefieldPackCatalog.playableBattleIDs.count)
+        XCTAssertTrue(campaign.completions.allSatisfy(\.completedFromNativeFranceBattlefield))
+        XCTAssertTrue(campaign.completions.allSatisfy { $0.completionRecord.score > 0 })
+        XCTAssertTrue(campaign.completions.allSatisfy { $0.phaseAdvances > 0 })
+        XCTAssertTrue(campaign.completions.allSatisfy { !$0.steps.isEmpty })
+    }
+
+    func testCycle350EasternFrontNativeFoundationCoversAll1941Battles() throws {
+        XCTAssertEqual(NativeEasternFrontBattlefieldFoundationCatalog.cycleRange, 346...350)
+        XCTAssertEqual(
+            NativeEasternFrontBattlefieldFoundationCatalog.foundationBattleIDs,
+            [.bialystokMinsk, .smolensk, .roslavlNovozybkov, .kiev, .bryansk, .mtsensk, .moscowTulaKashira]
+        )
+
+        let foundations = NativeEasternFrontBattlefieldFoundationCatalog.allFoundations
+        XCTAssertEqual(foundations.map(\.id), NativeEasternFrontBattlefieldFoundationCatalog.foundationBattleIDs)
+        XCTAssertTrue(foundations.allSatisfy(\.isNativeEasternFrontFoundationReady))
+
+        for foundation in foundations {
+            let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: foundation.id))
+            XCTAssertTrue(NativeEasternFrontBattlefieldFoundationCatalog.isFoundationReady(scenario), foundation.title)
+            XCTAssertFalse(foundation.summary.isEmpty)
+        }
+
+        let bialystok = try XCTUnwrap(NativeEasternFrontBattlefieldFoundationCatalog.foundation(for: .bialystokMinsk))
+        XCTAssertTrue(bialystok.hasRule(.pocket))
+        XCTAssertTrue(bialystok.hasRule(.breakout))
+        XCTAssertTrue(bialystok.hasRule(.mechanizedCounterattack))
+
+        let smolensk = try XCTUnwrap(NativeEasternFrontBattlefieldFoundationCatalog.foundation(for: .smolensk))
+        XCTAssertTrue(smolensk.hasRule(.riverCrossing))
+        XCTAssertTrue(smolensk.hasRule(.logistics))
+        XCTAssertTrue(smolensk.hasRule(.breakout))
+
+        let roslavl = try XCTUnwrap(NativeEasternFrontBattlefieldFoundationCatalog.foundation(for: .roslavlNovozybkov))
+        XCTAssertTrue(roslavl.hasRule(.southwardTurn))
+
+        let kiev = try XCTUnwrap(NativeEasternFrontBattlefieldFoundationCatalog.foundation(for: .kiev))
+        XCTAssertTrue(kiev.hasRule(.pincer))
+        XCTAssertTrue(kiev.hasRule(.commandPost))
+        XCTAssertTrue(kiev.hasRule(.pocket))
+
+        let bryansk = try XCTUnwrap(NativeEasternFrontBattlefieldFoundationCatalog.foundation(for: .bryansk))
+        XCTAssertTrue(bryansk.hasRule(.logistics))
+        XCTAssertTrue(bryansk.hasRule(.tulaDefense))
+
+        let mtsensk = try XCTUnwrap(NativeEasternFrontBattlefieldFoundationCatalog.foundation(for: .mtsensk))
+        XCTAssertTrue(mtsensk.hasRule(.armorAmbush))
+        XCTAssertTrue(mtsensk.hasRule(.t34KVShock))
+
+        let moscow = try XCTUnwrap(NativeEasternFrontBattlefieldFoundationCatalog.foundation(for: .moscowTulaKashira))
+        XCTAssertTrue(moscow.hasRule(.winterFriction))
+        XCTAssertTrue(moscow.hasRule(.tulaDefense))
+    }
+
+    func testCycle370NativeEasternFrontPackCovers1941BattlesAndCompletesThem() throws {
+        XCTAssertEqual(NativeEasternFrontBattlefieldPackCatalog.cycleRange, 346...370)
+        XCTAssertEqual(
+            NativeEasternFrontBattlefieldPackCatalog.playableBattleIDs,
+            [.bialystokMinsk, .smolensk, .roslavlNovozybkov, .kiev, .bryansk, .mtsensk, .moscowTulaKashira]
+        )
+
+        let packs = NativeEasternFrontBattlefieldPackCatalog.allPacks
+        XCTAssertEqual(packs.map(\.id), NativeEasternFrontBattlefieldPackCatalog.playableBattleIDs)
+        XCTAssertTrue(packs.allSatisfy(\.isNativeEasternFrontPackReady))
+        XCTAssertTrue(packs.allSatisfy { $0.foundationCycleStart == 346 && $0.foundationCycleEnd == 350 })
+
+        let bialystok = try XCTUnwrap(NativeEasternFrontBattlefieldPackCatalog.pack(for: .bialystokMinsk))
+        XCTAssertTrue(bialystok.hasRule(.pocket))
+        XCTAssertTrue(bialystok.hasRule(.breakout))
+        XCTAssertTrue(bialystok.hasRule(.mechanizedCounterattack))
+
+        let smolensk = try XCTUnwrap(NativeEasternFrontBattlefieldPackCatalog.pack(for: .smolensk))
+        XCTAssertTrue(smolensk.hasRule(.riverCrossing))
+        XCTAssertTrue(smolensk.hasRule(.logistics))
+        XCTAssertTrue(smolensk.hasRule(.breakout))
+
+        let kiev = try XCTUnwrap(NativeEasternFrontBattlefieldPackCatalog.pack(for: .kiev))
+        XCTAssertTrue(kiev.hasRule(.pincer))
+        XCTAssertTrue(kiev.hasRule(.commandPost))
+        XCTAssertTrue(kiev.hasRule(.pocket))
+
+        let mtsensk = try XCTUnwrap(NativeEasternFrontBattlefieldPackCatalog.pack(for: .mtsensk))
+        XCTAssertTrue(mtsensk.hasRule(.armorAmbush))
+        XCTAssertTrue(mtsensk.hasRule(.t34KVShock))
+
+        let moscow = try XCTUnwrap(NativeEasternFrontBattlefieldPackCatalog.pack(for: .moscowTulaKashira))
+        XCTAssertTrue(moscow.hasRule(.winterFriction))
+        XCTAssertTrue(moscow.hasRule(.tulaDefense))
+        XCTAssertTrue(moscow.hasRule(.counteroffensive))
+
+        let campaign = try NativeEasternFrontPackRunner.runCampaign()
+        XCTAssertTrue(campaign.completedAllEasternFrontBattles)
+        XCTAssertEqual(campaign.summary.completedScenarios, NativeEasternFrontBattlefieldPackCatalog.playableBattleIDs.count)
+        XCTAssertTrue(campaign.completions.allSatisfy(\.completedFromNativeEasternFrontBattlefield))
+        XCTAssertTrue(campaign.completions.allSatisfy { $0.completionRecord.score > 0 })
+        XCTAssertTrue(campaign.completions.allSatisfy { $0.phaseAdvances > 0 })
+        XCTAssertTrue(campaign.completions.allSatisfy { !$0.steps.isEmpty })
+    }
+
+    func testCycle375NativeAIEventPassCoversEveryBattle() throws {
+        XCTAssertEqual(NativeAIEventPassCatalog.cycleRange, 371...375)
+
+        let reports = NativeAIEventPassCatalog.allReports
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(reports.map(\.id), orderedIDs)
+        XCTAssertEqual(reports.count, GuderianCampaignCatalog.all.count)
+        XCTAssertTrue(reports.allSatisfy(\.isNativeAIEventPassReady))
+
+        for report in reports {
+            XCTAssertGreaterThan(report.aiOrderCount, 0, report.title)
+            XCTAssertGreaterThan(report.targetPriorityCount, 0, report.title)
+            XCTAssertGreaterThan(report.fallbackBehaviorCount, 0, report.title)
+            XCTAssertGreaterThan(report.eventTriggerCount, 0, report.title)
+            XCTAssertGreaterThan(report.deterministicSeedHint, 0, report.title)
+            XCTAssertTrue(report.hasBinding(.germanPriority), report.title)
+            XCTAssertTrue(report.hasBinding(.fallbackBehavior), report.title)
+            XCTAssertTrue(report.hasBinding(.victoryGate), report.title)
+            XCTAssertFalse(report.summary.isEmpty)
+        }
+
+        let sedan = try XCTUnwrap(NativeAIEventPassCatalog.report(for: .sedan))
+        XCTAssertTrue(sedan.hasBinding(.reinforcementTiming))
+        XCTAssertTrue(sedan.hasBinding(.scenarioRule))
+
+        let moscow = try XCTUnwrap(NativeAIEventPassCatalog.report(for: .moscowTulaKashira))
+        XCTAssertTrue(moscow.hasBinding(.reinforcementTiming))
+        XCTAssertTrue(moscow.hasBinding(.scenarioRule))
+        XCTAssertGreaterThan(moscow.scenarioRuleEventCount, 0)
+    }
+
     func testGuderianTestAutomationRunsEveryBattleAndSurfacesDiagnostics() throws {
         let report = CampaignAutomationRunner.runCampaign()
         let orderedIDs = GuderianCampaignCatalog.all
             .sorted { $0.order < $1.order }
             .map(\.id)
+        let demoIDs = Set(GuderianCampaignCatalog.demoIDs)
+        let polishIDs = Set(PolishCampaignSystemCatalog.polishScenarioIDs)
+        let franceIDs = Set(FranceCampaignSystemCatalog.franceScenarioIDs)
+        let easternFrontIDs = Set(EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs)
+        let nativePlayableIDs = Set(GuderianCampaignCatalog.demoIDs + PolishCampaignSystemCatalog.polishScenarioIDs + FranceCampaignSystemCatalog.franceScenarioIDs + EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs)
 
         XCTAssertEqual(report.reports.map(\.id), orderedIDs)
         XCTAssertEqual(report.reports.count, GuderianCampaignCatalog.all.count)
         XCTAssertEqual(report.completionSummary.completedScenarios, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(nativePlayableIDs.count, GuderianCampaignCatalog.all.count)
         XCTAssertGreaterThan(report.reports.reduce(0) { $0 + $1.actionsAttempted }, 0)
         XCTAssertGreaterThan(report.reports.reduce(0) { $0 + $1.phaseAdvances }, 0)
 
@@ -892,11 +1241,59 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertFalse(battle.steps.isEmpty, "\(battle.title) should expose an automation timeline")
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native Loader" })
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native Board" })
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native Board Diagnostics" })
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native Playability" })
-            XCTAssertTrue(battle.issues.contains { $0.stage == "Native Playability" && $0.kind == .warning })
             XCTAssertTrue(battle.issues.contains { $0.stage == "Native Loader" && $0.kind == .warning })
             XCTAssertFalse(battle.playerArmy.isEmpty)
             XCTAssertFalse(battle.opponentArmy.isEmpty)
+            XCTAssertTrue(battle.nativeBoardDiagnosticsPassed, battle.title)
+            XCTAssertNotNil(battle.boardDiagnostic, battle.title)
+            XCTAssertTrue(battle.boardDiagnostic?.passedRealBoardDiagnostics == true, battle.title)
+            XCTAssertTrue(battle.nativeAIEventPassReady, battle.title)
+            XCTAssertFalse(battle.nativeAIEventPassSummary.isEmpty)
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native AI/Event Pass" && $0.status == .passed })
+
+            if demoIDs.contains(battle.id) {
+                XCTAssertTrue(battle.nativeDemoBoardCompleted, battle.title)
+                XCTAssertNotNil(battle.completionRecord, battle.title)
+                XCTAssertFalse(battle.debriefSummary.isEmpty)
+                XCTAssertTrue(battle.steps.contains { $0.stage == "Native Demo" && $0.status == .passed })
+            }
+
+            if polishIDs.contains(battle.id) {
+                XCTAssertTrue(battle.nativePolandPackCompleted, battle.title)
+                XCTAssertNotNil(battle.completionRecord, battle.title)
+                XCTAssertFalse(battle.nativePolandPackSummary.isEmpty)
+                XCTAssertTrue(battle.steps.contains { $0.stage == "Native Poland Pack" && $0.status == .passed })
+            }
+
+            if franceIDs.contains(battle.id) {
+                XCTAssertTrue(battle.nativeFrancePackCompleted, battle.title)
+                XCTAssertNotNil(battle.completionRecord, battle.title)
+                XCTAssertFalse(battle.nativeFrancePackSummary.isEmpty)
+                XCTAssertTrue(battle.steps.contains { $0.stage == "Native France Pack" && $0.status == .passed })
+            }
+
+            if easternFrontIDs.contains(battle.id) {
+                XCTAssertTrue(battle.easternFrontFoundationReady, battle.title)
+                XCTAssertFalse(battle.easternFrontFoundationSummary.isEmpty)
+                XCTAssertTrue(battle.steps.contains { $0.stage == "Native Eastern Front Foundation" && $0.status == .passed })
+                XCTAssertTrue(battle.nativeEasternFrontPackCompleted, battle.title)
+                XCTAssertNotNil(battle.completionRecord, battle.title)
+                XCTAssertFalse(battle.nativeEasternFrontPackSummary.isEmpty)
+                XCTAssertTrue(battle.steps.contains { $0.stage == "Native Eastern Front Pack" && $0.status == .passed })
+            }
+
+            if nativePlayableIDs.contains(battle.id) {
+                XCTAssertFalse(battle.issues.contains { $0.stage == "Native Playability" && $0.kind == .warning }, battle.title)
+            } else {
+                XCTAssertFalse(battle.nativeDemoBoardCompleted, battle.title)
+                XCTAssertFalse(battle.nativePolandPackCompleted, battle.title)
+                XCTAssertFalse(battle.nativeFrancePackCompleted, battle.title)
+                XCTAssertFalse(battle.nativeEasternFrontPackCompleted, battle.title)
+                XCTAssertNil(battle.completionRecord, battle.title)
+                XCTAssertTrue(battle.issues.contains { $0.stage == "Native Playability" && $0.kind == .warning })
+            }
         }
     }
 

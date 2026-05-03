@@ -30,6 +30,10 @@ final class GuderianTestViewModel: ObservableObject {
     private var completionProgress: CampaignProgress {
         var progress = CampaignProgress()
         for report in reports where report.status == .passed || report.status == .warning {
+            if let record = report.completionRecord {
+                progress.recordCompletion(record)
+                continue
+            }
             guard let scenario = GuderianCampaignCatalog.scenario(id: report.id) else {
                 continue
             }
@@ -243,6 +247,12 @@ struct GuderianTestBattleRow: View {
                 HStack(spacing: 8) {
                     Text(scenario.theater.rawValue)
                     Text(report.map { "\($0.actionsSucceeded)/\($0.actionsAttempted) actions" } ?? "queued")
+                    if let record = report?.completionRecord {
+                        Text("\(record.score) VP")
+                    }
+                    if report?.nativeBoardDiagnosticsPassed == true {
+                        Text("board ok")
+                    }
                     if let report, !report.issues.isEmpty {
                         Text("\(report.issues.count) issues")
                     }
@@ -346,8 +356,59 @@ struct GuderianTestReportDetail: View {
                 DetailMetric(title: "Final Turn", value: "\(report.finalTurn)")
                 DetailMetric(title: "Final Phase", value: report.finalPhase)
                 DetailMetric(title: "Winner", value: report.engineWinner)
+                DetailMetric(title: "Score", value: report.completionRecord.map { "\($0.score) VP" } ?? "Pending")
+                DetailMetric(title: "Debrief", value: report.completionRecord?.victoryBand.rawValue ?? "Pending")
+                DetailMetric(title: "Board", value: report.nativeBoardDiagnosticsPassed ? "Passed" : "Check")
                 DetailMetric(title: "Units", value: "\(report.engineUnitCount)")
                 DetailMetric(title: "Objectives", value: "\(report.engineObjectiveCount)")
+            }
+
+            if !report.debriefSummary.isEmpty {
+                Label(
+                    report.debriefSummary,
+                    systemImage: report.nativeDemoBoardCompleted ? "flag.checkered" : "flag"
+                )
+                .font(.callout)
+                .foregroundStyle(report.nativeDemoBoardCompleted ? .green : .secondary)
+            }
+
+            if let diagnostic = report.boardDiagnostic {
+                Label(
+                    "\(diagnostic.legalActionsSucceeded)/\(diagnostic.legalActionsAttempted) legal board actions, \(diagnostic.phaseAdvances) phase advances, \(diagnostic.findings.count) findings",
+                    systemImage: diagnostic.passedRealBoardDiagnostics ? "checkerboard.rectangle" : "exclamationmark.triangle"
+                )
+                .font(.callout)
+                .foregroundStyle(diagnostic.passedRealBoardDiagnostics ? .green : .orange)
+            }
+
+            if !report.nativePolandPackSummary.isEmpty {
+                Label(report.nativePolandPackSummary, systemImage: "map")
+                    .font(.callout)
+                    .foregroundStyle(report.nativePolandPackCompleted ? .green : .secondary)
+            }
+
+            if !report.nativeFrancePackSummary.isEmpty {
+                Label(report.nativeFrancePackSummary, systemImage: "flag.checkered")
+                    .font(.callout)
+                    .foregroundStyle(report.nativeFrancePackCompleted ? .green : .secondary)
+            }
+
+            if !report.easternFrontFoundationSummary.isEmpty {
+                Label(report.easternFrontFoundationSummary, systemImage: "scope")
+                    .font(.callout)
+                    .foregroundStyle(report.easternFrontFoundationReady ? .green : .secondary)
+            }
+
+            if !report.nativeEasternFrontPackSummary.isEmpty {
+                Label(report.nativeEasternFrontPackSummary, systemImage: "snowflake")
+                    .font(.callout)
+                    .foregroundStyle(report.nativeEasternFrontPackCompleted ? .green : .secondary)
+            }
+
+            if !report.nativeAIEventPassSummary.isEmpty {
+                Label(report.nativeAIEventPassSummary, systemImage: "point.3.connected.trianglepath.dotted")
+                    .font(.callout)
+                    .foregroundStyle(report.nativeAIEventPassReady ? .green : .secondary)
             }
         }
     }

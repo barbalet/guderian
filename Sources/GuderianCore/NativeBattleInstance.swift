@@ -714,7 +714,40 @@ private struct NativeBattleInstanceBuilder {
                 sourceID: step.id
             )
         }
-        return setupTriggers + reinforcements + pacingRules + tutorials
+        let polishRules = PolishCampaignSystemCatalog.profile(for: bundle.scenario)?.specialRules.map { rule in
+            NativeBattleEventTrigger(
+                id: "\(rule.id)-native-polish-rule",
+                kind: .trigger,
+                title: rule.name,
+                timing: "Native Polish rule",
+                condition: rule.trigger,
+                effect: rule.effect,
+                sourceID: rule.id
+            )
+        } ?? []
+        let franceRules = FranceCampaignSystemCatalog.profile(for: bundle.scenario)?.specialRules.map { rule in
+            NativeBattleEventTrigger(
+                id: "\(rule.id)-native-france-rule",
+                kind: .trigger,
+                title: rule.name,
+                timing: "Native France rule",
+                condition: rule.trigger,
+                effect: rule.effect,
+                sourceID: rule.id
+            )
+        } ?? []
+        let easternRules = EasternFrontCampaignSystemCatalog.profile(for: bundle.scenario)?.specialRules.map { rule in
+            NativeBattleEventTrigger(
+                id: "\(rule.id)-native-eastern-front-rule",
+                kind: .trigger,
+                title: rule.name,
+                timing: "Native Eastern Front rule",
+                condition: rule.trigger,
+                effect: rule.effect,
+                sourceID: rule.id
+            )
+        } ?? []
+        return setupTriggers + reinforcements + pacingRules + tutorials + polishRules + franceRules + easternRules
     }
 
     private func makeAIProfile() -> NativeBattleAIProfile {

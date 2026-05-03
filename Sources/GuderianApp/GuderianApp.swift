@@ -1019,14 +1019,34 @@ struct ScenarioBriefingView: View {
 }
 
 @MainActor
+struct NativeBattleBoardCompletionSummary: Equatable {
+    let sourceName: String
+    let victoryBand: String
+    let score: Int
+    let completedTurn: Int
+    let outcomeSummary: String
+}
+
+@MainActor
 final class NativeBattleBoardViewModel: ObservableObject {
     @Published private(set) var snapshot: NativeBoardSnapshot?
+    @Published private(set) var completion: NativeBattleBoardCompletionSummary?
+    @Published private(set) var debriefError: String?
 
+    private let scenario: GuderianScenario
     private var session: NativeBoardSession?
 
     init(scenario: GuderianScenario) {
+        self.scenario = scenario
         session = NativeBoardSession(scenario: scenario, seed: UInt32(120_000 + scenario.order))
         refresh()
+    }
+
+    var canCompleteNativeBattle: Bool {
+        NativeDemoParityRunner.playableBattleIDs.contains(scenario.id) ||
+            NativePolandBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id) ||
+            NativeFranceBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id) ||
+            NativeEasternFrontBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id)
     }
 
     func select(_ unit: NativeBoardUnitSnapshot) {
@@ -1060,6 +1080,69 @@ final class NativeBattleBoardViewModel: ObservableObject {
     func resolvePendingChoice() {
         session?.resolveFirstPendingChoice()
         refresh()
+    }
+
+    func completeNativeBattle() {
+        guard let session else {
+            debriefError = "Board session unavailable."
+            return
+        }
+        do {
+            if NativeEasternFrontBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id) {
+                completion = try completionSummary(from: NativeEasternFrontPackRunner.completeBattle(from: session))
+            } else if NativeFranceBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id) {
+                completion = try completionSummary(from: NativeFrancePackRunner.completeBattle(from: session))
+            } else if NativePolandBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id) {
+                completion = try completionSummary(from: NativePolandPackRunner.completeBattle(from: session))
+            } else {
+                completion = try completionSummary(from: NativeDemoParityRunner.completeBattle(from: session))
+            }
+            debriefError = nil
+        } catch {
+            completion = nil
+            debriefError = "\(error)"
+        }
+        refresh()
+    }
+
+    private func completionSummary(from report: NativeDemoBattleCompletionReport) -> NativeBattleBoardCompletionSummary {
+        NativeBattleBoardCompletionSummary(
+            sourceName: "Native Demo",
+            victoryBand: report.victoryBand.rawValue,
+            score: report.score,
+            completedTurn: report.completedTurn,
+            outcomeSummary: report.outcomeSummary
+        )
+    }
+
+    private func completionSummary(from report: NativePolandCompletionReport) -> NativeBattleBoardCompletionSummary {
+        NativeBattleBoardCompletionSummary(
+            sourceName: "Native Poland Pack",
+            victoryBand: report.completionRecord.victoryBand.rawValue,
+            score: report.completionRecord.score,
+            completedTurn: report.completionRecord.completedTurn,
+            outcomeSummary: report.debriefSummary
+        )
+    }
+
+    private func completionSummary(from report: NativeFranceCompletionReport) -> NativeBattleBoardCompletionSummary {
+        NativeBattleBoardCompletionSummary(
+            sourceName: "Native France Pack",
+            victoryBand: report.completionRecord.victoryBand.rawValue,
+            score: report.completionRecord.score,
+            completedTurn: report.completionRecord.completedTurn,
+            outcomeSummary: report.debriefSummary
+        )
+    }
+
+    private func completionSummary(from report: NativeEasternFrontCompletionReport) -> NativeBattleBoardCompletionSummary {
+        NativeBattleBoardCompletionSummary(
+            sourceName: "Native Eastern Front Pack",
+            victoryBand: report.completionRecord.victoryBand.rawValue,
+            score: report.completionRecord.score,
+            completedTurn: report.completionRecord.completedTurn,
+            outcomeSummary: report.debriefSummary
+        )
     }
 
     private func refresh() {
@@ -1167,6 +1250,37 @@ struct NativeBattleBoardView: View {
                 }
             }
             .buttonStyle(.bordered)
+
+            if model.canCompleteNativeBattle {
+                Button {
+                    model.completeNativeBattle()
+                } label: {
+                    Label("Debrief", systemImage: "flag.checkered")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            if let completion = model.completion {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(completion.victoryBand, systemImage: "rosette")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                    Text("\(completion.score) VP | turn \(completion.completedTurn)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(completion.sourceName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(completion.outcomeSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+            } else if let debriefError = model.debriefError {
+                Label(debriefError, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
 
             if let selected = snapshot.selectedUnit {
                 VStack(alignment: .leading, spacing: 3) {

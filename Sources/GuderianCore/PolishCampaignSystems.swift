@@ -160,6 +160,7 @@ public enum PolishCampaignSystemCatalog {
             asset("kobryn-withdrawal", "Eastern withdrawal lanes", .withdrawalRoute, "Score force preservation and cohesion.", "Close if German pressure reaches both road exits."),
         ],
         specialRules: [
+            rule("kobryn-roadblock", "Western roadblock", "Polish guns or reserve infantry contest the western road.", "Delay the German fixing attack and preserve one eastern exit from immediate pressure."),
             rule("kobryn-rearguard", "Rearguard timing", "The player holds a town objective through the midgame.", "Unlock withdrawal scoring for infantry groups."),
             rule("kobryn-cohesion", "Cohesion preservation", "Three or more units exit through the same lane.", "Award operational success for preserving the rearguard."),
         ]

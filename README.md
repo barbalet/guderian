@@ -95,6 +95,20 @@ Cycle 280 update: the native scenario loader now builds custom dzw army-list ski
 
 Cycle 290 update: the guarded dzw board hook now applies Guderian terrain zones, objective names/positions, and mission target scores to native skirmish games. The Guderian app also has a native board shell with unit selection, movement, fire diagnostics, pending-choice resolution, objective/terrain snapshots, phase controls, and log display. Demo parity still targets cycle 300 for Wizna, Sedan, and Moscow/Tula/Kashira debrief/scoring flow.
 
+Cycle 300 update: the native playable demo milestone is in place. Wizna, Sedan, and Moscow/Tula/Kashira now complete from native board sessions through deterministic turn playback, scenario score awards, debrief summaries, and campaign completion records without generic proxy maps or generic proxy forces. The Guderian app exposes demo debrief completion from the native board, and GuderianTest records native demo completions while the other battles remain native board-shell conversions.
+
+Cycle 310 update: GuderianTest now runs real native-board diagnostics for all 19 battles. Each scenario launches a native board session, executes legal movement/shooting/assault-phase probes, advances phases, checks target validity, validates reinforcement entry zones, and flags unwinnable mission/debrief gates.
+
+Cycle 325 update: the native Poland 1939 pack is in place for Tuchola Forest, Wizna, Brzesc Litewski, and Kobryn. These battles now expose native Polish unit/mobility coverage, 1939 terrain/objective coverage, withdrawal, demolition, bunker, fortress/urban, rail-support, roadblock, cavalry-screen, anti-tank-lane, obsolete-armor, and command-friction rule bindings, plus native board completion records and debriefs.
+
+Cycle 345 update: the native France 1940 pack is in place for Sedan, Stonne, Montcornet, Amiens-Abbeville, Boulogne, Calais, Dunkirk, and Fall Rot. These battles now expose native 1940 unit/mobility coverage, river-crossing, bridgehead, heavy-tank, armored-raid, air-pressure, evacuation, siege-supply, port-denial, naval-support, Channel-delay, withdrawal, and fortress-fallback rule bindings, plus native board completion records and debriefs.
+
+Cycle 350 update: the Eastern Front 1941 native foundation is in place for Bialystok-Minsk, Smolensk, Roslavl-Novozybkov, Kiev, Bryansk, Mtsensk, and Moscow/Tula/Kashira. The 1941 battles now expose native foundation mappings for pockets, breakout lanes, mechanized counterattacks, command posts, river crossings, logistics friction, southward-turn pressure, pincers, armor ambushes, T-34/KV shock, winter friction, Tula defense, and counteroffensive rules.
+
+Cycle 370 update: the native Eastern Front 1941 pack is complete. Bialystok-Minsk, Smolensk, Roslavl-Novozybkov, Kiev, Bryansk, Mtsensk, and Moscow/Tula/Kashira now complete from native board sessions through deterministic playback, scenario score awards, debrief summaries, and campaign completion records.
+
+Cycle 375 update: the first AI/event pass is in place across all 19 battles. Native reports now map deterministic German AI priorities, fallback behavior, scripted events, reinforcement timing, pacing, scenario rules, tutorial cues, and victory gates against real native battle instances.
+
 ## Run
 
 Build and test from the repository root:
@@ -114,7 +128,7 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 
 ## Ship Status
 
-The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 290 completes the native board-shell pass for all battles; executable battles now use scenario-derived army-list skirmishes, terrain/objectives, mission targets, and deployment positions. Scripted events, reinforcements, scenario AI, scoring/debrief polish, and demo parity remain for the cycle 300 block.
+The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 300 completes the native playable demo target for Wizna, Sedan, and Moscow/Tula/Kashira; cycle 325 promotes the four Polish 1939 battles; cycle 345 promotes the eight France 1940 battles; and cycle 370 promotes the seven Eastern Front 1941 battles. All 19 battles now have native board completion records and debriefs. GuderianTest performs real board diagnostics across the full campaign and records the cycle 375 AI/event readiness pass. The remaining native work is the cycle 376-400 polish-and-ship path: deepen event/reinforcement hooks, scenario AI controls, balance/UX polish, and final campaign release verification.
 
 ## App Identity
 

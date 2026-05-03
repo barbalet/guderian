@@ -173,10 +173,20 @@ public enum NativePlayabilityArchitectureCatalog {
         }.count
 
         let loadout = NativeScenarioLoader.load(scenario, seed: UInt32(80_000 + scenario.order))
+        let hasDemoParity = NativeDemoParityRunner.isNativeDemoPlayable(scenario)
+        let hasPolandNativePack = NativePolandBattlefieldPackCatalog.isNativePlayable(scenario)
+        let hasFranceNativePack = NativeFranceBattlefieldPackCatalog.isNativePlayable(scenario)
+        let hasEasternFrontNativePack = NativeEasternFrontBattlefieldPackCatalog.isNativePlayable(scenario)
+        let hasNativePlayablePack = hasDemoParity || hasPolandNativePack || hasFranceNativePack || hasEasternFrontNativePack
         let requiredHookIDs = architecture.requiredEngineHooks
             .filter { hook in
                 if loadout.canApplyScenarioBoardHook {
-                    return hook.id != "scenario-instance-loader"
+                    if hook.id == "scenario-instance-loader" {
+                        return false
+                    }
+                    if hasNativePlayablePack && hook.id == "scenario-mission-state" {
+                        return false
+                    }
                 }
                 return true
             }
@@ -187,14 +197,32 @@ public enum NativePlayabilityArchitectureCatalog {
                 : loadout.canCreateSkirmishBridge
                 ? "Native loader creates an army-list skirmish bridge and deploys units from the Guderian blueprint."
                 : "Authored scenario data is present but the native loader cannot create a skirmish bridge.",
-            "Remaining native work is board-flow polish, debrief mission state, scripted events, reinforcements, and scenario AI controls.",
+            hasEasternFrontNativePack
+                ? "Cycle 370 native Eastern Front pack is available with scenario-specific 1941 units, terrain, objectives, pocket, breakout, mechanized-counterattack, command-post, river-crossing, logistics, pincer, armor-ambush, T-34/KV, winter-friction, Tula-defense, score awards, debrief, and completion records."
+                : hasFranceNativePack
+                ? "Cycle 345 native France pack is available with scenario-specific 1940 units, terrain, objectives, river-crossing, heavy-tank, evacuation, siege, Channel-delay, air-pressure, score awards, debrief, and completion records."
+                : hasPolandNativePack
+                ? "Cycle 325 native Poland pack is available with scenario-specific 1939 units, terrain, objectives, withdrawal/fortress rules, score awards, debrief, and completion records."
+                : hasDemoParity
+                ? "Cycle 300 demo parity is available from native campaign selection to board actions, score awards, debrief, and completion records."
+                : "Remaining native work is board-flow polish, debrief mission state, scripted events, reinforcements, and scenario AI controls.",
         ]
         if scenario.isDemoScenario {
-            notes.append("Demo parity target: cycle \(architecture.demoPlayableTargetCycle).")
+            notes.append(
+                hasDemoParity
+                    ? "Demo parity target reached in cycles \(NativeDemoParityRunner.cycleRange.lowerBound)-\(NativeDemoParityRunner.cycleRange.upperBound). Scripted events and AI controls still need full-campaign expansion."
+                    : "Demo parity target: cycle \(architecture.demoPlayableTargetCycle)."
+            )
+        }
+        let aiEventReport = NativeAIEventPassCatalog.report(for: scenario)
+        if aiEventReport.isNativeAIEventPassReady {
+            notes.append("Cycle 375 native AI/event pass is mapped with deterministic AI priorities, fallback behavior, event triggers, reinforcement timing, and victory gates.")
         }
 
         let status: NativePlayabilityStatus
-        if loadout.canApplyScenarioBoardHook {
+        if hasNativePlayablePack {
+            status = .nativePlayable
+        } else if loadout.canApplyScenarioBoardHook {
             status = .nativeBoardShellReady
         } else if loadout.canCreateSkirmishBridge {
             status = .nativeBoardHookMissing

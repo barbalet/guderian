@@ -86,6 +86,21 @@ public struct CampaignAutomationBattleReport: Identifiable, Codable, Hashable, S
     public let phaseAdvances: Int
     public let engineUnitCount: Int
     public let engineObjectiveCount: Int
+    public let completionRecord: CampaignCompletionRecord?
+    public let debriefSummary: String
+    public let nativeDemoBoardCompleted: Bool
+    public let boardDiagnostic: NativeBoardDiagnosticReport?
+    public let nativeBoardDiagnosticsPassed: Bool
+    public let nativePolandPackCompleted: Bool
+    public let nativePolandPackSummary: String
+    public let nativeFrancePackCompleted: Bool
+    public let nativeFrancePackSummary: String
+    public let easternFrontFoundationReady: Bool
+    public let easternFrontFoundationSummary: String
+    public let nativeEasternFrontPackCompleted: Bool
+    public let nativeEasternFrontPackSummary: String
+    public let nativeAIEventPassReady: Bool
+    public let nativeAIEventPassSummary: String
     public let steps: [CampaignAutomationStep]
     public let issues: [CampaignAutomationIssue]
     public let engineLogTail: [String]
@@ -210,24 +225,170 @@ public enum CampaignAutomationRunner {
             accumulator.step("Native Loader", .warning, "Deployment note", note)
         }
 
+        let boardDiagnostic = NativeBoardDiagnosticsRunner.runBattle(
+            scenario,
+            seed: UInt32(165_000 + scenario.order)
+        )
+        accumulator.recordBoardDiagnostic(boardDiagnostic)
+
         validateScenarioData(scenario, accumulator: &accumulator)
         validateEngineState(game, scenario: scenario, accumulator: &accumulator)
         playEngineBattle(game, scenario: scenario, accumulator: &accumulator, options: options)
+        completeNativeDemoBattleIfAvailable(scenario, accumulator: &accumulator)
+        completeNativePolandBattleIfAvailable(scenario, accumulator: &accumulator)
+        completeNativeFranceBattleIfAvailable(scenario, accumulator: &accumulator)
+        recordEasternFrontFoundationIfAvailable(scenario, accumulator: &accumulator)
+        completeNativeEasternFrontBattleIfAvailable(scenario, accumulator: &accumulator)
+        recordNativeAIEventPass(scenario, accumulator: &accumulator)
 
         let report = accumulator.finalize(loadout: loadout.summary, game: game)
         if report.status == .passed || (report.status == .warning && options.completeWarningRuns) {
-            let balance = ScenarioBalanceCatalog.profile(for: scenario)
-            progress.recordCompletion(
-                CampaignCompletionRecord(
-                    scenarioID: scenario.id,
-                    score: balance.maxPlayerScore,
-                    victoryBand: report.status == .passed ? .operational : .tactical,
-                    completedTurn: max(1, report.finalTurn),
-                    note: "Completed by GuderianTest automation with status \(report.status.rawValue)."
-                )
-            )
+            progress.recordCompletion(report.completionRecord ?? fallbackCompletionRecord(for: scenario, report: report))
         }
         return report
+    }
+
+    private static func completeNativeDemoBattleIfAvailable(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        guard scenario.isDemoScenario else {
+            return
+        }
+
+        do {
+            let completion = try NativeDemoParityRunner.runBattle(
+                scenario,
+                seed: UInt32(140_000 + scenario.order)
+            )
+            accumulator.recordDemoCompletion(completion)
+        } catch {
+            accumulator.issue(
+                .failure,
+                "Native Demo",
+                "Native demo completion failed",
+                "\(scenario.title) could not finish the cycle 300 native demo path: \(error)."
+            )
+            accumulator.step(
+                "Native Demo",
+                .failed,
+                "Native demo completion failed",
+                "\(error)"
+            )
+        }
+    }
+
+    private static func completeNativePolandBattleIfAvailable(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        guard NativePolandBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id) else {
+            return
+        }
+
+        do {
+            let completion = try NativePolandPackRunner.runBattle(
+                scenario,
+                seed: UInt32(180_000 + scenario.order)
+            )
+            accumulator.recordPolandCompletion(completion)
+        } catch {
+            accumulator.issue(
+                .failure,
+                "Native Poland Pack",
+                "Native Poland completion failed",
+                "\(scenario.title) could not finish the cycle 325 native Poland path: \(error)."
+            )
+            accumulator.step(
+                "Native Poland Pack",
+                .failed,
+                "Native Poland completion failed",
+                "\(error)"
+            )
+        }
+    }
+
+    private static func completeNativeFranceBattleIfAvailable(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        guard NativeFranceBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id) else {
+            return
+        }
+
+        do {
+            let completion = try NativeFrancePackRunner.runBattle(
+                scenario,
+                seed: UInt32(200_000 + scenario.order)
+            )
+            accumulator.recordFranceCompletion(completion)
+        } catch {
+            accumulator.issue(
+                .failure,
+                "Native France Pack",
+                "Native France completion failed",
+                "\(scenario.title) could not finish the cycle 345 native France path: \(error)."
+            )
+            accumulator.step(
+                "Native France Pack",
+                .failed,
+                "Native France completion failed",
+                "\(error)"
+            )
+        }
+    }
+
+    private static func recordEasternFrontFoundationIfAvailable(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        guard NativeEasternFrontBattlefieldFoundationCatalog.foundationBattleIDs.contains(scenario.id),
+              let foundation = NativeEasternFrontBattlefieldFoundationCatalog.foundation(for: scenario)
+        else {
+            return
+        }
+        accumulator.recordEasternFrontFoundation(
+            foundation,
+            ready: NativeEasternFrontBattlefieldFoundationCatalog.isFoundationReady(scenario)
+        )
+    }
+
+    private static func completeNativeEasternFrontBattleIfAvailable(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        guard NativeEasternFrontBattlefieldPackCatalog.playableBattleIDs.contains(scenario.id) else {
+            return
+        }
+
+        do {
+            let completion = try NativeEasternFrontPackRunner.runBattle(
+                scenario,
+                seed: UInt32(225_000 + scenario.order)
+            )
+            accumulator.recordEasternFrontCompletion(completion)
+        } catch {
+            accumulator.issue(
+                .failure,
+                "Native Eastern Front Pack",
+                "Native Eastern Front completion failed",
+                "\(scenario.title) could not finish the cycle 370 native Eastern Front path: \(error)."
+            )
+            accumulator.step(
+                "Native Eastern Front Pack",
+                .failed,
+                "Native Eastern Front completion failed",
+                "\(error)"
+            )
+        }
+    }
+
+    private static func recordNativeAIEventPass(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        let report = NativeAIEventPassCatalog.report(for: scenario)
+        accumulator.recordNativeAIEventPass(report)
     }
 
     private static func validateScenarioData(
@@ -249,7 +410,7 @@ public enum CampaignAutomationRunner {
                 .warning,
                 "Native Playability",
                 "Native scenario instance unavailable",
-                "\(scenario.title) is past proxy loading but still has native-playability work before the cycle \(NativePlayabilityArchitectureCatalog.architecture.demoPlayableTargetCycle) demo target. Pending hooks: \(readiness.requiredHookIDs.joined(separator: ", ")). \(readiness.notes.joined(separator: " "))"
+                "\(scenario.title) is past proxy loading but still has native-playability work before the cycle 400 full-campaign target. Pending hooks: \(readiness.requiredHookIDs.joined(separator: ", ")). \(readiness.notes.joined(separator: " "))"
             )
         }
 
@@ -612,6 +773,20 @@ public enum CampaignAutomationRunner {
         UInt32(70_000 + scenario.order)
     }
 
+    private static func fallbackCompletionRecord(
+        for scenario: GuderianScenario,
+        report: CampaignAutomationBattleReport
+    ) -> CampaignCompletionRecord {
+        let balance = ScenarioBalanceCatalog.profile(for: scenario)
+        return CampaignCompletionRecord(
+            scenarioID: scenario.id,
+            score: balance.maxPlayerScore,
+            victoryBand: report.status == .passed ? .operational : .tactical,
+            completedTurn: max(1, report.finalTurn),
+            note: "Completed by GuderianTest automation with status \(report.status.rawValue)."
+        )
+    }
+
     private static func playerName(_ player: player_t) -> String {
         switch player {
         case TE_PLAYER_ONE:
@@ -659,6 +834,21 @@ private struct AutomationAccumulator {
     var actionsAttempted = 0
     var actionsSucceeded = 0
     var phaseAdvances = 0
+    var completionRecord: CampaignCompletionRecord?
+    var debriefSummary = ""
+    var nativeDemoBoardCompleted = false
+    var boardDiagnostic: NativeBoardDiagnosticReport?
+    var nativeBoardDiagnosticsPassed = false
+    var nativePolandPackCompleted = false
+    var nativePolandPackSummary = ""
+    var nativeFrancePackCompleted = false
+    var nativeFrancePackSummary = ""
+    var easternFrontFoundationReady = false
+    var easternFrontFoundationSummary = ""
+    var nativeEasternFrontPackCompleted = false
+    var nativeEasternFrontPackSummary = ""
+    var nativeAIEventPassReady = false
+    var nativeAIEventPassSummary = ""
 
     mutating func step(_ stage: String, _ status: CampaignAutomationStatus, _ title: String, _ detail: String) {
         steps.append(
@@ -681,6 +871,118 @@ private struct AutomationAccumulator {
                 title: title,
                 detail: detail.isEmpty ? "The engine did not provide an error string." : detail
             )
+        )
+    }
+
+    mutating func recordDemoCompletion(_ completion: NativeDemoBattleCompletionReport) {
+        completionRecord = completion.completionRecord
+        debriefSummary = completion.debriefSummary
+        nativeDemoBoardCompleted = completion.completedFromNativeBoardToDebrief
+        actionsAttempted += completion.steps.count
+        actionsSucceeded += completion.steps.filter { $0.status == .succeeded }.count
+        phaseAdvances += completion.phaseAdvances
+        step(
+            "Native Demo",
+            completion.completedFromNativeBoardToDebrief ? .passed : .warning,
+            "Completed native demo battle",
+            "\(completion.title) finished on turn \(completion.completedTurn) with \(completion.score) VP and \(completion.victoryBand.rawValue) debrief."
+        )
+    }
+
+    mutating func recordBoardDiagnostic(_ diagnostic: NativeBoardDiagnosticReport) {
+        boardDiagnostic = diagnostic
+        nativeBoardDiagnosticsPassed = diagnostic.passedRealBoardDiagnostics
+        actionsAttempted += diagnostic.legalActionsAttempted
+        actionsSucceeded += diagnostic.legalActionsSucceeded
+        phaseAdvances += diagnostic.phaseAdvances
+        step(
+            "Native Board Diagnostics",
+            diagnostic.passedRealBoardDiagnostics ? .passed : .warning,
+            diagnostic.passedRealBoardDiagnostics ? "Real board diagnostics passed" : "Real board diagnostics found issues",
+            "\(diagnostic.legalActionsSucceeded)/\(diagnostic.legalActionsAttempted) legal actions, \(diagnostic.phaseAdvances) phase advances, \(diagnostic.findings.count) findings."
+        )
+        for finding in diagnostic.findings {
+            let kind: CampaignAutomationIssueKind
+            switch finding.kind {
+            case .invalidTarget:
+                kind = .warning
+            case .boardUnavailable, .blockedPhase, .impossibleReinforcement, .unwinnableGate:
+                kind = .blocker
+            }
+            issue(kind, "Native Board Diagnostics", finding.title, finding.detail)
+        }
+    }
+
+    mutating func recordPolandCompletion(_ completion: NativePolandCompletionReport) {
+        completionRecord = completion.completionRecord
+        debriefSummary = completion.debriefSummary
+        nativePolandPackCompleted = completion.completedFromNativePolandBattlefield
+        nativePolandPackSummary = completion.debriefSummary
+        actionsAttempted += completion.steps.count
+        actionsSucceeded += completion.steps.filter { $0.status == .succeeded }.count
+        phaseAdvances += completion.phaseAdvances
+        step(
+            "Native Poland Pack",
+            completion.completedFromNativePolandBattlefield ? .passed : .warning,
+            "Completed native Poland battle",
+            "\(completion.pack.title) finished on turn \(completion.completionRecord.completedTurn) with \(completion.completionRecord.score) VP and \(completion.completionRecord.victoryBand.rawValue) debrief."
+        )
+    }
+
+    mutating func recordFranceCompletion(_ completion: NativeFranceCompletionReport) {
+        completionRecord = completion.completionRecord
+        debriefSummary = completion.debriefSummary
+        nativeFrancePackCompleted = completion.completedFromNativeFranceBattlefield
+        nativeFrancePackSummary = completion.debriefSummary
+        actionsAttempted += completion.steps.count
+        actionsSucceeded += completion.steps.filter { $0.status == .succeeded }.count
+        phaseAdvances += completion.phaseAdvances
+        step(
+            "Native France Pack",
+            completion.completedFromNativeFranceBattlefield ? .passed : .warning,
+            "Completed native France battle",
+            "\(completion.pack.title) finished on turn \(completion.completionRecord.completedTurn) with \(completion.completionRecord.score) VP and \(completion.completionRecord.victoryBand.rawValue) debrief."
+        )
+    }
+
+    mutating func recordEasternFrontFoundation(
+        _ foundation: NativeEasternFrontBattlefieldFoundation,
+        ready: Bool
+    ) {
+        easternFrontFoundationReady = ready
+        easternFrontFoundationSummary = foundation.summary
+        step(
+            "Native Eastern Front Foundation",
+            ready ? .passed : .warning,
+            "Mapped native Eastern Front foundation",
+            foundation.summary
+        )
+    }
+
+    mutating func recordEasternFrontCompletion(_ completion: NativeEasternFrontCompletionReport) {
+        completionRecord = completion.completionRecord
+        debriefSummary = completion.debriefSummary
+        nativeEasternFrontPackCompleted = completion.completedFromNativeEasternFrontBattlefield
+        nativeEasternFrontPackSummary = completion.debriefSummary
+        actionsAttempted += completion.steps.count
+        actionsSucceeded += completion.steps.filter { $0.status == .succeeded }.count
+        phaseAdvances += completion.phaseAdvances
+        step(
+            "Native Eastern Front Pack",
+            completion.completedFromNativeEasternFrontBattlefield ? .passed : .warning,
+            "Completed native Eastern Front battle",
+            "\(completion.pack.title) finished on turn \(completion.completionRecord.completedTurn) with \(completion.completionRecord.score) VP and \(completion.completionRecord.victoryBand.rawValue) debrief."
+        )
+    }
+
+    mutating func recordNativeAIEventPass(_ report: NativeAIEventPassReport) {
+        nativeAIEventPassReady = report.isNativeAIEventPassReady
+        nativeAIEventPassSummary = report.summary
+        step(
+            "Native AI/Event Pass",
+            report.isNativeAIEventPassReady ? .passed : .warning,
+            "Mapped native AI/event pass",
+            report.summary
         )
     }
 
@@ -715,6 +1017,21 @@ private struct AutomationAccumulator {
             phaseAdvances: phaseAdvances,
             engineUnitCount: game.map { Int(game_unit_count($0)) } ?? 0,
             engineObjectiveCount: game.map { Int(game_objective_count($0)) } ?? 0,
+            completionRecord: completionRecord,
+            debriefSummary: debriefSummary,
+            nativeDemoBoardCompleted: nativeDemoBoardCompleted,
+            boardDiagnostic: boardDiagnostic,
+            nativeBoardDiagnosticsPassed: nativeBoardDiagnosticsPassed,
+            nativePolandPackCompleted: nativePolandPackCompleted,
+            nativePolandPackSummary: nativePolandPackSummary,
+            nativeFrancePackCompleted: nativeFrancePackCompleted,
+            nativeFrancePackSummary: nativeFrancePackSummary,
+            easternFrontFoundationReady: easternFrontFoundationReady,
+            easternFrontFoundationSummary: easternFrontFoundationSummary,
+            nativeEasternFrontPackCompleted: nativeEasternFrontPackCompleted,
+            nativeEasternFrontPackSummary: nativeEasternFrontPackSummary,
+            nativeAIEventPassReady: nativeAIEventPassReady,
+            nativeAIEventPassSummary: nativeAIEventPassSummary,
             steps: steps,
             issues: issues,
             engineLogTail: engineLogTail(in: game)
