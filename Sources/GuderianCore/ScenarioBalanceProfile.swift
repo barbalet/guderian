@@ -170,10 +170,10 @@ public enum ScenarioBalanceCatalog {
             return kiev
         case .bryansk:
             return bryansk
+        case .mtsensk:
+            return mtsensk
         case .moscowTulaKashira:
             return moscowTulaKashira
-        default:
-            return generic(for: scenario)
         }
     }
 
@@ -686,34 +686,69 @@ public enum ScenarioBalanceCatalog {
         ]
     )
 
+    private static let mtsensk = ScenarioBalanceProfile(
+        id: .mtsensk,
+        targetTurns: 5...7,
+        balanceIntent: "Mtsensk is a compact armored showcase: Soviet T-34/KV ambushes should feel sharp and surprising, but the player still has to preserve scarce tanks after the first German shock fades.",
+        playerWinCondition: "Score at least two German tank-loss or immobilization results, keep the Tula road delayed, and withdraw one elite tank group before final German artillery pressure.",
+        germanPressureLimit: "German armor can recover after the first ambush, but unsupported panzer assaults should be punished and early player armor should not be wiped before revealing from cover.",
+        scoreChannels: [
+            score("mtsensk-panzer-losses", "German tank losses", .player, 5, "Ambush turns", "Award for destroying, immobilizing, or pinning German spearhead vehicles."),
+            score("mtsensk-t34-shock", "T-34/KV shock", .player, 3, "First reveal", "Award when Soviet armor cancels unsupported German armor pressure."),
+            score("mtsensk-tula-road-delay", "Tula road delayed", .player, 3, "Scenario end", "Award if the German force fails to make a clean road exit toward Tula."),
+            score("mtsensk-guards-preserved", "Guards tanks preserved", .player, 3, "Turns 4-7", "Award for withdrawing one tank group after it scores an ambush."),
+            score("mtsensk-german-road", "Road reopened", .guderianAI, 6, "Scenario end", "German score for clearing the road, ridge cover, and Tula exit."),
+        ],
+        pacingRules: [
+            pacing("mtsensk-hidden-start", "Hidden start", "Turn 1", "Soviet tank groups begin concealed; German opening pressure is movement and recon, not full assault."),
+            pacing("mtsensk-ambush-window", "Ambush window", "Turns 2-3", "T-34/KV groups can score high-value ambush results before German caution markers stack."),
+            pacing("mtsensk-withdrawal-choice", "Withdrawal choice", "Turns 4-6", "Revealed Soviet tanks must choose between a second attack and preservation scoring."),
+            pacing("mtsensk-german-adaptation", "German adaptation", "Turns 4+", "German artillery, flank probes, and cautious movement reduce repeated ambush certainty."),
+        ],
+        reinforcements: [
+            reinforcement("mtsensk-lavrinenko-platoon", .player, "Turns 2-3", "Lavrinenko-style tank platoon", "Enter from a concealed ridge after German armor reaches the kill zone.", "Mobile kill team"),
+            reinforcement("mtsensk-german-artillery", .guderianAI, "Turns 4-5", "German artillery and air pressure", "Enter after an ambush lane is revealed.", "Ambush suppression"),
+        ],
+        outcomeBands: [
+            outcome("mtsensk-decisive", .decisive, 12...14, "Katukov's force wrecks the panzer lead and preserves tanks for the Tula defense."),
+            outcome("mtsensk-operational", .operational, 8...11, "The ambush delays the road and inflicts real panzer losses, though German pressure recovers."),
+            outcome("mtsensk-marginal", .marginal, 4...7, "Some German armor is blunted before Soviet tanks are forced back."),
+            outcome("mtsensk-historical", .historicalPressure, 0...3, "German forces absorb the ambush and reopen the road with limited delay."),
+        ]
+    )
+
     private static let moscowTulaKashira = ScenarioBalanceProfile(
         id: .moscowTulaKashira,
-        targetTurns: 7...9,
-        balanceIntent: "Turn the southern Moscow approach into an exhaustion contest where holding Tula, timing counterattacks, and forcing supply strain matter more than simply destroying every German unit.",
-        playerWinCondition: "Hold Tula through turn 7 and trigger at least two German exhaustion checks before the final counteroffensive window.",
-        germanPressureLimit: "German armor must choose between road speed and supply exposure; winter attrition should slow repeated assaults without stopping all attacks.",
+        targetTurns: 8...10,
+        balanceIntent: "Turn the full southern Moscow approach into an exhaustion chain where Bryansk/Mtsensk delay, Tula city defense, Venev/Kashira bypass denial, and late counteroffensive timing all matter.",
+        playerWinCondition: "Hold or contest Tula, deny the Kashira bypass, trigger at least two German exhaustion checks, and launch a mobile counterstroke before the final turn.",
+        germanPressureLimit: "German armor must choose between road speed, Tula assault, and Kashira bypass; winter attrition should punish overextension without stopping all attacks.",
         scoreChannels: [
             score("moscow-hold-tula", "Hold Tula", .player, 6, "Scenario end", "Award if Tula remains controlled or contested."),
-            score("moscow-kashira-road", "Deny Kashira road", .player, 3, "Turns 4-8", "Award if German spearheads do not exit through the Kashira road objective."),
+            score("moscow-kashira-road", "Deny Kashira road", .player, 4, "Turns 4-10", "Award if German spearheads do not exit through Venev and Kashira."),
             score("moscow-exhaustion", "German exhaustion checks", .player, 4, "Any German turn", "Award up to four points when German units suffer supply strain or winter movement penalties."),
-            score("moscow-counterattack", "Counterattack timing", .player, 3, "Turns 5-8", "Award if Soviet reserve armor damages or pins a German spearhead after it outruns infantry support."),
+            score("moscow-counterattack", "Counterattack timing", .player, 4, "Turns 5-10", "Award if Soviet mobile reserves damage, pin, or drive back a German spearhead after it outruns infantry support."),
+            score("moscow-mordves-driveback", "Mordves drive-back", .player, 2, "Final counteroffensive", "Award if late reserves force a German fallback from the Kashira axis."),
             score("moscow-german-breakthrough", "Southern breakthrough", .guderianAI, 7, "Scenario end", "German score for controlling Tula or exiting toward Kashira."),
         ],
         pacingRules: [
             pacing("moscow-road-speed", "Road speed temptation", "Turns 1-3", "German armor moves best on road elements but becomes vulnerable to planned ambush points."),
             pacing("moscow-supply-friction", "Supply friction", "Turns 3+", "Each German turn with spearheads beyond infantry support adds an exhaustion marker."),
+            pacing("moscow-venev-branch", "Venev branch", "Turns 4-6", "German AI can shift toward Kashira only if Tula remains contested and exhaustion remains manageable."),
             pacing("moscow-winter-attrition", "Winter attrition", "Turns 5+", "German assaults after repeated exhaustion checks suffer morale or movement pressure."),
-            pacing("moscow-counteroffensive-window", "Counteroffensive window", "Turns 6-8", "Soviet reserves should arrive before German pressure collapses completely."),
+            pacing("moscow-counteroffensive-window", "Counteroffensive window", "Turns 6-10", "Soviet reserves should arrive while German pressure is still dangerous, not after it has already collapsed."),
         ],
         reinforcements: [
             reinforcement("moscow-soviet-armor", .player, "Turns 5-6", "Soviet reserve armor counterattack", "Enter when a German spearhead controls a road objective or has two exhaustion markers.", "Counterattack"),
-            reinforcement("moscow-ski-cavalry", .player, "Turn 6", "Mobile winter reserve", "Enter if Tula remains contested.", "Flank pressure"),
+            reinforcement("moscow-belov-getman", .player, "Turns 5-7", "Belov/Getman mobile reserve", "Enter if the Venev-Kashira axis is threatened or a German spearhead has two exhaustion markers.", "Kashira counterstroke"),
+            reinforcement("moscow-ski-cavalry", .player, "Turns 6-7", "Mobile winter reserve", "Enter if Tula remains contested.", "Flank pressure"),
             reinforcement("moscow-german-infantry", .guderianAI, "Turns 3-4", "German infantry follow-up", "Enter if panzer units hold the Orel-Tula road.", "Assault support"),
+            reinforcement("moscow-german-venev-column", .guderianAI, "Turns 4-5", "German Venev bypass column", "Enter if Tula remains contested and the Orel-Tula road is open.", "Bypass pressure"),
         ],
         outcomeBands: [
-            outcome("moscow-decisive", .decisive, 13...16, "Tula holds, Kashira is denied, and German armor is exhausted before the counteroffensive."),
-            outcome("moscow-operational", .operational, 9...12, "The Soviet defense holds the city while German pressure slows under winter and supply strain."),
-            outcome("moscow-marginal", .marginal, 5...8, "The city is contested and both sides are badly worn down."),
+            outcome("moscow-decisive", .decisive, 16...20, "Tula holds, Kashira is denied, and German armor is driven back by a timed counteroffensive."),
+            outcome("moscow-operational", .operational, 11...15, "The Soviet defense holds the city while German pressure slows under winter, supply strain, and reserve counterattacks."),
+            outcome("moscow-marginal", .marginal, 5...10, "The city or bypass route is contested and both sides are badly worn down."),
             outcome("moscow-historical", .historicalPressure, 0...4, "German pressure reaches dangerous depth before the Soviet defense stabilizes."),
         ]
     )

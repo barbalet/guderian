@@ -117,10 +117,10 @@ public enum ScenarioSetupCatalog {
             return kiev
         case .bryansk:
             return bryansk
+        case .mtsensk:
+            return mtsensk
         case .moscowTulaKashira:
             return moscowTulaKashira
-        default:
-            return generic(for: scenario)
         }
     }
 
@@ -480,27 +480,54 @@ public enum ScenarioSetupCatalog {
         ]
     )
 
+    private static let mtsensk = ScenarioSetupScript(
+        id: .mtsensk,
+        playerBriefing: "Do not meet the panzers in the open. Let 4th Panzer Division enter the Orel-Mtsensk road kill zone, reveal T-34/KV groups from wooded ridges, use rifle and anti-tank screens to pin the lead, then withdraw surviving tanks toward Tula.",
+        guderianBriefing: "The German plan forces the road quickly at first, then switches to reconnaissance, artillery, and flanking pressure after the first T-34/KV ambush exposes the danger.",
+        units: [
+            unit("mtsensk-katukov-hq", "Mikhail Katukov command group", .player, "Ambush coordination", "Coordinates 4th Tank Brigade ambushes and staged withdrawals."),
+            unit("mtsensk-4th-tank", "4th Tank Brigade T-34/KV groups", .player, "Armor ambush", "Shock armor that can blunt German panzer attacks when revealed from cover."),
+            unit("mtsensk-lavrinenko-platoon", "Lavrinenko-style tank platoon", .player, "Mobile kill team", "Represents elite tank crews used for short, violent ambushes."),
+            unit("mtsensk-guards-rifle", "1st Guards Rifle Corps screen", .player, "Road and ridge screen", "Infantry, airborne, artillery, and border-guard elements covering the ambush area."),
+            unit("mtsensk-at-artillery", "Anti-tank and artillery screen", .player, "Track kill support", "Pins or immobilizes German armor in road chokepoints."),
+            unit("mtsensk-4th-panzer", "German 4th Panzer Division spearhead", .guderianAI, "Road thrust", "Panzer force trying to recover speed after Bryansk and Orel."),
+            unit("mtsensk-german-recon", "German reconnaissance and flank patrols", .guderianAI, "Ambush detection", "Attempts to clear wooded ridge lanes before armor commits."),
+            unit("mtsensk-german-artillery", "German artillery and air pressure", .guderianAI, "Ambush suppression", "Late pressure against revealed Soviet tanks and anti-tank guns."),
+        ],
+        triggers: [
+            trigger("mtsensk-ambush-reveal", "Ambush reveal", "A concealed tank group attacks from wooded ridge or road-choke cover", "Score German tank-loss points, cancel one movement order, and mark the ambush lane revealed."),
+            trigger("mtsensk-t34-shock", "T-34/KV shock", "German armor attacks without artillery or flank support", "Ignore one unsupported German armor result and add a German caution marker."),
+            trigger("mtsensk-track-kill", "Track-kill screen", "Anti-tank guns or rifle screens fire into a road choke", "Pin or immobilize the panzer lead before the assault step."),
+            trigger("mtsensk-withdrawal", "Staged withdrawal", "A tank group has scored an ambush or is marked revealed", "Allow withdrawal toward Tula for preservation scoring."),
+        ]
+    )
+
     private static let moscowTulaKashira = ScenarioSetupScript(
         id: .moscowTulaKashira,
-        playerBriefing: "Hold Tula, deny the Kashira road, and force German armor to outrun its infantry and supply. The Soviet player wins by timing reserves after German spearheads are tired, not by meeting every thrust at the map edge.",
-        guderianBriefing: "The German plan drives along the Orel-Tula road, attempts to crack the city belt with infantry follow-up, and risks exhaustion if armor keeps pushing without support.",
+        playerBriefing: "Hold Tula, deny the Kashira bypass, and force German armor to outrun infantry and supply. The full scenario links Bryansk, Mtsensk, Tula, Venev, Kashira, and Mordves into one southern-pincer chain.",
+        guderianBriefing: "The German plan drives along the Orel-Tula road, probes the Venev-Kashira bypass when Tula resists, and risks exhaustion if armor keeps pushing without infantry, fuel, or winter support.",
         units: [
             unit("moscow-tula-rifle", "Tula rifle defense group", .player, "City defense", "Infantry and guns holding the Tula belt and prepared urban positions."),
             unit("moscow-worker-militia", "Tula worker militia detachments", .player, "Morale anchor", "Local defense units that help keep city objectives contested under pressure."),
             unit("moscow-at-guns", "Soviet anti-tank gun line", .player, "Road denial", "Guns deployed to punish German armor that remains on the Orel-Tula road."),
             unit("moscow-reserve-armor", "Soviet reserve armor counterattack", .player, "Timed counterattack", "T-34/KV-style counterattack placeholder that enters after German exhaustion or road overextension."),
             unit("moscow-mobile-winter-reserve", "Mobile winter reserve", .player, "Flank pressure", "Ski, cavalry, or mobile detachments represented as a late-game pressure force."),
+            unit("moscow-belov-getman", "Belov/Getman mobile reserve", .player, "Kashira counterstroke", "Cavalry and mechanized reserve abstraction that can drive back overextended panzers near Kashira."),
+            unit("moscow-mordves-group", "Mordves counteroffensive group", .player, "Drive-back route", "Late reserve pressure that turns German exhaustion into retreat scoring."),
             unit("moscow-panzer-spearhead", "German panzer spearhead", .guderianAI, "Road thrust", "Armor racing the winter road net toward Tula and Kashira."),
             unit("moscow-motorized-infantry", "German motorized infantry follow-up", .guderianAI, "Assault support", "Infantry needed to convert panzer reach into objective control."),
+            unit("moscow-venev-column", "German Venev bypass column", .guderianAI, "Bypass pressure", "Armor trying to skirt Tula and threaten Kashira."),
             unit("moscow-supply-columns", "German supply columns", .guderianAI, "Exhaustion clock", "Represents the logistical strain limiting repeated German attacks."),
             unit("moscow-artillery-support", "German artillery support", .guderianAI, "City suppression", "Fire support that helps attacks but cannot fully offset winter and supply penalties."),
         ],
         triggers: [
             trigger("moscow-first-exhaustion", "First exhaustion marker", "German armor ends a turn beyond infantry support", "Mark supply strain and expose the spearhead to Soviet counterattack scoring."),
             trigger("moscow-road-ambush", "Road ambush", "German armor moves through a marked winter road choke", "Allow Soviet anti-tank guns to score counterattack or exhaustion points."),
+            trigger("moscow-venev-bypass", "Venev bypass", "German armor controls Venev while Tula remains contested", "Threaten the Kashira road and force a mobile reserve response."),
             trigger("moscow-reserve-release", "Soviet reserve release", "German spearhead controls a road objective or has two exhaustion markers", "Release Soviet reserve armor counterattack."),
+            trigger("moscow-kashira-counterstroke", "Kashira counterstroke", "Belov/Getman reserve attacks an exhausted German spearhead near Kashira", "Drive back one panzer marker and score counteroffensive points."),
             trigger("moscow-city-morale", "Tula morale check", "Tula is contested at the end of a German assault turn", "Worker militia and city defenders may preserve contested control."),
-            trigger("moscow-final-counteroffensive", "Final counteroffensive window", "Turns 6-8 and German exhaustion is active", "Soviet mobile winter reserve can enter on a flank objective."),
+            trigger("moscow-final-counteroffensive", "Final counteroffensive window", "Turns 6-9 and German exhaustion is active", "Soviet mobile winter reserve can enter on a flank objective and open the Mordves drive-back route."),
         ]
     )
 

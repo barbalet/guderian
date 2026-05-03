@@ -11,6 +11,10 @@ public enum EasternFrontAssetKind: String, Codable, Hashable, Sendable {
     case pocket = "Pocket"
     case logisticsFriction = "Logistics friction"
     case winterFriction = "Winter friction"
+    case armorAmbush = "Armor ambush"
+    case antiTankScreen = "Anti-tank screen"
+    case counteroffensiveAxis = "Counteroffensive axis"
+    case cityDefense = "City defense"
 }
 
 public struct EasternFrontAsset: Identifiable, Codable, Hashable, Sendable {
@@ -88,6 +92,8 @@ public enum EasternFrontCampaignSystemCatalog {
             return kiev
         case .bryansk:
             return bryansk
+        case .mtsensk:
+            return mtsensk
         case .moscowTulaKashira:
             return moscowTulaKashira
         default:
@@ -101,6 +107,7 @@ public enum EasternFrontCampaignSystemCatalog {
         .roslavlNovozybkov,
         .kiev,
         .bryansk,
+        .mtsensk,
         .moscowTulaKashira,
     ]
 
@@ -206,17 +213,42 @@ public enum EasternFrontCampaignSystemCatalog {
         ]
     )
 
+    private static let mtsensk = EasternFrontScenarioSystemProfile(
+        id: .mtsensk,
+        operationalProblem: "Katukov's 4th Tank Brigade and 1st Guards Rifle Corps cover the Orel-Mtsensk-Tula road while Guderian's panzer formations attempt to recover momentum after the Bryansk encirclement.",
+        playerDoctrine: "Use concealed T-34/KV ambushes, rifle screens, and anti-tank guns to force German tank losses, then withdraw armor before air, artillery, and flank probes convert the ambush into a trap.",
+        assets: [
+            easternAsset("mtsensk-4th-tank", "Katukov 4th Tank Brigade", .armorAmbush, "Main T-34/KV ambush and counterattack force.", "Must reveal from cover; exposed tanks become high-priority German targets."),
+            easternAsset("mtsensk-1st-guards-rifle", "1st Guards Rifle Corps screen", .rifleArmy, "Infantry, airborne, artillery, and border-guard screen around Mtsensk.", "Can slow roads but cannot duel panzer divisions in open ground."),
+            easternAsset("mtsensk-t34-kv", "T-34 and KV shock platoons", .tankReserve, "Armored shock assets that outclass many early German tank engagements.", "Scarce; preservation scoring matters after each ambush."),
+            easternAsset("mtsensk-at-screen", "Anti-tank and artillery screen", .antiTankScreen, "Track-breaking and close-range kill lanes against German armor.", "Needs terrain cover or a rifle screen to survive."),
+            easternAsset("mtsensk-wooded-ridges", "Wooded ridge ambush lanes", .armorAmbush, "Cover and line-of-sight breaks along the Orel-Mtsensk road.", "Lose surprise if German reconnaissance clears them."),
+            easternAsset("mtsensk-orel-road", "Orel-Mtsensk-Tula road", .breakoutRoute, "German advance route and Soviet withdrawal path.", "If the road is lost end-to-end, armor preservation becomes harder."),
+        ],
+        specialRules: [
+            easternRule("mtsensk-ambush-reveal", "Ambush reveal", "A concealed tank group attacks German armor from a wooded ridge or road choke.", "Score tank-loss points and cancel one German movement order, then mark the ambush lane revealed."),
+            easternRule("mtsensk-t34-shock", "T-34/KV shock", "German panzer units attack without artillery or flanking support.", "Ignore one unsupported German armor result and add a German caution marker."),
+            easternRule("mtsensk-track-kill", "Track kill screen", "Anti-tank guns or rifle screens fire at armor in a road choke.", "Immobilize or pin a panzer spearhead before it can assault."),
+            easternRule("mtsensk-preserve-guards", "Guards preservation", "A tank or rifle group withdraws after scoring an ambush.", "Award preservation points and keep the Tula road delay chain active."),
+        ]
+    )
+
     private static let moscowTulaKashira = EasternFrontScenarioSystemProfile(
         id: .moscowTulaKashira,
-        operationalProblem: "German armor pushes through winter, supply strain, and Soviet defensive belts toward Tula and Kashira.",
-        playerDoctrine: "Hold city belts, use anti-tank guns and reserves after German overextension, and convert winter logistics into counterattack timing.",
+        operationalProblem: "The full southern Moscow pincer links the Bryansk/Orel approach, Mtsensk armor delay, Tula city defense, Venev breakthrough threat, Kashira counterstroke, and winter counteroffensive into one exhaustion chain.",
+        playerDoctrine: "Hold Tula, deny Orel-Tula and Kashira exits, use Belov/Getman-style mobile reserves after German overextension, and convert winter logistics into a counteroffensive rather than a static last stand.",
         assets: [
-            easternAsset("moscow-rifle-belt", "Tula rifle defensive belt", .rifleArmy, "Prepared city defense and morale anchor.", "Can be worn down if reserves arrive too late."),
-            easternAsset("moscow-tank-reserve", "Soviet tank reserve", .tankReserve, "Counterattack force against overextended armor.", "Scores best after German exhaustion markers appear."),
+            easternAsset("moscow-rifle-belt", "Tula rifle defensive belt", .cityDefense, "Prepared city defense and morale anchor.", "Can be worn down if reserves arrive too late."),
+            easternAsset("moscow-50th-army", "50th Army and Tula militia", .rifleArmy, "City, factory, and roadblock defense.", "Cannot cover every bypass route without mobile reserves."),
+            easternAsset("moscow-kashira-reserve", "Kashira mobile reserve", .tankReserve, "Belov/Getman-style counterattack force against overextended armor.", "Scores best after German exhaustion markers appear."),
+            easternAsset("moscow-venev-axis", "Venev-Kashira threat axis", .counteroffensiveAxis, "German bypass route and Soviet counterstroke trigger.", "If ignored, German exit pressure bypasses Tula."),
             easternAsset("moscow-winter", "Winter logistics friction", .winterFriction, "Limits repeated German armored assaults.", "Should slow pressure without freezing the battle."),
+            easternAsset("moscow-orel-tula-road", "Orel-Tula road chain", .breakoutRoute, "Connects Bryansk and Mtsensk delays to the final Moscow approach.", "Early German control increases Tula pressure."),
         ],
         specialRules: [
             easternRule("moscow-exhaustion", "German exhaustion", "German armor outruns infantry or supply.", "Add exhaustion and unlock Soviet reserve timing."),
+            easternRule("moscow-venev-bypass", "Venev bypass", "German armor controls Venev and the Kashira road is open.", "Threaten a southern exit unless Soviet mobile reserves counterattack."),
+            easternRule("moscow-kashira-counterstroke", "Kashira counterstroke", "Soviet mobile reserves attack an exhausted German spearhead.", "Drive back one panzer marker and score counteroffensive points."),
             easternRule("moscow-counteroffensive", "Counteroffensive window", "Late turns with German exhaustion active.", "Soviet mobile reserves may enter and score flank pressure."),
         ]
     )

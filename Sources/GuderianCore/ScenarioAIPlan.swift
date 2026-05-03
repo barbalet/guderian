@@ -274,27 +274,33 @@ public enum GermanAIPlanCatalog {
                     order("bryansk-friction-check", "Turns 6+", .shooting, "Autumn road friction", "Resolve supply strain before further exploitation if armor outruns support."),
                 ]
             )
+        case .mtsensk:
+            return GermanAIPlan(
+                id: .mtsensk,
+                postureName: "Ambush adaptation",
+                strategicGoal: "Force the Orel-Mtsensk road, absorb or uncover Soviet armor ambushes, and reopen the route toward Tula without bleeding panzer strength.",
+                targetPriorities: ["Orel-Mtsensk-Tula road", "Katukov tank ambush", "Anti-tank screen", "Tula road exit"],
+                orders: [
+                    order("mtsensk-road-probe", "Turn 1", .movement, "Orel-Mtsensk-Tula road", "Advance with reconnaissance screens before committing the main panzer group."),
+                    order("mtsensk-ambush-contact", "Turns 2-3", .shooting, "Katukov tank ambush", "If T-34/KV shock reveals, suppress the lane and halt unsupported armor movement."),
+                    order("mtsensk-flank-patrols", "Turns 3-4", .movement, "Wooded ridge ambush belt", "Use flank patrols to clear ridge cover before a renewed road push."),
+                    order("mtsensk-artillery-response", "Turns 4-5", .artillery, "Anti-tank screen", "Bring artillery or air pressure onto revealed guns and tank positions."),
+                    order("mtsensk-road-reopen", "Turns 5+", .assault, "Tula road exit", "Resume the drive only after caution markers or flank probes reduce ambush risk."),
+                ]
+            )
         case .moscowTulaKashira:
             return GermanAIPlan(
                 id: .moscowTulaKashira,
-                postureName: "Exhausted winter thrust",
-                strategicGoal: "Push along the road net while supply strain slowly reduces German freedom of action.",
-                targetPriorities: ["Tula", "Kashira road", "Soviet artillery", "winter supply routes"],
+                postureName: "Southern pincer exhaustion chain",
+                strategicGoal: "Push from Orel toward Tula, probe the Venev-Kashira bypass if the city holds, and avoid losing the offensive to winter exhaustion and Soviet counterstrokes.",
+                targetPriorities: ["Orel-Tula road", "Tula", "Venev bypass gate", "Kashira road", "Belov/Getman counterstroke"],
                 orders: [
-                    order("moscow-road", "Turns 1-2", .movement, "Orel-Tula road", "Keep armor on roads to reduce winter penalties."),
+                    order("moscow-road", "Turns 1-2", .movement, "Orel-Tula road", "Keep armor on roads to reduce winter penalties and link Bryansk/Mtsensk pressure to Tula."),
                     order("moscow-pressure", "Turns 3-4", .shooting, "Tula defensive belt", "Suppress city defenders before committing assault troops."),
-                    order("moscow-exhaustion", "Turns 5+", .reinforcement, "German supply strain", "Throttle reinforcements and force the player to time counterattacks."),
-                ]
-            )
-        default:
-            return GermanAIPlan(
-                id: scenario.id,
-                postureName: "Scenario pressure plan",
-                strategicGoal: "Advance on the primary player objective while preserving mobile formations.",
-                targetPriorities: scenario.objectives.map(\.name),
-                orders: [
-                    order("\(scenario.id.rawValue)-advance", "Opening", .movement, scenario.objectives.first?.name ?? scenario.title, "Move toward the highest-value objective."),
-                    order("\(scenario.id.rawValue)-fire", "Midgame", .shooting, scenario.playerForceSummary, "Suppress the player force before assaulting or bypassing."),
+                    order("moscow-venev-bypass", "Turns 4-5", .movement, "Venev bypass gate", "Probe the Kashira route if Tula remains contested and German exhaustion is below two markers."),
+                    order("moscow-kashira-push", "Turns 5-6", .assault, "Kashira road", "Attempt exit pressure only if mobile reserves are pinned or unavailable."),
+                    order("moscow-exhaustion", "Turns 6+", .reinforcement, "German supply strain", "Throttle reinforcements and force the player to time counterattacks."),
+                    order("moscow-fallback", "Turns 7+", .movement, "Mordves drive-back line", "If Soviet counterstroke succeeds, fall back to a shorter road line rather than pushing unsupported."),
                 ]
             )
         }

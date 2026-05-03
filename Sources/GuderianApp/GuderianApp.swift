@@ -183,6 +183,18 @@ struct ScenarioBriefingView: View {
         content.balance
     }
 
+    var historicalOverlay: ScenarioHistoricalOverlay {
+        content.historicalOverlay
+    }
+
+    var aiSnapshot: GermanAISnapshot {
+        GermanAIRefinementCatalog.snapshot(for: scenario)
+    }
+
+    var balanceAudit: ScenarioBalanceAudit {
+        ScenarioBalanceAuditCatalog.audit(for: scenario)
+    }
+
     var logEntries: [ScenarioLogEntry] {
         content.logEntries
     }
@@ -216,15 +228,18 @@ struct ScenarioBriefingView: View {
                 briefingSection("Player Force", scenario.playerForceSummary, icon: "shield.lefthalf.filled")
                 briefingSection("Guderian Command", scenario.guderianCommand, icon: "bolt.horizontal")
                 briefingSection("Design Intent", scenario.designIntent, icon: "scope")
+                historicalOverlayView
                 forceOrder
                 polishSystemView
                 franceSystemView
                 easternFrontSystemView
                 objectives
                 balanceView
+                balanceAuditView
                 reinforcementsView
                 triggers
                 aiPlanView
+                aiRefinementView
                 tutorialView
                 scenarioLog
                 debriefView
@@ -248,6 +263,31 @@ struct ScenarioBriefingView: View {
             Text(scenario.historicalResult)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private var historicalOverlayView: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Historical Overlay", systemImage: "book")
+                .font(.headline)
+            Text(historicalOverlay.commanderContext)
+                .font(.callout)
+            Text(historicalOverlay.mapNote)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Text(historicalOverlay.outcomeSummary)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            ForEach(historicalOverlay.caveats, id: \.self) { caveat in
+                HStack(alignment: .firstTextBaseline) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                    Text(caveat)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -495,6 +535,24 @@ struct ScenarioBriefingView: View {
         }
     }
 
+    private var balanceAuditView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Balance Audit", systemImage: "checkmark.seal")
+                .font(.headline)
+            Text(balanceAudit.agencyNote)
+                .font(.callout)
+            Text(balanceAudit.pressureNote)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            HStack {
+                Label("\(balanceAudit.victoryGradeCount) grades", systemImage: "chart.bar")
+                Label("\(balanceAudit.maximumPlayerScore) max VP", systemImage: "sum")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
     @ViewBuilder
     private var reinforcementsView: some View {
         if !balance.reinforcements.isEmpty {
@@ -644,6 +702,38 @@ struct ScenarioBriefingView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
+                }
+            }
+        }
+    }
+
+    private var aiRefinementView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("AI Refinement", systemImage: "slider.horizontal.3")
+                .font(.headline)
+            Text("Primary order: \(aiSnapshot.primaryOrderID)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Seed hint: \(aiSnapshot.deterministicSeedHint)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                ForEach(aiSnapshot.difficultyTiers, id: \.self) { tier in
+                    Text(tier.rawValue)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+            ForEach(aiSnapshot.fallbackBehaviors) { behavior in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(behavior.trigger)
+                        .font(.caption.weight(.semibold))
+                    Text(behavior.response)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
             }
         }

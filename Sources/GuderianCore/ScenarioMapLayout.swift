@@ -156,10 +156,10 @@ public enum ScenarioMapCatalog {
             return kiev
         case .bryansk:
             return bryansk
+        case .mtsensk:
+            return mtsensk
         case .moscowTulaKashira:
             return moscowTulaKashira
-        default:
-            return fallback(for: scenario)
         }
     }
 
@@ -500,18 +500,44 @@ public enum ScenarioMapCatalog {
         ]
     )
 
+    private static let mtsensk = ScenarioMapLayout(
+        id: .mtsensk,
+        title: "Mtsensk Armor Ambush",
+        elements: [
+            line("mtsensk-orel-road", "Orel-Mtsensk-Tula road", .road, [p(4, 48), p(25, 43), p(47, 37), p(70, 30), p(96, 22)], note: "German panzer movement axis and Soviet delay objective."),
+            line("mtsensk-zusha", "Zusha river and ravines", .river, [p(8, 34), p(30, 36), p(54, 34), p(78, 31), p(99, 32)], width: 4, note: "Partial obstacle and ambush terrain around Mtsensk."),
+            line("mtsensk-wooded-ridges", "Wooded ridge ambush belt", .forest, [p(18, 24), p(38, 25), p(58, 22), p(80, 25)], width: 9, note: "Concealed firing lanes for T-34/KV groups."),
+            marker("mtsensk-town", "Mtsensk", .town, .player, p(63, 33), radius: 7, note: "Road hub and ambush center."),
+            marker("mtsensk-orel", "Orel road entry", .objective, .guderianAI, p(17, 45), radius: 5, note: "German armored entry from Orel."),
+            marker("mtsensk-tula-exit", "Tula road exit", .objective, .player, p(90, 24), radius: 5, note: "Delay route toward Tula."),
+            marker("mtsensk-katukov", "Katukov tank ambush", .objective, .player, p(47, 28), radius: 5, note: "T-34/KV reveal point."),
+            marker("mtsensk-at-screen", "Anti-tank screen", .artillery, .player, p(57, 39), radius: 4, note: "Track-kill and artillery support position."),
+            marker("mtsensk-guards-rifle", "1st Guards Rifle screen", .fortifiedLine, .player, p(71, 29), radius: 5, note: "Infantry screen covering withdrawal and ambush resets."),
+            marker("mtsensk-4th-panzer", "4th Panzer pressure", .objective, .guderianAI, p(30, 42), radius: 5, note: "German spearhead trying to force the road."),
+            marker("mtsensk-german-caution", "German caution marker", .airPressure, .guderianAI, p(42, 48), radius: 4, note: "AI fallback pressure after T-34/KV shock."),
+        ],
+        deploymentZones: [
+            zone("mtsensk-soviet-ambush", "Katukov ambush screen", .player, p(43, 21), 43, 23, "4th Tank Brigade, rifle screens, anti-tank guns, and artillery hide along the road and ridges."),
+            zone("mtsensk-german-spearhead", "German panzer spearhead", .guderianAI, p(2, 36), 34, 18, "4th Panzer Division and motorized support enter from the Orel road."),
+        ]
+    )
+
     private static let moscowTulaKashira = ScenarioMapLayout(
         id: .moscowTulaKashira,
         title: "Tula-Kashira Winter Defense",
         elements: [
             line("tula-road", "Orel-Tula road", .road, [p(6, 56), p(30, 43), p(57, 31), p(86, 12)], note: "Main panzer advance route."),
+            line("venev-kashira-axis", "Venev-Kashira bypass", .road, [p(52, 46), p(69, 36), p(83, 24), p(95, 14)], width: 2, note: "Southern bypass route that can open the road to Moscow."),
             line("winter-track", "Frozen side track", .road, [p(18, 61), p(34, 52), p(52, 46), p(76, 39)], width: 2, note: "Secondary movement route with winter friction."),
             line("upa-river", "Upa river", .river, [p(12, 33), p(39, 30), p(65, 24), p(100, 28)], width: 5, note: "Frozen river and defensive obstacle."),
             line("tula-belt", "Tula defensive belt", .fortifiedLine, [p(58, 18), p(66, 23), p(76, 23), p(86, 18)], width: 4, note: "Prepared city defenses and anti-tank positions."),
             marker("road-choke", "Winter road choke", .ridge, .neutral, p(47, 37), radius: 4, note: "Movement friction and ambush point."),
             marker("tula", "Tula", .town, .player, p(69, 23), radius: 8, note: "City hold objective."),
+            marker("venev", "Venev bypass gate", .town, .neutral, p(78, 27), radius: 5, note: "German bypass pressure before Kashira."),
             marker("kashira-road", "Kashira road", .objective, .player, p(83, 12), radius: 5, note: "Southern approach to Moscow."),
             marker("soviet-reserve", "Soviet reserve staging", .objective, .player, p(73, 49), radius: 5, note: "Reserve armor and mobile winter forces enter from this area."),
+            marker("belov-counterstroke", "Belov/Getman counterstroke", .objective, .player, p(82, 38), radius: 5, note: "Mobile reserve attack against overextended armor."),
+            marker("mordves-driveback", "Mordves drive-back line", .objective, .player, p(58, 48), radius: 4, note: "Late counteroffensive route after German exhaustion."),
             marker("winter-supply", "German supply strain", .airPressure, .guderianAI, p(26, 48), radius: 5, note: "Attrition and movement friction event source."),
             marker("panzer-overreach", "Panzer overreach line", .objective, .guderianAI, p(55, 32), radius: 4, note: "German armor beyond this line starts checking supply and morale pressure."),
         ],

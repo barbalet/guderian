@@ -7,6 +7,7 @@ public enum ScenarioLogCategory: String, CaseIterable, Codable, Hashable, Sendab
     case aiPlan = "AI Plan"
     case balance = "Balance"
     case reinforcements = "Reinforcements"
+    case historical = "Historical"
 }
 
 public struct ScenarioLogEntry: Identifiable, Codable, Hashable, Sendable {
@@ -30,6 +31,7 @@ public enum ScenarioEventLogCatalog {
         let setup = ScenarioSetupCatalog.setup(for: scenario)
         let aiPlan = GermanAIPlanCatalog.plan(for: scenario)
         let balance = ScenarioBalanceCatalog.profile(for: scenario)
+        let overlay = ScenarioHistoricalOverlayCatalog.overlay(for: scenario)
 
         let objectiveEntries = scenario.objectives.map { objective in
             entry(
@@ -63,6 +65,13 @@ public enum ScenarioEventLogCatalog {
             )
         }
 
+        let historicalEntries = [
+            entry("\(scenario.id.rawValue)-commander-context", .historical, "Context", "Commander context", overlay.commanderContext),
+            entry("\(scenario.id.rawValue)-outcome-summary", .historical, "Outcome", "Historical outcome", overlay.outcomeSummary),
+        ] + overlay.caveats.enumerated().map { index, caveat in
+            entry("\(scenario.id.rawValue)-caveat-\(index)", .historical, "Caveat", "Scenario caveat", caveat)
+        }
+
         return [
             entry(
                 "\(scenario.id.rawValue)-briefing",
@@ -71,7 +80,7 @@ public enum ScenarioEventLogCatalog {
                 scenario.title,
                 setup.playerBriefing
             ),
-        ] + objectiveEntries + forceEntries + aiEntries + balanceEntries + reinforcementEntries
+        ] + historicalEntries + objectiveEntries + forceEntries + aiEntries + balanceEntries + reinforcementEntries
     }
 }
 

@@ -8,6 +8,7 @@ public struct ScenarioContentBundle: Identifiable, Codable, Hashable, Sendable {
     public let aiPlan: GermanAIPlan
     public let balance: ScenarioBalanceProfile
     public let logEntries: [ScenarioLogEntry]
+    public let historicalOverlay: ScenarioHistoricalOverlay
 
     public init(
         scenario: GuderianScenario,
@@ -15,7 +16,8 @@ public struct ScenarioContentBundle: Identifiable, Codable, Hashable, Sendable {
         setup: ScenarioSetupScript,
         aiPlan: GermanAIPlan,
         balance: ScenarioBalanceProfile,
-        logEntries: [ScenarioLogEntry]
+        logEntries: [ScenarioLogEntry],
+        historicalOverlay: ScenarioHistoricalOverlay
     ) {
         self.id = scenario.id
         self.scenario = scenario
@@ -24,6 +26,7 @@ public struct ScenarioContentBundle: Identifiable, Codable, Hashable, Sendable {
         self.aiPlan = aiPlan
         self.balance = balance
         self.logEntries = logEntries
+        self.historicalOverlay = historicalOverlay
     }
 }
 
@@ -46,6 +49,7 @@ public enum ScenarioContentCatalog {
         .roslavlNovozybkov,
         .kiev,
         .bryansk,
+        .mtsensk,
         .moscowTulaKashira,
     ]
 
@@ -56,7 +60,8 @@ public enum ScenarioContentCatalog {
             setup: ScenarioSetupCatalog.setup(for: scenario),
             aiPlan: GermanAIPlanCatalog.plan(for: scenario),
             balance: ScenarioBalanceCatalog.profile(for: scenario),
-            logEntries: ScenarioEventLogCatalog.entries(for: scenario)
+            logEntries: ScenarioEventLogCatalog.entries(for: scenario),
+            historicalOverlay: ScenarioHistoricalOverlayCatalog.overlay(for: scenario)
         )
     }
 
