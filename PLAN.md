@@ -2,6 +2,12 @@
 
 Cycle 0 update: README and this plan were created from a review of the root project, the included `dzw` engine directory, and Wikipedia research on Guderian's World War II field-command battles.
 
+Cycle 30 update: cycles 1-30 are complete. The repository now has a root Swift package, a `GuderianCore` campaign/scenario data model, all 19 command-scope scenarios represented as metadata, demo IDs locked to Wizna/Sedan/Moscow-Tula-Kashira, a no-submodule-edit `dzw` proxy loader, a SwiftUI app shell with Metal device detection, and regression tests for catalog and loader behavior.
+
+Cycle 60 update: cycles 31-60 are complete. The app now has campaign progress controls, an expanded briefing workspace, reusable historical map rendering, generated fallback maps for every scenario, custom Wizna/Sedan/Moscow map layouts, German AI posture metadata, Wizna tutorial steps, and Sedan force/setup triggers for river crossing, air pressure, engineers, panzer follow-up, artillery, and French counterattack timing.
+
+Cycle 90 update: cycles 61-90 are complete. Sedan now has explicit score channels, pacing caps, reinforcement timing, and debrief bands; Moscow/Tula has winter road friction, Tula defensive-belt data, Soviet reserve armor, anti-tank guns, mobile winter reserves, German supply/exhaustion pressure, and balance tuning; the app briefing adds score/debrief sections, reinforcement summaries, and a filtered operation log; tests now cover all three demo scenario proxy loads, scoring, AI plans, reinforcements, and event-log categories.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -74,6 +80,12 @@ Cycles 101-250 expand the demo into all command-scope battles:
 | 86-90 | Tests | Add deterministic tests for scenario loading, objectives, AI plans, reinforcements, scoring, and three demo scenarios. |
 | 91-95 | Packaging | Add app icon pipeline, credits/source ledger, README run guidance, and demo release checklist. |
 | 96-100 | Demo hardening | Run build/test passes, fix scenario bugs, tune UX, and tag the playable demo milestone. |
+
+Status through cycle 30: completed. No `dzw` files were modified; the first loadable scenario uses inherited `dzw` force presets as temporary proxies until Polish, French, and fuller Soviet/German scenario data are added.
+
+Status through cycle 60: completed. No `dzw` files were modified; cycles 31-60 are implemented as Guderian-owned Swift/Core metadata and UI surfaces, with proxy loading still isolated behind `DZWScenarioLoader`.
+
+Status through cycle 90: completed. No `dzw` files were modified; cycles 61-90 remain data/UI/test work in the root package, with the inherited engine still used only through the proxy loader.
 
 ## Cycles 101-250: Complete Campaign
 

@@ -67,6 +67,27 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 
 Cycle 0 update: initial repository review, `dzw` engine review, and Wikipedia battle-scope research completed on 2026-05-03.
 
+Cycle 30 update: the root Swift package, `GuderianCore` campaign data model, 19-scenario metadata catalog, `dzw` proxy scenario loader, SwiftUI/Metal-ready `GuderianApp` shell, and catalog/loader tests are in place.
+
+Cycle 60 update: campaign progress, briefing workspace, map renderer, custom Wizna/Sedan/Moscow layouts, German AI plans, Wizna tutorial flow, and Sedan crossing/force triggers are in place without modifying `dzw`.
+
+Cycle 90 update: Sedan and Moscow/Tula balance profiles, reinforcement timing, scoring/debrief bands, filtered operation logs, Moscow winter setup data, and expanded demo regression tests are in place.
+
+## Run
+
+Build and test from the repository root:
+
+```bash
+swift test
+swift build
+```
+
+Run the initial Guderian scenario workspace:
+
+```bash
+swift run GuderianApp
+```
+
 ## App Identity
 
 Use an image of Heinz Guderian's face as the app icon only if a suitable public-domain or permissively licensed source image is selected and recorded. The icon should not make the game celebratory; it should read as historical subject identification.
