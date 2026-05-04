@@ -150,6 +150,16 @@ swift run GuderianApp
 
 Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme.
 
+## Homebrew
+
+The v1.0.0 Homebrew submission assets are prepared as a cask because Guderian ships as a macOS app bundle. Build the GitHub Release zip with:
+
+```bash
+scripts/package-homebrew-release.sh 1.0.0
+```
+
+Then upload `dist/Guderian-1.0.0.zip` to the GitHub release at `https://github.com/barbalet/guderian/releases/tag/v1.0.0`. The cask lives at `Casks/g/guderian.rb`, and the full release checklist is in `docs/homebrew.md`.
+
 ## Ship Status
 
 The campaign content and native automation layers are substantial, and the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 590 completes playable-screen parity for all 19 battles, from Tuchola Forest through Moscow/Tula/Kashira, with debrief, persistence, screen-parity automation, reusable surface routing, and GuderianTest reporting.
