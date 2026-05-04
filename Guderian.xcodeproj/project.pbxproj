@@ -10,6 +10,8 @@
 		A10000000000000000000011 /* GuderianApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* GuderianApp.swift */; };
 		A10000000000000000000012 /* ScenarioMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* ScenarioMapView.swift */; };
 		A10000000000000000000015 /* DZWPlayableBattleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* DZWPlayableBattleView.swift */; };
+		A10000000000000000000016 /* GuderianCampaignView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000026 /* GuderianCampaignView.swift */; };
+		A10000000000000000000017 /* BattlefieldWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* BattlefieldWorkspace.swift */; };
 		A10000000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* Assets.xcassets */; };
 		A10000000000000000000014 /* GuderianCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000071 /* GuderianCore */; };
 		A20000000000000000000011 /* GuderianBattleUISwiftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* GuderianBattleUISwiftTests.swift */; };
@@ -18,14 +20,20 @@
 		A30000000000000000000011 /* GuderianTestApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000021 /* GuderianTestApp.swift */; };
 		A30000000000000000000012 /* GuderianCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000071 /* GuderianCore */; };
 		A30000000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* Assets.xcassets */; };
+		A30000000000000000000014 /* ScenarioMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* ScenarioMapView.swift */; };
+		A30000000000000000000015 /* DZWPlayableBattleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* DZWPlayableBattleView.swift */; };
+		A30000000000000000000016 /* GuderianCampaignView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000026 /* GuderianCampaignView.swift */; };
+		A30000000000000000000017 /* BattlefieldWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* BattlefieldWorkspace.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A10000000000000000000021 /* GuderianApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianApp/GuderianApp.swift; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000021 /* GuderianApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianAppHost/GuderianApp.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000022 /* ScenarioMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianApp/ScenarioMapView.swift; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000023 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000024 /* Guderian.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Guderian.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000025 /* DZWPlayableBattleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianApp/DZWPlayableBattleView.swift; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000026 /* GuderianCampaignView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianApp/GuderianCampaignView.swift; sourceTree = SOURCE_ROOT; };
+		A10000000000000000000027 /* BattlefieldWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianApp/BattlefieldWorkspace.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000021 /* GuderianBattleUISwiftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/GuderianTests/GuderianBattleUISwiftTests.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000022 /* GuderianCampaignTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/GuderianTests/GuderianCampaignTests.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000024 /* GuderianUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GuderianUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -76,6 +84,8 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000021 /* GuderianApp.swift */,
+				A10000000000000000000026 /* GuderianCampaignView.swift */,
+				A10000000000000000000027 /* BattlefieldWorkspace.swift */,
 				A10000000000000000000025 /* DZWPlayableBattleView.swift */,
 				A10000000000000000000022 /* ScenarioMapView.swift */,
 			);
@@ -256,6 +266,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000011 /* GuderianApp.swift in Sources */,
+				A10000000000000000000016 /* GuderianCampaignView.swift in Sources */,
+				A10000000000000000000017 /* BattlefieldWorkspace.swift in Sources */,
 				A10000000000000000000015 /* DZWPlayableBattleView.swift in Sources */,
 				A10000000000000000000012 /* ScenarioMapView.swift in Sources */,
 			);
@@ -275,6 +287,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				A30000000000000000000011 /* GuderianTestApp.swift in Sources */,
+				A30000000000000000000016 /* GuderianCampaignView.swift in Sources */,
+				A30000000000000000000017 /* BattlefieldWorkspace.swift in Sources */,
+				A30000000000000000000015 /* DZWPlayableBattleView.swift in Sources */,
+				A30000000000000000000014 /* ScenarioMapView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

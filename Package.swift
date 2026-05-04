@@ -11,6 +11,10 @@ let package = Package(
             name: "GuderianCore",
             targets: ["GuderianCore"]
         ),
+        .library(
+            name: "GuderianAppUI",
+            targets: ["GuderianAppUI"]
+        ),
         .executable(
             name: "GuderianApp",
             targets: ["GuderianApp"]
@@ -28,11 +32,12 @@ let package = Package(
             name: "GuderianCore",
             dependencies: [
                 .product(name: "DerZweiteWeltkriegCore", package: "dzw"),
+                .product(name: "DerZweiteWeltkriegGuderian", package: "dzw"),
             ],
             path: "Sources/GuderianCore"
         ),
-        .executableTarget(
-            name: "GuderianApp",
+        .target(
+            name: "GuderianAppUI",
             dependencies: ["GuderianCore"],
             path: "Sources/GuderianApp",
             linkerSettings: [
@@ -43,8 +48,17 @@ let package = Package(
             ]
         ),
         .executableTarget(
+            name: "GuderianApp",
+            dependencies: ["GuderianAppUI"],
+            path: "Sources/GuderianAppHost",
+            linkerSettings: [
+                .linkedFramework("SwiftUI"),
+                .linkedFramework("AppKit"),
+            ]
+        ),
+        .executableTarget(
             name: "GuderianTest",
-            dependencies: ["GuderianCore"],
+            dependencies: ["GuderianCore", "GuderianAppUI"],
             path: "Sources/GuderianTest",
             linkerSettings: [
                 .linkedFramework("SwiftUI"),

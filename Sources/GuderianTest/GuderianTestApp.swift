@@ -1,10 +1,19 @@
 import GuderianCore
+#if SWIFT_PACKAGE
+import GuderianAppUI
+#endif
 import SwiftUI
 
 @main
 struct GuderianTestApp: App {
     var body: some Scene {
         WindowGroup("GuderianTest") {
+            GuderianCampaignView()
+                .frame(minWidth: 1120, minHeight: 760)
+        }
+        .windowResizability(.contentMinSize)
+
+        WindowGroup("GuderianTest Playability") {
             GuderianTestDashboard()
                 .frame(minWidth: 1180, minHeight: 760)
         }

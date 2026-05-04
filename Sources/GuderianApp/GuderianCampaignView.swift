@@ -3,18 +3,7 @@ import Foundation
 import Metal
 import SwiftUI
 
-@main
-struct GuderianApp: App {
-    var body: some Scene {
-        WindowGroup("guderian") {
-            GuderianCampaignView()
-                .frame(minWidth: 1120, minHeight: 760)
-        }
-        .windowResizability(.contentMinSize)
-    }
-}
-
-struct GuderianCampaignView: View {
+public struct GuderianCampaignView: View {
     private let scenarios = GuderianCampaignCatalog.all.sorted { $0.order < $1.order }
     @State private var selectedID: GuderianBattleID? = .tucholaForest
     @State private var progress = CampaignProgress()
@@ -34,7 +23,9 @@ struct GuderianCampaignView: View {
         FullCampaignShipReportCatalog.report(catalog: scenarios)
     }
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         NavigationStack {
             List {
                 campaignStatusSection

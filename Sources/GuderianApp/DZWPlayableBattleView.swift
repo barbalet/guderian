@@ -288,10 +288,47 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 }
 
+private enum DZWPlayableBattlePanel: String, CaseIterable, Identifiable {
+    case command
+    case inspector
+    case forces
+    case log
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .command:
+            return "Command"
+        case .inspector:
+            return "Inspector"
+        case .forces:
+            return "Forces"
+        case .log:
+            return "Log"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .command:
+            return "slider.horizontal.3"
+        case .inspector:
+            return "scope"
+        case .forces:
+            return "person.3"
+        case .log:
+            return "list.bullet.rectangle"
+        }
+    }
+}
+
 struct DZWPlayableBattleView: View {
     @StateObject private var model: DZWPlayableBattleViewModel
     @State private var dragPreview: [Int: CGPoint] = [:]
     @State private var assaultAdvance = true
+    @State private var battlefieldZoom: CGFloat = 1
+    @State private var visiblePanels: Set<DZWPlayableBattlePanel> = [.command, .inspector]
     private let onCompletion: (CampaignCompletionRecord) -> Void
 
     init(scenario: GuderianScenario, onCompletion: @escaping (CampaignCompletionRecord) -> Void = { _ in }) {
@@ -301,17 +338,24 @@ struct DZWPlayableBattleView: View {
 
     var body: some View {
         if let snapshot = model.snapshot {
-            HStack(spacing: 18) {
-                VStack(spacing: 14) {
-                    header(snapshot)
+            ZStack(alignment: .topLeading) {
+                BattlefieldViewport(
+                    zoom: $battlefieldZoom,
+                    boardWidth: DZWPlayableBattleViewModel.boardWidth,
+                    boardHeight: DZWPlayableBattleViewModel.boardHeight
+                ) {
                     board(snapshot)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                sidebar(snapshot)
-                    .frame(width: 340)
+                VStack {
+                    battlefieldToolbar
+                    Spacer()
+                }
+                .padding(18)
+                .zIndex(10)
+
+                floatingPanels(snapshot)
             }
-            .padding(18)
             .background(Color(red: 0.10, green: 0.14, blue: 0.10))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("battle-screen")
@@ -322,6 +366,166 @@ struct DZWPlayableBattleView: View {
                 description: Text(model.lastError)
             )
         }
+    }
+
+    private var battlefieldToolbar: some View {
+        HStack(spacing: 10) {
+            Label("Battlefield", systemImage: "map")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+
+            Button {
+                adjustZoom(by: -0.15)
+            } label: {
+                Image(systemName: "minus.magnifyingglass")
+                    .frame(width: 24, height: 24)
+            }
+            .accessibilityLabel("Zoom out")
+
+            Slider(value: zoomBinding, in: 0.6...2.2)
+                .frame(width: 160)
+                .accessibilityIdentifier("battlefield-zoom-slider")
+
+            Text("\(Int((battlefieldZoom * 100).rounded()))%")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .frame(width: 44, alignment: .trailing)
+
+            Button {
+                battlefieldZoom = 1
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .frame(width: 24, height: 24)
+            }
+            .accessibilityLabel("Reset zoom")
+
+            Divider()
+                .frame(height: 24)
+
+            ForEach(DZWPlayableBattlePanel.allCases) { panel in
+                Button {
+                    toggle(panel)
+                } label: {
+                    Label(panel.title, systemImage: panel.systemImage)
+                }
+                .tint(visiblePanels.contains(panel) ? Color(red: 0.13, green: 0.32, blue: 0.67) : Color.black.opacity(0.32))
+                .accessibilityIdentifier("toggle-\(panel.rawValue)-window")
+            }
+        }
+        .buttonStyle(.borderedProminent)
+        .padding(10)
+        .foregroundStyle(.white)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.black.opacity(0.68))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.24), radius: 18, x: 0, y: 10)
+    }
+
+    @ViewBuilder
+    private func floatingPanels(_ snapshot: NativeBoardSnapshot) -> some View {
+        if visiblePanels.contains(.command) {
+            BattleFloatingWindow(
+                title: DZWPlayableBattlePanel.command.title,
+                systemImage: DZWPlayableBattlePanel.command.systemImage,
+                width: 780,
+                maxHeight: 700,
+                scrollIdentifier: "battle-sidebar-scroll",
+                onClose: { toggle(.command) }
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    header(snapshot)
+                    actionsSection(snapshot)
+                    resultSection(snapshot)
+                }
+            }
+            .padding(.top, 82)
+            .padding(.leading, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .zIndex(4)
+        }
+
+        if visiblePanels.contains(.inspector) {
+            BattleFloatingWindow(
+                title: DZWPlayableBattlePanel.inspector.title,
+                systemImage: DZWPlayableBattlePanel.inspector.systemImage,
+                width: 320,
+                maxHeight: 540,
+                scrollIdentifier: "battle-inspector-scroll",
+                onClose: { toggle(.inspector) }
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    selectionSection(snapshot)
+                    objectivesSection(snapshot)
+                }
+            }
+            .padding(.top, 82)
+            .padding(.trailing, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .zIndex(5)
+        }
+
+        if visiblePanels.contains(.forces) {
+            BattleFloatingWindow(
+                title: DZWPlayableBattlePanel.forces.title,
+                systemImage: DZWPlayableBattlePanel.forces.systemImage,
+                width: 360,
+                maxHeight: 560,
+                scrollIdentifier: "battle-forces-scroll",
+                onClose: { toggle(.forces) }
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    armiesSection(snapshot)
+                    aiTurnSection()
+                }
+            }
+            .padding(.trailing, 18)
+            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .zIndex(3)
+        }
+
+        if visiblePanels.contains(.log) {
+            BattleFloatingWindow(
+                title: DZWPlayableBattlePanel.log.title,
+                systemImage: DZWPlayableBattlePanel.log.systemImage,
+                width: 380,
+                maxHeight: 460,
+                scrollIdentifier: "battle-log-scroll",
+                onClose: { toggle(.log) }
+            ) {
+                logSection(snapshot)
+            }
+            .padding(.leading, 18)
+            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .zIndex(3)
+        }
+    }
+
+    private var zoomBinding: Binding<CGFloat> {
+        Binding(
+            get: { battlefieldZoom },
+            set: { battlefieldZoom = clampedZoom($0) }
+        )
+    }
+
+    private func toggle(_ panel: DZWPlayableBattlePanel) {
+        if visiblePanels.contains(panel) {
+            visiblePanels.remove(panel)
+        } else {
+            visiblePanels.insert(panel)
+        }
+    }
+
+    private func adjustZoom(by delta: CGFloat) {
+        battlefieldZoom = clampedZoom(battlefieldZoom + delta)
+    }
+
+    private func clampedZoom(_ zoom: CGFloat) -> CGFloat {
+        min(max(zoom, 0.6), 2.2)
     }
 
     private func header(_ snapshot: NativeBoardSnapshot) -> some View {
@@ -442,26 +646,6 @@ struct DZWPlayableBattleView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("battle-board")
         .accessibilityLabel("Battle board")
-    }
-
-    private func sidebar(_ snapshot: NativeBoardSnapshot) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                selectionSection(snapshot)
-                actionsSection(snapshot)
-                resultSection(snapshot)
-                objectivesSection(snapshot)
-                armiesSection(snapshot)
-                aiTurnSection()
-                logSection(snapshot)
-            }
-            .padding(16)
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 18)
-                .fill(Color(red: 0.96, green: 0.93, blue: 0.84))
-        )
-        .accessibilityIdentifier("battle-sidebar-scroll")
     }
 
     private func selectionSection(_ snapshot: NativeBoardSnapshot) -> some View {
