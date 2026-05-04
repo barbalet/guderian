@@ -64,8 +64,13 @@ public struct NativeBoardMissionSnapshot: Codable, Hashable, Sendable {
 public struct NativeBoardUnitSnapshot: Identifiable, Codable, Hashable, Sendable {
     public let id: Int
     public let name: String
+    public let engineName: String
+    public let nativeUnitID: String?
     public let owner: NativeBoardPlayer
     public let kind: String
+    public let mobility: String
+    public let role: String
+    public let historicalNote: String
     public let x: Double
     public let y: Double
     public let facingDegrees: Double
@@ -79,6 +84,10 @@ public struct NativeBoardUnitSnapshot: Identifiable, Codable, Hashable, Sendable
     public let canAssaultNow: Bool
     public let selected: Bool
     public let targeted: Bool
+
+    public var roleLine: String {
+        mobility == role ? role : "\(mobility) | \(role)"
+    }
 }
 
 public struct NativeBoardZoneSnapshot: Identifiable, Codable, Hashable, Sendable {
@@ -138,6 +147,7 @@ public final class NativeBoardSession {
 
     public let loadout: NativeScenarioLoadout
     private let loadedGame: NativeScenarioLoadedGame
+    private let nativeUnitByEngineID: [Int: NativeBattleUnit]
     private var selectedUnitID: Int?
     private var selectedTargetID: Int?
     private var lastAction = NativeBoardActionMessage(status: .idle, title: "Ready", detail: "Board session is ready.")
@@ -153,6 +163,7 @@ public final class NativeBoardSession {
         }
         self.loadout = loadout
         self.loadedGame = loadedGame
+        nativeUnitByEngineID = Self.nativeUnitMap(handle: loadedGame.handle, instance: loadout.instance)
         selectFirstActiveUnit()
         selectNearestEnemyToSelectedUnit()
     }
@@ -230,24 +241,134 @@ public final class NativeBoardSession {
             return failAction("No unit selected", "Select a unit before issuing movement.")
         }
         guard NativeBoardPhase(game_view(handle).phase) == .movement, unit.can_move_now else {
-            return failAction("Movement blocked", "\(nativeBoardCString(unit.name)) cannot move in the current phase.")
+            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move in the current phase.")
         }
         guard let objective = nearestObjective(to: unit) else {
             return failAction("No objective", "The board has no scenario objective to move toward.")
         }
 
-        let dx = Double(objective.x) - Double(unit.x)
-        let dy = Double(objective.y) - Double(unit.y)
-        let length = max(0.01, sqrt(dx * dx + dy * dy))
-        let step = min(maxDistance, length)
-        let x = clamp(Double(unit.x) + (dx / length) * step, min: 1, max: loadout.blueprint.engineBoardFrame.width - 1)
-        let y = clamp(Double(unit.y) + (dy / length) * step, min: 1, max: loadout.blueprint.engineBoardFrame.height - 1)
+        return move(unit, toward: objective, maxDistance: maxDistance)
+    }
 
-        if game_move_unit(handle, Int32(unit.id), Float(x), Float(y)) {
-            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Moved", detail: "\(nativeBoardCString(unit.name)) advanced toward \(nativeBoardCString(objective.name)).")
+    @discardableResult
+    public func moveSelectedUnitTowardPriorityObjective(named priorityNames: [String], maxDistance: Double = 6) -> Bool {
+        guard let unit = selectedUnitView() else {
+            return failAction("No unit selected", "Select a unit before issuing movement.")
+        }
+        guard NativeBoardPhase(game_view(handle).phase) == .movement, unit.can_move_now else {
+            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move in the current phase.")
+        }
+        let priorityObjectives = priorityObjectives(named: priorityNames)
+        var candidateObjectives = priorityObjectives
+        if let nearest = nearestObjective(to: unit), !candidateObjectives.contains(where: { $0.id == nearest.id }) {
+            candidateObjectives.append(nearest)
+        }
+        guard !candidateObjectives.isEmpty else {
+            return failAction("No objective", "The board has no scenario objective to move toward.")
+        }
+
+        for objective in candidateObjectives {
+            if move(unit, toward: objective, maxDistance: maxDistance) {
+                return true
+            }
+        }
+
+        return failFromEngine("Priority move blocked")
+    }
+
+    @discardableResult
+    public func moveUnit(_ id: Int, to point: NativeBattleCoordinate) -> Bool {
+        guard let unit = unitView(id: id) else {
+            return failAction("Unit unavailable", "Unit \(id) is not present on the board.")
+        }
+        guard NativeBoardPhase(game_view(handle).phase) == .movement, unit.can_move_now else {
+            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move in the current phase.")
+        }
+
+        let x = clamp(point.x, min: 1, max: loadout.blueprint.engineBoardFrame.width - 1)
+        let y = clamp(point.y, min: 1, max: loadout.blueprint.engineBoardFrame.height - 1)
+        if game_move_unit(handle, Int32(id), Float(x), Float(y)) {
+            selectedUnitID = id
+            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Moved", detail: "\(unitDisplayName(unit)) moved to \(Int(x)), \(Int(y)).")
             return true
         }
         return failFromEngine("Move blocked")
+    }
+
+    @discardableResult
+    public func rotateUnit(_ id: Int, to facingDegrees: Double) -> Bool {
+        guard let unit = unitView(id: id) else {
+            return failAction("Unit unavailable", "Unit \(id) is not present on the board.")
+        }
+        if game_rotate_unit(handle, Int32(id), Float(facingDegrees)) {
+            selectedUnitID = id
+            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Rotated", detail: "\(unitDisplayName(unit)) rotated to \(Int(facingDegrees)) degrees.")
+            return true
+        }
+        return failFromEngine("Rotate blocked")
+    }
+
+    @discardableResult
+    public func toggleCover(for id: Int, enabled: Bool) -> Bool {
+        guard let unit = unitView(id: id) else {
+            return failAction("Unit unavailable", "Unit \(id) is not present on the board.")
+        }
+        if game_toggle_cover(handle, Int32(id), enabled) {
+            selectedUnitID = id
+            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Cover updated", detail: "\(unitDisplayName(unit)) \(enabled ? "entered" : "left") cover.")
+            return true
+        }
+        return failFromEngine("Cover toggle blocked")
+    }
+
+    @discardableResult
+    public func toggleHullDown(for id: Int, enabled: Bool) -> Bool {
+        guard let unit = unitView(id: id) else {
+            return failAction("Unit unavailable", "Unit \(id) is not present on the board.")
+        }
+        if game_toggle_hull_down(handle, Int32(id), enabled) {
+            selectedUnitID = id
+            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Hull-down updated", detail: "\(unitDisplayName(unit)) \(enabled ? "took" : "left") hull-down position.")
+            return true
+        }
+        return failFromEngine("Hull-down toggle blocked")
+    }
+
+    @discardableResult
+    public func shootUnit(_ attackerID: Int, targetID: Int) -> Bool {
+        guard let unit = unitView(id: attackerID) else {
+            return failAction("Unit unavailable", "Unit \(attackerID) is not present on the board.")
+        }
+        guard NativeBoardPhase(game_view(handle).phase) == .shooting, unit.can_shoot_now else {
+            return failAction("Shooting blocked", "\(unitDisplayName(unit)) cannot shoot in the current phase.")
+        }
+        if game_shoot_unit(handle, Int32(attackerID), Int32(targetID)) {
+            selectedUnitID = attackerID
+            selectedTargetID = targetID
+            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Fired", detail: "\(unitDisplayName(unit)) fired at \(unitName(id: targetID)).")
+            resolveFirstPendingChoice()
+            return true
+        }
+        return failFromEngine("Shot blocked")
+    }
+
+    @discardableResult
+    public func assaultUnit(_ attackerID: Int, targetID: Int, advance: Bool = true) -> Bool {
+        guard let unit = unitView(id: attackerID) else {
+            return failAction("Unit unavailable", "Unit \(attackerID) is not present on the board.")
+        }
+        guard NativeBoardPhase(game_view(handle).phase) == .assault, unit.can_assault_now else {
+            return failAction("Assault blocked", "\(unitDisplayName(unit)) cannot assault in the current phase.")
+        }
+        let followUp = advance ? TE_FOLLOW_UP_ADVANCE : TE_FOLLOW_UP_CONSOLIDATE
+        if game_assault_unit(handle, Int32(attackerID), Int32(targetID), followUp) {
+            selectedUnitID = attackerID
+            selectedTargetID = targetID
+            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Assaulted", detail: "\(unitDisplayName(unit)) assaulted \(unitName(id: targetID)).")
+            resolveFirstPendingChoice()
+            return true
+        }
+        return failFromEngine("Assault blocked")
     }
 
     @discardableResult
@@ -259,11 +380,11 @@ public final class NativeBoardSession {
             return failAction("No target selected", "Select an enemy unit before shooting.")
         }
         guard NativeBoardPhase(game_view(handle).phase) == .shooting, unit.can_shoot_now else {
-            return failAction("Shooting blocked", "\(nativeBoardCString(unit.name)) cannot shoot in the current phase.")
+            return failAction("Shooting blocked", "\(unitDisplayName(unit)) cannot shoot in the current phase.")
         }
 
         if game_shoot_unit(handle, Int32(unit.id), Int32(targetID)) {
-            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Fired", detail: "\(nativeBoardCString(unit.name)) fired at \(unitName(id: targetID)).")
+            lastAction = NativeBoardActionMessage(status: .succeeded, title: "Fired", detail: "\(unitDisplayName(unit)) fired at \(unitName(id: targetID)).")
             resolveFirstPendingChoice()
             return true
         }
@@ -309,11 +430,19 @@ public final class NativeBoardSession {
     private func unitSnapshots() -> [NativeBoardUnitSnapshot] {
         (0..<Int(game_unit_count(handle))).map { index in
             let unit = game_unit_view(handle, Int32(index))
+            let engineName = nativeBoardCString(unit.name)
+            let nativeUnit = nativeUnitByEngineID[Int(unit.id)]
+            let engineKind = unitKindName(unit.kind)
             return NativeBoardUnitSnapshot(
                 id: Int(unit.id),
-                name: nativeBoardCString(unit.name),
+                name: nativeUnit?.name ?? engineName,
+                engineName: engineName,
+                nativeUnitID: nativeUnit?.id,
                 owner: NativeBoardPlayer(unit.owner),
-                kind: unitKindName(unit.kind),
+                kind: engineKind,
+                mobility: nativeUnit?.mobility.rawValue ?? engineKind,
+                role: nativeUnit?.role ?? engineKind,
+                historicalNote: nativeUnit?.historicalNote ?? "",
                 x: Double(unit.x),
                 y: Double(unit.y),
                 facingDegrees: Double(unit.facing_degrees),
@@ -375,9 +504,13 @@ public final class NativeBoardSession {
         guard let selectedUnitID else {
             return nil
         }
+        return unitView(id: selectedUnitID)
+    }
+
+    private func unitView(id: Int) -> unit_view_t? {
         return (0..<Int(game_unit_count(handle))).lazy
             .map { game_unit_view(self.handle, Int32($0)) }
-            .first { Int($0.id) == selectedUnitID }
+            .first { Int($0.id) == id }
     }
 
     private func nearestObjective(to unit: unit_view_t) -> objective_view_t? {
@@ -388,11 +521,91 @@ public final class NativeBoardSession {
             }
     }
 
+    private func priorityObjectives(named priorityNames: [String]) -> [objective_view_t] {
+        let objectives = (0..<Int(game_objective_count(handle))).map { game_objective_view(self.handle, Int32($0)) }
+        var matches: [objective_view_t] = []
+        for priorityName in priorityNames {
+            let priority = normalized(priorityName)
+            if let objective = objectives.first(where: { objective in
+                let name = normalized(nativeBoardCString(objective.name))
+                return name.contains(priority) || priority.contains(name)
+            }), !matches.contains(where: { $0.id == objective.id }) {
+                matches.append(objective)
+            }
+        }
+        return matches
+    }
+
+    private func move(_ unit: unit_view_t, toward objective: objective_view_t, maxDistance: Double) -> Bool {
+        let dx = Double(objective.x) - Double(unit.x)
+        let dy = Double(objective.y) - Double(unit.y)
+        let length = max(0.01, sqrt(dx * dx + dy * dy))
+        let baseStep = min(maxDistance, length)
+        let candidateDistances = [baseStep, baseStep / 2, min(1.5, length), min(0.75, length)]
+            .filter { $0 > 0.05 }
+        let xDirection = dx == 0 ? 0 : dx / abs(dx)
+        let yDirection = dy == 0 ? 0 : dy / abs(dy)
+
+        for distance in candidateDistances {
+            let candidates = [
+                (
+                    Double(unit.x) + (dx / length) * distance,
+                    Double(unit.y) + (dy / length) * distance
+                ),
+                (
+                    Double(unit.x) + xDirection * distance,
+                    Double(unit.y)
+                ),
+                (
+                    Double(unit.x),
+                    Double(unit.y) + yDirection * distance
+                ),
+            ]
+
+            for candidate in candidates {
+                let x = clamp(candidate.0, min: 1, max: loadout.blueprint.engineBoardFrame.width - 1)
+                let y = clamp(candidate.1, min: 1, max: loadout.blueprint.engineBoardFrame.height - 1)
+                if game_move_unit(handle, Int32(unit.id), Float(x), Float(y)) {
+                    lastAction = NativeBoardActionMessage(status: .succeeded, title: "Moved", detail: "\(unitDisplayName(unit)) advanced toward \(nativeBoardCString(objective.name)).")
+                    return true
+                }
+            }
+        }
+        return failFromEngine("Move blocked")
+    }
+
     private func unitName(id: Int) -> String {
         (0..<Int(game_unit_count(handle))).lazy
             .map { game_unit_view(self.handle, Int32($0)) }
             .first { Int($0.id) == id }
-            .map { nativeBoardCString($0.name) } ?? "Unit \(id)"
+            .map(unitDisplayName) ?? "Unit \(id)"
+    }
+
+    private func unitDisplayName(_ unit: unit_view_t) -> String {
+        nativeUnitByEngineID[Int(unit.id)]?.name ?? nativeBoardCString(unit.name)
+    }
+
+    private static func nativeUnitMap(handle: OpaquePointer, instance: NativeBattleInstance) -> [Int: NativeBattleUnit] {
+        let nativeBySide: [NativeBoardPlayer: [NativeBattleUnit]] = [
+            .player: instance.units.filter { $0.side == .player },
+            .guderianAI: instance.units.filter { $0.side == .guderianAI },
+        ]
+        var sideOffsets: [NativeBoardPlayer: Int] = [:]
+        var result: [Int: NativeBattleUnit] = [:]
+
+        for index in 0..<Int(game_unit_count(handle)) {
+            let unit = game_unit_view(handle, Int32(index))
+            let owner = NativeBoardPlayer(unit.owner)
+            guard owner == .player || owner == .guderianAI, !unit.destroyed, !unit.embarked else {
+                continue
+            }
+            let offset = sideOffsets[owner, default: 0]
+            sideOffsets[owner] = offset + 1
+            if let nativeUnit = nativeBySide[owner]?[safe: offset] {
+                result[Int(unit.id)] = nativeUnit
+            }
+        }
+        return result
     }
 
     private func failFromEngine(_ title: String) -> Bool {
@@ -411,6 +624,19 @@ public final class NativeBoardSession {
 
     private func clamp(_ value: Double, min minimum: Double, max maximum: Double) -> Double {
         Swift.min(Swift.max(value, minimum), maximum)
+    }
+
+    private func normalized(_ string: String) -> String {
+        string
+            .lowercased()
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "/", with: " ")
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

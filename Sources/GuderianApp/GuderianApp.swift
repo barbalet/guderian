@@ -16,7 +16,7 @@ struct GuderianApp: App {
 
 struct GuderianCampaignView: View {
     private let scenarios = GuderianCampaignCatalog.all.sorted { $0.order < $1.order }
-    @State private var selectedID: GuderianBattleID? = GuderianCampaignCatalog.demoIDs.first
+    @State private var selectedID: GuderianBattleID? = .tucholaForest
     @State private var progress = CampaignProgress()
     @State private var playMode: CampaignPlayMode = .chronological
     @State private var hasLoadedSaveState = false
@@ -132,7 +132,14 @@ struct GuderianCampaignView: View {
                     .background(.bar)
             }
         } detail: {
-            ScenarioBriefingView(scenario: selectedScenario, progress: progress, playMode: playMode, shipReport: shipReport)
+            ScenarioBriefingView(
+                scenario: selectedScenario,
+                progress: progress,
+                playMode: playMode,
+                shipReport: shipReport
+            ) { record in
+                progress.recordCompletion(record)
+            }
         }
         .onAppear {
             loadSavedCampaignState()
@@ -263,6 +270,7 @@ struct ScenarioBriefingView: View {
     let progress: CampaignProgress
     let playMode: CampaignPlayMode
     let shipReport: FullCampaignShipReport
+    let onCompletion: (CampaignCompletionRecord) -> Void
     @State private var logCategory: ScenarioLogCategory? = nil
 
     var loadout: DZWScenarioLoadout? {
@@ -329,6 +337,17 @@ struct ScenarioBriefingView: View {
     }
 
     var body: some View {
+        if PlayableBattleSurfaceCatalog.isRoutedToPlayableScreen(scenario.id) {
+            DZWPlayableBattleView(scenario: scenario, onCompletion: onCompletion)
+                .id(scenario.id)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor))
+        } else {
+            briefingWorkspace
+        }
+    }
+
+    private var briefingWorkspace: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
@@ -339,6 +358,7 @@ struct ScenarioBriefingView: View {
                 shipReadinessView
                 ScenarioMapView(layout: layout)
                     .frame(maxWidth: 860)
+                playableScreenRolloutView
                 NativeBattleBoardView(scenario: scenario)
                     .id(scenario.id)
                     .frame(maxWidth: 860)
@@ -514,6 +534,37 @@ struct ScenarioBriefingView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ship-readiness-panel")
+    }
+
+    private var playableScreenRolloutView: some View {
+        let plan = PlayableBattleSurfaceCatalog.plan(for: scenario.id)
+        return VStack(alignment: .leading, spacing: 8) {
+            Label("Playable Screen Rollout", systemImage: "checkerboard.rectangle")
+                .font(.headline)
+            if let plan {
+                HStack {
+                    Label(plan.readiness.rawValue, systemImage: plan.readiness == .pilotComplete ? "checkmark.circle" : "clock")
+                    Label(plan.cycleLabel, systemImage: "calendar")
+                    Label(plan.hostSurfaceName, systemImage: "rectangle.3.group")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 8)], alignment: .leading, spacing: 8) {
+                    ForEach(plan.acceptanceGates, id: \.self) { gate in
+                        Label(gate.rawValue, systemImage: scenario.id == .tucholaForest ? "checkmark.circle" : "circle")
+                            .font(.caption)
+                            .foregroundStyle(scenario.id == .tucholaForest ? .green : .secondary)
+                    }
+                }
+                ForEach(plan.notes, id: \.self) { note in
+                    Text(note)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("playable-screen-rollout-panel")
     }
 
     private func briefingSection(_ title: String, _ value: String, icon: String) -> some View {

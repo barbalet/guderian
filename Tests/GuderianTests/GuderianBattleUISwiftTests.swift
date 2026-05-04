@@ -54,6 +54,21 @@ struct GuderianBattleUISwiftTests {
         #expect(suite.results.allSatisfy { $0.engineUnitCount > 0 && $0.engineObjectiveCount > 0 })
     }
 
+    @Test("Tuchola DZW-style playable screen drives commands, blocked feedback, AI, debrief, and persistence")
+    func tucholaDZWStylePlayableScreenHarnessCompletes() throws {
+        let result = try DZWPlayableScreenHarness.runTucholaFlow()
+
+        #expect(result.completedAllStages)
+        #expect(result.blockers.isEmpty)
+        #expect(result.completedStages == DZWPlayableScreenHarnessStage.allCases)
+        #expect(result.completion.completionRecord.scenarioID == .tucholaForest)
+        #expect(result.persistedProgress.completionRecord(for: .tucholaForest) != nil)
+        #expect(result.displayedAccessibilityIdentifiers.contains("battle-screen"))
+        #expect(result.displayedAccessibilityIdentifiers.contains("battle-action-feedback"))
+        #expect(result.displayedAccessibilityIdentifiers.contains("battle-debrief-panel"))
+        #expect(result.displayedAccessibilityIdentifiers.contains("battle-persisted-result"))
+    }
+
     private func runAndExpectComplete(_ id: GuderianBattleID) throws -> BattleUIFlowResult {
         let result = try BattleUIFlowRunner.runFullBattleFlow(for: id)
         let requiredStages = BattleUIFlowStage.allCases

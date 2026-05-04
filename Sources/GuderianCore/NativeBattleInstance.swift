@@ -614,6 +614,10 @@ private struct NativeBattleInstanceBuilder {
     }
 
     private func makeObjectives() -> [NativeBattleObjective] {
+        if bundle.scenario.id == .tucholaForest {
+            return makeTucholaForestObjectives()
+        }
+
         let anchors = objectiveAnchors()
         return bundle.scenario.objectives.enumerated().map { index, objective in
             let anchor = anchors.isEmpty ? nil : anchors[index % anchors.count]
@@ -648,7 +652,7 @@ private struct NativeBattleInstanceBuilder {
                 role: unit.role,
                 historicalNote: unit.historicalNote,
                 deploymentZoneID: zone.id,
-                startingPosition: position(in: zone, index: offset, count: count),
+                startingPosition: tucholaForestStartingPosition(for: unit.id) ?? position(in: zone, index: offset, count: count),
                 weapons: weaponProfiles(for: unit)
             )
         }
@@ -793,6 +797,70 @@ private struct NativeBattleInstanceBuilder {
         return bundle.mapLayout.elements.filter { preferredKinds.contains($0.kind) }
     }
 
+    private func makeTucholaForestObjectives() -> [NativeBattleObjective] {
+        [
+            tucholaObjective(
+                id: "tuchola-pruszcz-bridge",
+                name: "Pruszcz bridge / Pila-Mlyn bridge",
+                side: .player,
+                kind: .deny,
+                victoryPoints: 4,
+                timing: "Turns 1-3",
+                description: "Block, demolish, or keep the Brda crossings at Pruszcz and Pila-Mlyn contested before German engineers can reopen the road."
+            ),
+            tucholaObjective(
+                id: "tuchola-chojnice",
+                name: "Chojnice road hub / Tuchola road hub",
+                side: .player,
+                kind: .hold,
+                victoryPoints: 3,
+                timing: "Turns 2-5",
+                description: "Keep at least one Chojnice-Tuchola forest road hub contested so German motorized infantry cannot freely fix the corridor defense."
+            ),
+            tucholaObjective(
+                id: "tuchola-krojanty",
+                name: "Krojanty cavalry screen",
+                side: .player,
+                kind: .disrupt,
+                victoryPoints: 2,
+                timing: "Turns 2-3",
+                description: "Use the Pomeranian Cavalry Brigade screen to disrupt reconnaissance, then pull it back before armor closes."
+            ),
+            tucholaObjective(
+                id: "tuchola-bydgoszcz",
+                name: "Bydgoszcz withdrawal",
+                side: .player,
+                kind: .withdraw,
+                victoryPoints: 5,
+                timing: "Turns 4-8",
+                description: "Exit coherent Polish infantry, cavalry, command, and anti-tank assets toward Bydgoszcz before the pincer seals the corridor."
+            ),
+        ]
+    }
+
+    private func tucholaObjective(
+        id: String,
+        name: String,
+        side: NativeBattleSide,
+        kind: NativeBattleObjectiveKind,
+        victoryPoints: Int,
+        timing: String,
+        description: String
+    ) -> NativeBattleObjective {
+        let anchor = bundle.mapLayout.elements.first { $0.id == id }
+        return NativeBattleObjective(
+            id: "\(id)-objective",
+            name: name,
+            side: side,
+            kind: kind,
+            victoryPoints: victoryPoints,
+            timing: timing,
+            description: description,
+            anchorTerrainID: anchor?.id,
+            position: anchor.flatMap(center) ?? NativeBattleCoordinate(x: bundle.mapLayout.width / 2, y: bundle.mapLayout.height / 2)
+        )
+    }
+
     private func center(of element: ScenarioMapElement) -> NativeBattleCoordinate? {
         if element.points.isEmpty {
             return nil
@@ -833,6 +901,37 @@ private struct NativeBattleInstanceBuilder {
             x: clamp(x, min: 0, max: bundle.mapLayout.width),
             y: clamp(y, min: 0, max: bundle.mapLayout.height)
         )
+    }
+
+    private func tucholaForestStartingPosition(for unitID: String) -> NativeBattleCoordinate? {
+        guard bundle.scenario.id == .tucholaForest else {
+            return nil
+        }
+
+        switch unitID {
+        case "tuchola-9th-infantry":
+            return NativeBattleCoordinate(x: 31, y: 39)
+        case "tuchola-27th-infantry":
+            return NativeBattleCoordinate(x: 43, y: 34)
+        case "tuchola-czersk-group":
+            return NativeBattleCoordinate(x: 22, y: 28)
+        case "tuchola-cavalry":
+            return NativeBattleCoordinate(x: 24, y: 18)
+        case "tuchola-at-guns":
+            return NativeBattleCoordinate(x: 36, y: 31)
+        case "tuchola-demolition-parties":
+            return NativeBattleCoordinate(x: 49, y: 37)
+        case "tuchola-3rd-panzer":
+            return NativeBattleCoordinate(x: 7, y: 35)
+        case "tuchola-motorized-divisions":
+            return NativeBattleCoordinate(x: 15, y: 27)
+        case "tuchola-engineers":
+            return NativeBattleCoordinate(x: 10, y: 40)
+        case "tuchola-pincer":
+            return NativeBattleCoordinate(x: 73, y: 18)
+        default:
+            return nil
+        }
     }
 
     private func weaponProfiles(for unit: ScenarioUnitCard) -> [NativeBattleWeaponProfile] {
@@ -890,6 +989,7 @@ private struct NativeBattleInstanceBuilder {
         if containsAny(text, ["air", "stuka", "luftwaffe"]) { return .airPressure }
         if containsAny(text, ["naval", "destroyer"]) { return .navalSupport }
         if containsAny(text, ["armored train", "train"]) { return .armoredTrain }
+        if containsAny(text, ["pincer pressure", "pressure marker"]) { return .command }
         if containsAny(text, ["command", "hq", "headquarters"]) { return .command }
         if containsAny(text, ["engineer", "pioneer", "demolition"]) { return .engineer }
         if containsAny(text, ["artillery"]) { return .artillery }

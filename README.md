@@ -67,6 +67,9 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 - Cycles 251-300: native playable demo, replacing proxy forces/maps with real Guderian battle instances for Wizna, Sedan, and Moscow/Tula/Kashira.
 - Cycles 301-400: native full campaign, converting all 19 battles to scenario-specific units, terrain, actions, AI pressure, scoring, and debriefs.
 - Cycles 401-450: post-ship hardening, adding after-action analysis and deterministic campaign soak probes across every native battle.
+- Cycles 451-500: `derZweiteWeltkrieg` playable-screen rebase, beginning with Tuchola Forest as the accepted DZW-style board/sidebar/unit-control pilot and then carrying that screen parity through the campaign.
+
+Cycle 451 correction: after running `derZweiteWeltkrieg`, the accepted playability bar is the actual DZW battle screen: terrain board, objectives, opposing units, direct unit selection, draggable movement, phase/action controls, pending-choice handling, and a visible combat log. Earlier cycle 400/450 reports proved native data, diagnostics, and automation stability, but they overstated product playability because the Guderian app still surfaced a simplified board instead of the full DZW-style playable screen.
 
 Cycle 0 update: initial repository review, `dzw` engine review, and Wikipedia battle-scope research completed on 2026-05-03.
 
@@ -114,11 +117,17 @@ Cycle 380 update: native AI/event execution is now resolved against live board s
 
 Cycle 390 update: native balance and UX audits now cover every battle. The audits verify pacing bands, player-agency score coverage, readable unit/objective/terrain density, full battle-flow accessibility identifiers, save/load continuity, and failure/debrief reporting.
 
-Cycle 400 update: the native full-campaign ship gate is green. The report verifies all 19 battles as native playable, full GuderianTest automation completion, cycle 380 AI/event execution readiness, cycle 390 balance/UX readiness, and the earlier cycle 250 metadata ship baseline.
+Cycle 400 update: the native automation gate is green. The report verifies all 19 battles as native board sessions with completion records, full GuderianTest automation completion, cycle 380 AI/event execution readiness, cycle 390 balance/UX readiness, and the earlier cycle 250 metadata baseline. It is not the final user-playability gate.
 
 Cycle 425 update: post-ship after-action analysis now covers every battle with agency, AI pressure, event timing, historical-context, automation-coverage notes, and tuning follow-ups.
 
 Cycle 450 update: deterministic native campaign soak probes now run three seeded board diagnostics per battle across the full 19-battle campaign, with stable replay signatures and no blocking findings.
+
+Cycle 460 update: the Tuchola Forest row now opens a DZW-style playable battle shell directly in Guderian. The screen uses the native Tuchola board session with terrain zones, objectives, Polish and German units, unit selection, draggable movement, rotation, cover/hull-down toggles, shooting/assault controls, pending-choice resolution, phase advancement, and battle-log feedback. This is the first accepted playable-screen pilot; the remaining battles still need the same UI parity pass.
+
+Cycle 480 update: Tuchola Forest now has the first fidelity pass on the DZW-style screen. Native Polish/German unit names, roles, mobility, and historical notes are shown on the live board; scoring objectives now map to the Brda bridges, Chojnice/Tuchola road hubs, Krojanty, and Bydgoszcz withdrawal while terrain markers carry the East Prussia pincer and XIX Corps spearhead; and the German AI turn runner visibly advances through prioritized objectives while falling back from blocked Brda movement lines.
+
+Cycle 500 update: the Tuchola Forest DZW-style playable-screen pilot now runs from opening board to restart/debrief/scored completion with campaign-progress persistence and failure/debrief error reporting. A dedicated screen-parity harness drives launch, selection, movement, phase flow, attack attempts, blocked-action feedback, German AI, debrief, and persistence, and the reusable playable-battle surface catalog now defines acceptance gates and rollout windows for converting the rest of the campaign.
 
 ## Run
 
@@ -139,7 +148,7 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 
 ## Ship Status
 
-The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 300 completes the native playable demo target for Wizna, Sedan, and Moscow/Tula/Kashira; cycle 325 promotes the four Polish 1939 battles; cycle 345 promotes the eight France 1940 battles; and cycle 370 promotes the seven Eastern Front 1941 battles. Cycle 400 completes the native full-campaign ship gate: all 19 battles have native board completion records, debriefs, board-state AI/event execution, balance/UX audits, and GuderianTest automation coverage. Cycle 450 adds post-ship analysis and deterministic native soak probes across the full campaign.
+The campaign content and native automation layers are substantial, but the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 500 completes the Tuchola Forest pilot through debrief, persistence, screen-parity automation, reusable surface routing, and a per-battle rollout checklist. No cycles remain in the 451-500 correction plan; the next documented rollout begins with Wizna at cycles 501-505 and continues in five-cycle battle conversions through Moscow/Tula/Kashira.
 
 ## App Identity
 

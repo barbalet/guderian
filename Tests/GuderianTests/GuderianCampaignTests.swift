@@ -1358,6 +1358,135 @@ final class GuderianCampaignTests: XCTestCase {
         }
     }
 
+    func testCycle460TucholaForestSupportsDZWStylePlayableCommands() throws {
+        let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let session = try XCTUnwrap(NativeBoardSession(scenario: scenario, seed: 19390901))
+        let opening = session.snapshot()
+
+        XCTAssertEqual(opening.scenarioID, .tucholaForest)
+        XCTAssertEqual(opening.mission.name, scenario.title)
+        XCTAssertTrue(opening.isScenarioBoardPlayable)
+        XCTAssertGreaterThan(opening.zones.count, 0)
+        XCTAssertGreaterThan(opening.objectives.count, 0)
+        XCTAssertTrue(opening.units.contains { $0.owner == .player })
+        XCTAssertTrue(opening.units.contains { $0.owner == .guderianAI })
+        XCTAssertEqual(opening.phase, .movement)
+
+        let selected = try XCTUnwrap(opening.selectedUnit)
+        XCTAssertEqual(selected.owner, opening.activePlayer)
+        XCTAssertTrue(selected.canMoveNow)
+
+        let destination = NativeBattleCoordinate(
+            x: min(selected.x + 1.25, 70),
+            y: min(selected.y + 1.0, 46)
+        )
+        XCTAssertTrue(session.moveUnit(selected.id, to: destination), session.snapshot().lastAction.detail)
+
+        let movedSnapshot = session.snapshot()
+        let moved = try XCTUnwrap(movedSnapshot.units.first { $0.id == selected.id })
+        XCTAssertNotEqual(moved.x, selected.x)
+        XCTAssertNotEqual(moved.y, selected.y)
+
+        XCTAssertTrue(session.rotateUnit(selected.id, to: selected.facingDegrees + 45), session.snapshot().lastAction.detail)
+        _ = session.toggleCover(for: selected.id, enabled: true)
+        _ = session.toggleHullDown(for: selected.id, enabled: true)
+
+        session.selectNearestEnemyToSelectedUnit()
+        XCTAssertNotNil(session.snapshot().selectedTarget)
+        session.advancePhase()
+        XCTAssertEqual(session.snapshot().phase, .shooting)
+    }
+
+    func testCycle480TucholaForestHasFidelityAndGermanAITurnTargets() throws {
+        let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let instance = NativeBattleInstanceCatalog.instance(for: scenario)
+
+        XCTAssertEqual(instance.objectives.count, scenario.objectives.count)
+        XCTAssertTrue(instance.objectives.contains { $0.name == "Pruszcz bridge / Pila-Mlyn bridge" && $0.kind == .deny })
+        XCTAssertTrue(instance.objectives.contains { $0.name == "Bydgoszcz withdrawal" && $0.kind == .withdraw })
+        XCTAssertTrue(instance.terrain.contains { $0.name == "East Prussia pincer" && $0.side == .guderianAI })
+        XCTAssertTrue(instance.terrain.contains { $0.name == "XIX Corps spearhead" && $0.side == .guderianAI })
+        XCTAssertTrue(instance.units.contains { $0.id == "tuchola-cavalry" && $0.mobility == .cavalry })
+        XCTAssertTrue(instance.units.contains { $0.id == "tuchola-demolition-parties" && $0.mobility == .engineer })
+        XCTAssertTrue(instance.units.contains { $0.id == "tuchola-3rd-panzer" && $0.mobility == .armor })
+
+        let session = try XCTUnwrap(NativeBoardSession(scenario: scenario, seed: 19390901))
+        let opening = session.snapshot()
+        XCTAssertTrue(opening.units.contains { $0.name == "Polish 9th Infantry Division bridge guards" && $0.role.contains("Brda") })
+        XCTAssertTrue(opening.units.contains { $0.name == "Pomeranian Cavalry Brigade screen" && $0.mobility == "Cavalry" })
+        XCTAssertTrue(opening.units.contains { $0.name == "German 3rd Panzer Division spearhead" && $0.mobility == "Armor" })
+        XCTAssertTrue(opening.objectives.contains { $0.name == "Pruszcz bridge / Pila-Mlyn bridge" })
+        XCTAssertTrue(opening.objectives.contains { $0.name == "Bydgoszcz withdrawal" })
+
+        var safety = 0
+        while session.snapshot().activePlayer != .guderianAI && safety < 4 {
+            session.advancePhase()
+            safety += 1
+        }
+
+        let germanTurn = session.snapshot()
+        XCTAssertEqual(germanTurn.activePlayer, .guderianAI)
+        XCTAssertEqual(germanTurn.phase, .movement)
+        let selectedAIUnit = try XCTUnwrap(germanTurn.selectedUnit)
+        XCTAssertEqual(selectedAIUnit.owner, .guderianAI)
+
+        XCTAssertTrue(
+            session.moveSelectedUnitTowardPriorityObjective(
+                named: ["Pruszcz bridge", "Pila-Mlyn bridge", "Chojnice road hub", "Bydgoszcz withdrawal"],
+                maxDistance: 6
+            ),
+            session.snapshot().lastAction.detail
+        )
+        let afterAIMove = session.snapshot()
+        let movedAIUnit = try XCTUnwrap(afterAIMove.units.first { $0.id == selectedAIUnit.id })
+        XCTAssertTrue(movedAIUnit.x != selectedAIUnit.x || movedAIUnit.y != selectedAIUnit.y)
+        XCTAssertTrue(
+            ["Pruszcz bridge", "Pila-Mlyn bridge", "Chojnice road hub", "Bydgoszcz withdrawal"].contains { afterAIMove.lastAction.detail.contains($0) },
+            afterAIMove.lastAction.detail
+        )
+    }
+
+    func testCycle500DZWPlayableScreenHarnessAndRolloutPlanAreReady() throws {
+        XCTAssertEqual(DZWPlayableScreenHarness.cycleRange, 486...490)
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.cycleRange, 491...500)
+
+        let harness = try DZWPlayableScreenHarness.runTucholaFlow(seed: 19390901)
+        XCTAssertEqual(harness.id, .tucholaForest)
+        XCTAssertTrue(harness.completedAllStages, harness.blockers.joined(separator: "\n"))
+        XCTAssertTrue(harness.blockers.isEmpty)
+        XCTAssertEqual(harness.completedStages, DZWPlayableScreenHarnessStage.allCases)
+        XCTAssertTrue(harness.openingSnapshot.isScenarioBoardPlayable)
+        XCTAssertEqual(harness.completion.completionRecord.scenarioID, .tucholaForest)
+        XCTAssertGreaterThan(harness.completion.completionRecord.score, 0)
+        XCTAssertNotNil(harness.persistedProgress.completionRecord(for: .tucholaForest))
+        XCTAssertTrue(harness.displayedAccessibilityIdentifiers.contains("battle-screen"))
+        XCTAssertTrue(harness.displayedAccessibilityIdentifiers.contains("battle-board"))
+        XCTAssertTrue(harness.displayedAccessibilityIdentifiers.contains("battle-action-feedback"))
+        XCTAssertTrue(harness.displayedAccessibilityIdentifiers.contains("battle-debrief-panel"))
+        XCTAssertTrue(harness.displayedAccessibilityIdentifiers.contains("battle-persisted-result"))
+
+        let plans = PlayableBattleSurfaceCatalog.allPlans
+        XCTAssertEqual(plans.count, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(plans.map(\.id), GuderianCampaignCatalog.all.sorted { $0.order < $1.order }.map(\.id))
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.routedBattleIDs, [.tucholaForest])
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.nextRolloutIDs.first, .wizna)
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.nextRolloutIDs.count, GuderianCampaignCatalog.all.count - 1)
+
+        let tucholaPlan = try XCTUnwrap(PlayableBattleSurfaceCatalog.plan(for: .tucholaForest))
+        XCTAssertEqual(tucholaPlan.readiness, .pilotComplete)
+        XCTAssertEqual(tucholaPlan.cycleWindow, 451...500)
+        XCTAssertEqual(tucholaPlan.acceptanceGates, PlayableBattleAcceptanceGate.allCases)
+
+        let wiznaPlan = try XCTUnwrap(PlayableBattleSurfaceCatalog.plan(for: .wizna))
+        XCTAssertEqual(wiznaPlan.readiness, .nextRollout)
+        XCTAssertEqual(wiznaPlan.cycleWindow, 501...505)
+
+        let finalPlan = try XCTUnwrap(PlayableBattleSurfaceCatalog.plan(for: .moscowTulaKashira))
+        XCTAssertEqual(finalPlan.cycleWindow, 586...590)
+        XCTAssertTrue(plans.allSatisfy { !$0.notes.isEmpty })
+        XCTAssertTrue(plans.allSatisfy { $0.hostSurfaceName == PlayableBattleSurfaceCatalog.hostSurfaceName })
+    }
+
     func testGuderianTestAutomationRunsEveryBattleAndSurfacesDiagnostics() throws {
         let report = CampaignAutomationRunner.runCampaign()
         let orderedIDs = GuderianCampaignCatalog.all
