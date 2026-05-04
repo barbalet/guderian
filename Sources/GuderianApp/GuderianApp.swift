@@ -35,39 +35,26 @@ struct GuderianCampaignView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selectedID) {
-                Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(completionSummary.progressLabel)
-                            .font(.headline)
-                        Text("\(progress.availableScenarios(in: playMode, catalog: scenarios).count) available | \(playMode.rawValue)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(shipReport.isShipReady ? "Full campaign ship-ready" : "\(shipReport.blockers.count) ship blockers")
-                            .font(.caption)
-                            .foregroundStyle(shipReport.isShipReady ? .green : .orange)
+        NavigationStack {
+            List {
+                campaignStatusSection
+                scenarioListSection
+            }
+            .listStyle(.inset)
+            .navigationTitle("Campaign")
+            .navigationDestination(for: GuderianBattleID.self) { id in
+                if let scenario = scenarios.first(where: { $0.id == id }) {
+                    ScenarioBriefingView(
+                        scenario: scenario,
+                        progress: progress,
+                        playMode: playMode,
+                        shipReport: shipReport
+                    ) { record in
+                        progress.recordCompletion(record)
                     }
-                    .padding(.vertical, 4)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(completionSummary.progressLabel), \(progress.availableScenarios(in: playMode, catalog: scenarios).count) available, \(shipReport.isShipReady ? "ship ready" : "ship blockers present")")
-
-                    Picker("Play mode", selection: $playMode) {
-                        Text(CampaignPlayMode.chronological.rawValue).tag(CampaignPlayMode.chronological)
-                        Text(CampaignPlayMode.standalone.rawValue).tag(CampaignPlayMode.standalone)
-                    }
-                    .pickerStyle(.segmented)
-                    .accessibilityLabel("Campaign play mode")
-                }
-
-                Section("Scenarios") {
-                    ForEach(scenarios) { scenario in
-                        ScenarioRow(scenario: scenario, progress: progress, playMode: playMode)
-                            .tag(scenario.id)
-                    }
+                    .navigationTitle(scenario.title)
                 }
             }
-            .navigationTitle("Campaign")
             .safeAreaInset(edge: .bottom) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -131,15 +118,6 @@ struct GuderianCampaignView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.bar)
             }
-        } detail: {
-            ScenarioBriefingView(
-                scenario: selectedScenario,
-                progress: progress,
-                playMode: playMode,
-                shipReport: shipReport
-            ) { record in
-                progress.recordCompletion(record)
-            }
         }
         .onAppear {
             loadSavedCampaignState()
@@ -152,6 +130,48 @@ struct GuderianCampaignView: View {
         }
         .onChange(of: playMode) { _, _ in
             persistCampaignState()
+        }
+    }
+
+    private var campaignStatusSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(completionSummary.progressLabel)
+                    .font(.headline)
+                Text("\(progress.availableScenarios(in: playMode, catalog: scenarios).count) available | \(playMode.rawValue)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(shipReport.isShipReady ? "Full campaign ship-ready" : "\(shipReport.blockers.count) ship blockers")
+                    .font(.caption)
+                    .foregroundStyle(shipReport.isShipReady ? .green : .orange)
+            }
+            .padding(.vertical, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(completionSummary.progressLabel), \(progress.availableScenarios(in: playMode, catalog: scenarios).count) available, \(shipReport.isShipReady ? "ship ready" : "ship blockers present")")
+
+            Picker("Play mode", selection: $playMode) {
+                Text(CampaignPlayMode.chronological.rawValue).tag(CampaignPlayMode.chronological)
+                Text(CampaignPlayMode.standalone.rawValue).tag(CampaignPlayMode.standalone)
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel("Campaign play mode")
+        }
+    }
+
+    private var scenarioListSection: some View {
+        Section("Scenarios") {
+            ForEach(scenarios) { scenario in
+                NavigationLink(value: scenario.id) {
+                    ScenarioRow(scenario: scenario, progress: progress, playMode: playMode)
+                }
+                .disabled(!progress.isAvailable(scenario, in: playMode))
+                .simultaneousGesture(TapGesture().onEnded {
+                    if progress.isAvailable(scenario, in: playMode) {
+                        selectedID = scenario.id
+                    }
+                })
+                .accessibilityIdentifier("scenario-row-link-\(scenario.id.rawValue)")
+            }
         }
     }
 
@@ -357,11 +377,11 @@ struct ScenarioBriefingView: View {
                 }
                 shipReadinessView
                 ScenarioMapView(layout: layout)
-                    .frame(maxWidth: 860)
+                    .frame(maxWidth: 1120)
                 playableScreenRolloutView
                 NativeBattleBoardView(scenario: scenario)
                     .id(scenario.id)
-                    .frame(maxWidth: 860)
+                    .frame(maxWidth: 1120)
                 briefingSection("Player Force", scenario.playerForceSummary, icon: "shield.lefthalf.filled")
                 briefingSection("Guderian Command", scenario.guderianCommand, icon: "bolt.horizontal")
                 briefingSection("Design Intent", scenario.designIntent, icon: "scope")
@@ -385,7 +405,8 @@ struct ScenarioBriefingView: View {
                 sources
             }
             .padding(28)
-            .frame(maxWidth: 920, alignment: .leading)
+            .frame(maxWidth: 1240, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }

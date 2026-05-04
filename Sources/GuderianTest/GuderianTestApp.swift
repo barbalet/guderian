@@ -16,7 +16,7 @@ struct GuderianTestApp: App {
 final class GuderianTestViewModel: ObservableObject {
     @Published private(set) var reports: [CampaignAutomationBattleReport] = []
     @Published private(set) var isRunning = false
-    @Published var selectedID: GuderianBattleID? = GuderianCampaignCatalog.all.first?.id
+    @Published private(set) var focusedID: GuderianBattleID? = GuderianCampaignCatalog.all.first?.id
 
     private var runTask: Task<Void, Never>?
 
@@ -51,11 +51,8 @@ final class GuderianTestViewModel: ObservableObject {
         return progress
     }
 
-    var selectedReport: CampaignAutomationBattleReport? {
-        guard let selectedID else {
-            return reports.first
-        }
-        return reports.first { $0.id == selectedID }
+    func report(for id: GuderianBattleID) -> CampaignAutomationBattleReport? {
+        reports.first { $0.id == id }
     }
 
     func start() {
@@ -71,8 +68,8 @@ final class GuderianTestViewModel: ObservableObject {
                 guard !Task.isCancelled else {
                     break
                 }
-                if selectedID == nil {
-                    selectedID = scenario.id
+                if focusedID == nil {
+                    focusedID = scenario.id
                 }
 
                 let report = CampaignAutomationRunner.runBattle(
@@ -81,7 +78,7 @@ final class GuderianTestViewModel: ObservableObject {
                     options: .appDefault
                 )
                 reports.append(report)
-                selectedID = report.id
+                focusedID = report.id
                 try? await Task.sleep(nanoseconds: 70_000_000)
             }
             isRunning = false
@@ -97,7 +94,7 @@ final class GuderianTestViewModel: ObservableObject {
     func reset() {
         stop()
         reports = []
-        selectedID = GuderianCampaignCatalog.all.first?.id
+        focusedID = GuderianCampaignCatalog.all.first?.id
     }
 }
 
@@ -105,15 +102,23 @@ struct GuderianTestDashboard: View {
     @StateObject private var viewModel = GuderianTestViewModel()
 
     var body: some View {
-        NavigationSplitView {
+        NavigationStack {
             VStack(spacing: 0) {
                 runHeader
                 Divider()
                 battleList
             }
-            .navigationSplitViewColumnWidth(min: 360, ideal: 420)
-        } detail: {
-            detailPane
+            .navigationTitle("Battles")
+            .navigationDestination(for: GuderianBattleID.self) { id in
+                if let scenario = GuderianCampaignCatalog.scenario(id: id) {
+                    GuderianTestBattleScreen(
+                        scenario: scenario,
+                        report: viewModel.report(for: id),
+                        isFocused: viewModel.focusedID == id,
+                        isRunning: viewModel.isRunning
+                    )
+                }
+            }
         }
         .toolbar {
             ToolbarItemGroup {
@@ -157,6 +162,9 @@ struct GuderianTestDashboard: View {
                     Text(viewModel.summary.completionSummary.progressLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text(viewModel.isRunning ? "Automation is running through the campaign." : "Open a battle row to inspect the full automation playback.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
                 if viewModel.isRunning {
@@ -177,32 +185,21 @@ struct GuderianTestDashboard: View {
     }
 
     private var battleList: some View {
-        List(selection: $viewModel.selectedID) {
+        List {
             ForEach(GuderianCampaignCatalog.all.sorted(by: { $0.order < $1.order })) { scenario in
                 let report = viewModel.reports.first { $0.id == scenario.id }
-                GuderianTestBattleRow(scenario: scenario, report: report)
-                    .tag(scenario.id)
+                NavigationLink(value: scenario.id) {
+                    GuderianTestBattleRow(
+                        scenario: scenario,
+                        report: report,
+                        isFocused: viewModel.focusedID == scenario.id
+                    )
+                }
+                .accessibilityIdentifier("guderian-test-row-link-\(scenario.id.rawValue)")
             }
         }
-        .listStyle(.sidebar)
+        .listStyle(.inset)
         .accessibilityIdentifier("guderian-test-battle-list")
-    }
-
-    @ViewBuilder
-    private var detailPane: some View {
-        if let report = viewModel.selectedReport {
-            GuderianTestReportDetail(report: report)
-        } else {
-            VStack(spacing: 12) {
-                Image(systemName: "gauge.with.dots.needle.bottom.50percent")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
-                Text("Awaiting first automation report")
-                    .font(.headline)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .windowBackgroundColor))
-        }
     }
 }
 
@@ -235,34 +232,36 @@ struct SummaryBadge: View {
 struct GuderianTestBattleRow: View {
     let scenario: GuderianScenario
     let report: CampaignAutomationBattleReport?
+    let isFocused: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 14) {
             statusIcon
-                .frame(width: 20)
+                .frame(width: 24)
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(scenario.order). \(scenario.title)")
-                    .font(.callout.weight(.medium))
+                    .font(.headline)
                     .lineLimit(1)
-                HStack(spacing: 8) {
-                    Text(scenario.theater.rawValue)
+                Text("\(scenario.dateLabel) | \(scenario.theater.rawValue)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8)], alignment: .leading, spacing: 4) {
                     Text(report.map { "\($0.actionsSucceeded)/\($0.actionsAttempted) actions" } ?? "queued")
-                    if let record = report?.completionRecord {
-                        Text("\(record.score) VP")
-                    }
-                    if report?.nativeBoardDiagnosticsPassed == true {
-                        Text("board ok")
-                    }
-                    if let report, !report.issues.isEmpty {
-                        Text("\(report.issues.count) issues")
-                    }
+                    Text(report?.nativeBoardDiagnosticsPassed == true ? "board ok" : "board pending")
+                    Text(report?.completionRecord.map { "\($0.score) VP" } ?? "score pending")
+                    Text(report.map { $0.issues.isEmpty ? "no issues" : "\($0.issues.count) issues" } ?? "not run")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
             Spacer()
+            if isFocused {
+                Label("Running", systemImage: "play.circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.blue)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
         .accessibilityIdentifier("guderian-test-row-\(scenario.id.rawValue)")
     }
 
@@ -314,6 +313,47 @@ struct GuderianTestBattleRow: View {
     }
 }
 
+struct GuderianTestBattleScreen: View {
+    let scenario: GuderianScenario
+    let report: CampaignAutomationBattleReport?
+    let isFocused: Bool
+    let isRunning: Bool
+
+    var body: some View {
+        Group {
+            if let report {
+                GuderianTestReportDetail(report: report)
+            } else {
+                pendingScreen
+            }
+        }
+        .navigationTitle(scenario.title)
+        .accessibilityIdentifier("guderian-test-battle-screen-\(scenario.id.rawValue)")
+    }
+
+    private var pendingScreen: some View {
+        VStack(spacing: 16) {
+            Image(systemName: isFocused && isRunning ? "play.circle.fill" : "clock")
+                .font(.system(size: 54))
+                .foregroundStyle(isFocused && isRunning ? .blue : .secondary)
+            Text(scenario.title)
+                .font(.title2.weight(.semibold))
+            Text(isFocused && isRunning ? "Automation is running this battle now." : "Automation has not produced a battle report yet.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                Label(scenario.playerForceSummary, systemImage: "shield.lefthalf.filled")
+                Label(scenario.guderianCommand, systemImage: "bolt.horizontal")
+                Label("\(scenario.objectives.count) objectives queued", systemImage: "scope")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
 struct GuderianTestReportDetail: View {
     let report: CampaignAutomationBattleReport
 
@@ -328,7 +368,8 @@ struct GuderianTestReportDetail: View {
                 engineLogSection
             }
             .padding(24)
-            .frame(maxWidth: 980, alignment: .leading)
+            .frame(maxWidth: 1260, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .accessibilityIdentifier("guderian-test-report-detail")
@@ -352,7 +393,7 @@ struct GuderianTestReportDetail: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], alignment: .leading, spacing: 10) {
                 DetailMetric(title: "Final Turn", value: "\(report.finalTurn)")
                 DetailMetric(title: "Final Phase", value: report.finalPhase)
                 DetailMetric(title: "Winner", value: report.engineWinner)
