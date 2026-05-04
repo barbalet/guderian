@@ -410,6 +410,30 @@ struct GuderianTestReportDetail: View {
                     .font(.callout)
                     .foregroundStyle(report.nativeAIEventPassReady ? .green : .secondary)
             }
+
+            if !report.nativeAIEventExecutionSummary.isEmpty {
+                Label(report.nativeAIEventExecutionSummary, systemImage: "arrow.triangle.branch")
+                    .font(.callout)
+                    .foregroundStyle(report.nativeAIEventExecutionReady ? .green : .secondary)
+            }
+
+            if !report.nativeBalanceUXSummary.isEmpty {
+                Label(report.nativeBalanceUXSummary, systemImage: "slider.horizontal.3")
+                    .font(.callout)
+                    .foregroundStyle(report.nativeBalanceUXReady ? .green : .secondary)
+            }
+
+            if !report.nativePostShipAnalysisSummary.isEmpty {
+                Label(report.nativePostShipAnalysisSummary, systemImage: "doc.text.magnifyingglass")
+                    .font(.callout)
+                    .foregroundStyle(report.nativePostShipAnalysisReady ? .green : .secondary)
+            }
+
+            if !report.nativeSoakSummary.isEmpty {
+                Label(report.nativeSoakSummary, systemImage: "repeat.circle")
+                    .font(.callout)
+                    .foregroundStyle(report.nativeSoakReady ? .green : .secondary)
+            }
         }
     }
 

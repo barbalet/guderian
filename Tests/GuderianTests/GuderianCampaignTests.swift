@@ -708,7 +708,7 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(architecture.requiredEngineHooks.allSatisfy { $0.owner == .dzwEngine })
     }
 
-    func testCycle375AllBattlesAreNativePlayableWithAIEventReadiness() throws {
+    func testCycle400AllBattlesAreNativePlayableWithShipReadinessNotes() throws {
         let reports = NativePlayabilityArchitectureCatalog.allReadinessReports
         let orderedIDs = GuderianCampaignCatalog.all
             .sorted { $0.order < $1.order }
@@ -727,12 +727,15 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertFalse(report.requiredHookIDs.contains("scenario-instance-loader"))
             XCTAssertTrue(report.notes.contains { $0.contains("scenario-specific terrain/objectives/mission target") })
             XCTAssertTrue(report.notes.contains { $0.contains("Cycle 375 native AI/event pass") })
+            XCTAssertTrue(report.notes.contains { $0.contains("Cycle 380 native AI/event execution") })
+            XCTAssertTrue(report.notes.contains { $0.contains("Cycle 390 balance/UX audit") })
 
             if nativePlayableIDs.contains(report.id) {
                 XCTAssertEqual(report.status, .nativePlayable)
                 XCTAssertFalse(report.requiredHookIDs.contains("scenario-mission-state"))
-                XCTAssertTrue(report.requiredHookIDs.contains("scenario-event-triggers"))
-                XCTAssertTrue(report.requiredHookIDs.contains("scenario-ai-controls"))
+                XCTAssertFalse(report.requiredHookIDs.contains("scenario-event-triggers"))
+                XCTAssertFalse(report.requiredHookIDs.contains("scenario-ai-controls"))
+                XCTAssertTrue(report.requiredHookIDs.isEmpty, report.title)
                 if easternFrontIDs.contains(report.id) {
                     XCTAssertTrue(report.notes.contains { $0.contains("Cycle 370 native Eastern Front pack") })
                 } else if franceIDs.contains(report.id) {
@@ -1216,6 +1219,145 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertGreaterThan(moscow.scenarioRuleEventCount, 0)
     }
 
+    func testCycle380NativeAIEventExecutionOperatesOnBoardState() throws {
+        XCTAssertEqual(NativeAIEventExecutionCatalog.cycleRange, 376...380)
+
+        let reports = NativeAIEventExecutionCatalog.allReports
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(reports.map(\.id), orderedIDs)
+        XCTAssertEqual(reports.count, GuderianCampaignCatalog.all.count)
+        XCTAssertTrue(reports.allSatisfy(\.isNativeAIEventExecutionReady))
+
+        for report in reports {
+            XCTAssertEqual(report.passCycleStart, NativeAIEventPassCatalog.cycleRange.lowerBound, report.title)
+            XCTAssertEqual(report.passCycleEnd, NativeAIEventPassCatalog.cycleRange.upperBound, report.title)
+            XCTAssertTrue(report.openedBoardSession, report.title)
+            XCTAssertTrue(report.scenarioBoardPlayable, report.title)
+            XCTAssertGreaterThan(report.aiControlResolutionCount, 0, report.title)
+            XCTAssertGreaterThan(report.fallbackResolutionCount, 0, report.title)
+            XCTAssertGreaterThan(report.eventResolutionCount, 0, report.title)
+            XCTAssertGreaterThan(report.victoryGateResolutionCount, 0, report.title)
+            XCTAssertEqual(report.boardStateResolutionCount, report.resolutions.count, report.title)
+            XCTAssertFalse(report.preferredObjectiveNames.isEmpty, report.title)
+            XCTAssertFalse(report.summary.isEmpty)
+            XCTAssertTrue(report.resolutions.allSatisfy(\.resolvedAgainstBoardState), report.title)
+            XCTAssertTrue(report.resolutions.contains { $0.boardTargetKind == .objective || $0.boardTargetKind == .mission })
+        }
+
+        let sedan = try XCTUnwrap(NativeAIEventExecutionCatalog.report(for: .sedan))
+        XCTAssertGreaterThan(sedan.reinforcementResolutionCount, 0)
+        XCTAssertGreaterThan(sedan.scenarioRuleResolutionCount, 0)
+
+        let moscow = try XCTUnwrap(NativeAIEventExecutionCatalog.report(for: .moscowTulaKashira))
+        XCTAssertGreaterThan(moscow.reinforcementResolutionCount, 0)
+        XCTAssertGreaterThan(moscow.scenarioRuleResolutionCount, 0)
+    }
+
+    func testCycle390NativeBalanceUXAuditCoversEveryBattle() throws {
+        XCTAssertEqual(NativeBalanceUXAuditCatalog.cycleRange, 381...390)
+
+        let reports = NativeBalanceUXAuditCatalog.allReports
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(reports.map(\.id), orderedIDs)
+        XCTAssertEqual(reports.count, GuderianCampaignCatalog.all.count)
+        XCTAssertTrue(reports.allSatisfy(\.isNativeBalanceUXReady))
+
+        for report in reports {
+            XCTAssertTrue(report.readableUnitDensity, report.title)
+            XCTAssertTrue(report.playablePacingReady, report.title)
+            XCTAssertTrue(report.playerAgencyReady, report.title)
+            XCTAssertTrue(report.debriefReady, report.title)
+            XCTAssertTrue(report.accessibilityReady, report.title)
+            XCTAssertTrue(report.saveLoadReady, report.title)
+            XCTAssertTrue(report.failureReportingReady, report.title)
+            XCTAssertTrue(report.blockers.isEmpty, report.title)
+            XCTAssertGreaterThan(report.nativeUnitCount, 0, report.title)
+            XCTAssertGreaterThan(report.nativeObjectiveCount, 0, report.title)
+            XCTAssertGreaterThan(report.nativeTerrainCount, 0, report.title)
+            XCTAssertGreaterThanOrEqual(report.victoryBandCount, 3, report.title)
+            XCTAssertGreaterThanOrEqual(report.maxPlayerScore, report.missionTargetScore, report.title)
+            XCTAssertEqual(Set(report.signals.map(\.kind)).count, 7, report.title)
+            XCTAssertTrue(report.signals.allSatisfy(\.ready), report.title)
+            XCTAssertFalse(report.summary.isEmpty)
+        }
+    }
+
+    func testCycle400NativeCampaignShipReportIsReady() throws {
+        XCTAssertEqual(NativeCampaignShipReportCatalog.cycleRange, 391...400)
+
+        let report = NativeCampaignShipReportCatalog.report()
+
+        XCTAssertTrue(report.isNativeCampaignShipReady, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.scenarioCount, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(report.nativePlayableCount, report.scenarioCount)
+        XCTAssertEqual(report.automationNonTerminalCount, report.scenarioCount)
+        XCTAssertEqual(report.completedScenarioCount, report.scenarioCount)
+        XCTAssertEqual(report.aiEventExecutionReadyCount, report.scenarioCount)
+        XCTAssertEqual(report.balanceUXReadyCount, report.scenarioCount)
+        XCTAssertTrue(report.metadataShipReady)
+        XCTAssertTrue(report.blockers.isEmpty)
+        XCTAssertTrue(report.gates.allSatisfy { $0.status == .passed })
+        XCTAssertTrue(report.gates.contains { $0.id == "native-playable" })
+        XCTAssertTrue(report.gates.contains { $0.id == "ai-events" })
+        XCTAssertTrue(report.gates.contains { $0.id == "balance-ux" })
+        XCTAssertTrue(report.buildCommands.contains("swift test"))
+        XCTAssertTrue(report.buildCommands.contains { $0.contains("GuderianTest") })
+        XCTAssertFalse(report.summary.isEmpty)
+    }
+
+    func testCycle425PostShipAnalysisCoversEveryBattle() throws {
+        XCTAssertEqual(NativePostShipAnalysisCatalog.cycleRange, 401...425)
+
+        let reports = NativePostShipAnalysisCatalog.allReports
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(reports.map(\.id), orderedIDs)
+        XCTAssertEqual(reports.count, GuderianCampaignCatalog.all.count)
+        XCTAssertTrue(reports.allSatisfy(\.isPostShipAnalysisReady))
+
+        for report in reports {
+            XCTAssertEqual(report.readinessStatus, .nativePlayable, report.title)
+            XCTAssertTrue(report.aiEventExecutionReady, report.title)
+            XCTAssertTrue(report.balanceUXReady, report.title)
+            XCTAssertGreaterThanOrEqual(report.notes.count, 5, report.title)
+            XCTAssertEqual(Set(report.notes.map(\.theme)).count, 5, report.title)
+            XCTAssertFalse(report.tuningBacklog.isEmpty, report.title)
+            XCTAssertFalse(report.summary.isEmpty)
+        }
+    }
+
+    func testCycle450NativeCampaignSoakRunsDeterministicProbes() throws {
+        XCTAssertEqual(NativeCampaignSoakRunner.cycleRange, 426...450)
+        XCTAssertEqual(NativeCampaignSoakRunner.seedsPerBattle, 3)
+
+        let suite = NativeCampaignSoakRunner.runCampaign()
+        let orderedIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
+
+        XCTAssertEqual(suite.reports.map(\.id), orderedIDs)
+        XCTAssertEqual(suite.reports.count, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(suite.stableBattleCount, GuderianCampaignCatalog.all.count)
+        XCTAssertTrue(suite.isCampaignSoakReady)
+
+        for report in suite.reports {
+            XCTAssertTrue(report.isSoakStable, report.title)
+            XCTAssertEqual(report.probes.count, NativeCampaignSoakRunner.seedsPerBattle, report.title)
+            XCTAssertEqual(Set(report.probes.map(\.seed)).count, NativeCampaignSoakRunner.seedsPerBattle, report.title)
+            XCTAssertEqual(Set(report.probes.map(\.replaySignature)).count, NativeCampaignSoakRunner.seedsPerBattle, report.title)
+            XCTAssertTrue(report.probes.allSatisfy(\.isStable), report.title)
+            XCTAssertFalse(report.summary.isEmpty)
+        }
+    }
+
     func testGuderianTestAutomationRunsEveryBattleAndSurfacesDiagnostics() throws {
         let report = CampaignAutomationRunner.runCampaign()
         let orderedIDs = GuderianCampaignCatalog.all
@@ -1252,6 +1394,18 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertTrue(battle.nativeAIEventPassReady, battle.title)
             XCTAssertFalse(battle.nativeAIEventPassSummary.isEmpty)
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native AI/Event Pass" && $0.status == .passed })
+            XCTAssertTrue(battle.nativeAIEventExecutionReady, battle.title)
+            XCTAssertFalse(battle.nativeAIEventExecutionSummary.isEmpty)
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native AI/Event Execution" && $0.status == .passed })
+            XCTAssertTrue(battle.nativeBalanceUXReady, battle.title)
+            XCTAssertFalse(battle.nativeBalanceUXSummary.isEmpty)
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native Balance/UX" && $0.status == .passed })
+            XCTAssertTrue(battle.nativePostShipAnalysisReady, battle.title)
+            XCTAssertFalse(battle.nativePostShipAnalysisSummary.isEmpty)
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native Post-Ship Analysis" && $0.status == .passed })
+            XCTAssertTrue(battle.nativeSoakReady, battle.title)
+            XCTAssertFalse(battle.nativeSoakSummary.isEmpty)
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Native Campaign Soak" && $0.status == .passed })
 
             if demoIDs.contains(battle.id) {
                 XCTAssertTrue(battle.nativeDemoBoardCompleted, battle.title)

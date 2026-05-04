@@ -101,6 +101,14 @@ public struct CampaignAutomationBattleReport: Identifiable, Codable, Hashable, S
     public let nativeEasternFrontPackSummary: String
     public let nativeAIEventPassReady: Bool
     public let nativeAIEventPassSummary: String
+    public let nativeAIEventExecutionReady: Bool
+    public let nativeAIEventExecutionSummary: String
+    public let nativeBalanceUXReady: Bool
+    public let nativeBalanceUXSummary: String
+    public let nativePostShipAnalysisReady: Bool
+    public let nativePostShipAnalysisSummary: String
+    public let nativeSoakReady: Bool
+    public let nativeSoakSummary: String
     public let steps: [CampaignAutomationStep]
     public let issues: [CampaignAutomationIssue]
     public let engineLogTail: [String]
@@ -240,6 +248,10 @@ public enum CampaignAutomationRunner {
         recordEasternFrontFoundationIfAvailable(scenario, accumulator: &accumulator)
         completeNativeEasternFrontBattleIfAvailable(scenario, accumulator: &accumulator)
         recordNativeAIEventPass(scenario, accumulator: &accumulator)
+        recordNativeAIEventExecution(scenario, accumulator: &accumulator)
+        recordNativeBalanceUXAudit(scenario, accumulator: &accumulator)
+        recordNativePostShipAnalysis(scenario, accumulator: &accumulator)
+        recordNativeCampaignSoak(scenario, accumulator: &accumulator)
 
         let report = accumulator.finalize(loadout: loadout.summary, game: game)
         if report.status == .passed || (report.status == .warning && options.completeWarningRuns) {
@@ -391,6 +403,38 @@ public enum CampaignAutomationRunner {
         accumulator.recordNativeAIEventPass(report)
     }
 
+    private static func recordNativeAIEventExecution(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        let report = NativeAIEventExecutionCatalog.report(for: scenario)
+        accumulator.recordNativeAIEventExecution(report)
+    }
+
+    private static func recordNativeBalanceUXAudit(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        let report = NativeBalanceUXAuditCatalog.report(for: scenario)
+        accumulator.recordNativeBalanceUXAudit(report)
+    }
+
+    private static func recordNativePostShipAnalysis(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        let report = NativePostShipAnalysisCatalog.report(for: scenario)
+        accumulator.recordNativePostShipAnalysis(report)
+    }
+
+    private static func recordNativeCampaignSoak(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        let report = NativeCampaignSoakRunner.runBattle(scenario)
+        accumulator.recordNativeCampaignSoak(report)
+    }
+
     private static func validateScenarioData(
         _ scenario: GuderianScenario,
         accumulator: inout AutomationAccumulator
@@ -472,7 +516,7 @@ public enum CampaignAutomationRunner {
             let view = game_view(game)
             switch view.phase {
             case TE_PHASE_MOVEMENT:
-                runMovementPhase(game, accumulator: &accumulator)
+                runMovementPhase(game, scenario: scenario, accumulator: &accumulator)
             case TE_PHASE_SHOOTING:
                 runShootingPhase(game, accumulator: &accumulator)
             case TE_PHASE_ASSAULT:
@@ -503,14 +547,18 @@ public enum CampaignAutomationRunner {
         }
     }
 
-    private static func runMovementPhase(_ game: OpaquePointer, accumulator: inout AutomationAccumulator) {
+    private static func runMovementPhase(
+        _ game: OpaquePointer,
+        scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
         let view = game_view(game)
         let units = unitSnapshots(in: game)
         let objectives = objectiveSnapshots(in: game)
         var moved = 0
 
         for unit in units where unit.canMoveNow {
-            guard let target = movementTarget(for: unit, units: units, objectives: objectives) else {
+            guard let target = movementTarget(for: unit, scenario: scenario, units: units, objectives: objectives) else {
                 continue
             }
             if attemptMove(unit, toward: target, in: game, accumulator: &accumulator) {
@@ -698,9 +746,19 @@ public enum CampaignAutomationRunner {
 
     private static func movementTarget(
         for unit: AutomationUnit,
+        scenario: GuderianScenario,
         units: [AutomationUnit],
         objectives: [AutomationObjective]
     ) -> AutomationPoint? {
+        if unit.owner == TE_PLAYER_TWO,
+           let preferredName = NativeAIEventExecutionCatalog.preferredObjectiveName(
+            for: scenario,
+            objectiveNames: objectives.map(\.name)
+           ),
+           let objective = objectives.first(where: { $0.name == preferredName }) {
+            return objective.point
+        }
+
         if let objective = objectives.sorted(by: {
             objectivePriority(for: unit, objective: $0) < objectivePriority(for: unit, objective: $1)
         }).first {
@@ -849,6 +907,14 @@ private struct AutomationAccumulator {
     var nativeEasternFrontPackSummary = ""
     var nativeAIEventPassReady = false
     var nativeAIEventPassSummary = ""
+    var nativeAIEventExecutionReady = false
+    var nativeAIEventExecutionSummary = ""
+    var nativeBalanceUXReady = false
+    var nativeBalanceUXSummary = ""
+    var nativePostShipAnalysisReady = false
+    var nativePostShipAnalysisSummary = ""
+    var nativeSoakReady = false
+    var nativeSoakSummary = ""
 
     mutating func step(_ stage: String, _ status: CampaignAutomationStatus, _ title: String, _ detail: String) {
         steps.append(
@@ -986,6 +1052,56 @@ private struct AutomationAccumulator {
         )
     }
 
+    mutating func recordNativeAIEventExecution(_ report: NativeAIEventExecutionReport) {
+        nativeAIEventExecutionReady = report.isNativeAIEventExecutionReady
+        nativeAIEventExecutionSummary = report.summary
+        step(
+            "Native AI/Event Execution",
+            report.isNativeAIEventExecutionReady ? .passed : .warning,
+            "Resolved AI/event pass on board state",
+            report.summary
+        )
+    }
+
+    mutating func recordNativeBalanceUXAudit(_ report: NativeBalanceUXAuditReport) {
+        nativeBalanceUXReady = report.isNativeBalanceUXReady
+        nativeBalanceUXSummary = report.summary
+        step(
+            "Native Balance/UX",
+            report.isNativeBalanceUXReady ? .passed : .warning,
+            "Audited native balance and UX",
+            report.summary
+        )
+        for blocker in report.blockers {
+            issue(.blocker, "Native Balance/UX", "Balance/UX blocker", blocker)
+        }
+    }
+
+    mutating func recordNativePostShipAnalysis(_ report: NativePostShipAnalysisReport) {
+        nativePostShipAnalysisReady = report.isPostShipAnalysisReady
+        nativePostShipAnalysisSummary = report.summary
+        step(
+            "Native Post-Ship Analysis",
+            report.isPostShipAnalysisReady ? .passed : .warning,
+            "Recorded post-ship analysis",
+            report.summary
+        )
+    }
+
+    mutating func recordNativeCampaignSoak(_ report: NativeCampaignSoakBattleReport) {
+        nativeSoakReady = report.isSoakStable
+        nativeSoakSummary = report.summary
+        actionsAttempted += report.probes.reduce(0) { $0 + $1.legalActionsAttempted }
+        actionsSucceeded += report.probes.reduce(0) { $0 + $1.legalActionsSucceeded }
+        phaseAdvances += report.probes.reduce(0) { $0 + $1.phaseAdvances }
+        step(
+            "Native Campaign Soak",
+            report.isSoakStable ? .passed : .warning,
+            "Ran deterministic soak probes",
+            report.summary
+        )
+    }
+
     func finalize(loadout: AutomationLoadoutSummary?, game: OpaquePointer?) -> CampaignAutomationBattleReport {
         let gameView = game.map { game_view($0) }
         let mission = game.map { game_mission_view($0) }
@@ -1032,6 +1148,14 @@ private struct AutomationAccumulator {
             nativeEasternFrontPackSummary: nativeEasternFrontPackSummary,
             nativeAIEventPassReady: nativeAIEventPassReady,
             nativeAIEventPassSummary: nativeAIEventPassSummary,
+            nativeAIEventExecutionReady: nativeAIEventExecutionReady,
+            nativeAIEventExecutionSummary: nativeAIEventExecutionSummary,
+            nativeBalanceUXReady: nativeBalanceUXReady,
+            nativeBalanceUXSummary: nativeBalanceUXSummary,
+            nativePostShipAnalysisReady: nativePostShipAnalysisReady,
+            nativePostShipAnalysisSummary: nativePostShipAnalysisSummary,
+            nativeSoakReady: nativeSoakReady,
+            nativeSoakSummary: nativeSoakSummary,
             steps: steps,
             issues: issues,
             engineLogTail: engineLogTail(in: game)

@@ -66,6 +66,7 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 - Cycles 101-250: complete campaign, expanding to every battle listed above and shipping all scenarios as playable, tested, historically annotated missions.
 - Cycles 251-300: native playable demo, replacing proxy forces/maps with real Guderian battle instances for Wizna, Sedan, and Moscow/Tula/Kashira.
 - Cycles 301-400: native full campaign, converting all 19 battles to scenario-specific units, terrain, actions, AI pressure, scoring, and debriefs.
+- Cycles 401-450: post-ship hardening, adding after-action analysis and deterministic campaign soak probes across every native battle.
 
 Cycle 0 update: initial repository review, `dzw` engine review, and Wikipedia battle-scope research completed on 2026-05-03.
 
@@ -109,6 +110,16 @@ Cycle 370 update: the native Eastern Front 1941 pack is complete. Bialystok-Mins
 
 Cycle 375 update: the first AI/event pass is in place across all 19 battles. Native reports now map deterministic German AI priorities, fallback behavior, scripted events, reinforcement timing, pacing, scenario rules, tutorial cues, and victory gates against real native battle instances.
 
+Cycle 380 update: native AI/event execution is now resolved against live board snapshots for all 19 battles. Guderian AI movement uses scenario-authored objective priorities, and each mapped priority, fallback, event, reinforcement timing, scenario rule, pacing cue, tutorial cue, and victory gate resolves to a board target.
+
+Cycle 390 update: native balance and UX audits now cover every battle. The audits verify pacing bands, player-agency score coverage, readable unit/objective/terrain density, full battle-flow accessibility identifiers, save/load continuity, and failure/debrief reporting.
+
+Cycle 400 update: the native full-campaign ship gate is green. The report verifies all 19 battles as native playable, full GuderianTest automation completion, cycle 380 AI/event execution readiness, cycle 390 balance/UX readiness, and the earlier cycle 250 metadata ship baseline.
+
+Cycle 425 update: post-ship after-action analysis now covers every battle with agency, AI pressure, event timing, historical-context, automation-coverage notes, and tuning follow-ups.
+
+Cycle 450 update: deterministic native campaign soak probes now run three seeded board diagnostics per battle across the full 19-battle campaign, with stable replay signatures and no blocking findings.
+
 ## Run
 
 Build and test from the repository root:
@@ -128,7 +139,7 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 
 ## Ship Status
 
-The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 300 completes the native playable demo target for Wizna, Sedan, and Moscow/Tula/Kashira; cycle 325 promotes the four Polish 1939 battles; cycle 345 promotes the eight France 1940 battles; and cycle 370 promotes the seven Eastern Front 1941 battles. All 19 battles now have native board completion records and debriefs. GuderianTest performs real board diagnostics across the full campaign and records the cycle 375 AI/event readiness pass. The remaining native work is the cycle 376-400 polish-and-ship path: deepen event/reinforcement hooks, scenario AI controls, balance/UX polish, and final campaign release verification.
+The cycle 250 full-campaign content target is complete: all 19 campaign scenarios are hand-authored, historically annotated, proxy-loadable, smoke-tested, and covered by release-readiness checks. Cycle 300 completes the native playable demo target for Wizna, Sedan, and Moscow/Tula/Kashira; cycle 325 promotes the four Polish 1939 battles; cycle 345 promotes the eight France 1940 battles; and cycle 370 promotes the seven Eastern Front 1941 battles. Cycle 400 completes the native full-campaign ship gate: all 19 battles have native board completion records, debriefs, board-state AI/event execution, balance/UX audits, and GuderianTest automation coverage. Cycle 450 adds post-ship analysis and deterministic native soak probes across the full campaign.
 
 ## App Identity
 

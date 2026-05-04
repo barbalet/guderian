@@ -178,6 +178,7 @@ public enum NativePlayabilityArchitectureCatalog {
         let hasFranceNativePack = NativeFranceBattlefieldPackCatalog.isNativePlayable(scenario)
         let hasEasternFrontNativePack = NativeEasternFrontBattlefieldPackCatalog.isNativePlayable(scenario)
         let hasNativePlayablePack = hasDemoParity || hasPolandNativePack || hasFranceNativePack || hasEasternFrontNativePack
+        let hasNativeAIEventExecution = NativeAIEventExecutionCatalog.isExecutionReady(scenario)
         let requiredHookIDs = architecture.requiredEngineHooks
             .filter { hook in
                 if loadout.canApplyScenarioBoardHook {
@@ -187,6 +188,10 @@ public enum NativePlayabilityArchitectureCatalog {
                     if hasNativePlayablePack && hook.id == "scenario-mission-state" {
                         return false
                     }
+                }
+                if hasNativeAIEventExecution &&
+                    (hook.id == "scenario-event-triggers" || hook.id == "scenario-ai-controls") {
+                    return false
                 }
                 return true
             }
@@ -217,6 +222,14 @@ public enum NativePlayabilityArchitectureCatalog {
         let aiEventReport = NativeAIEventPassCatalog.report(for: scenario)
         if aiEventReport.isNativeAIEventPassReady {
             notes.append("Cycle 375 native AI/event pass is mapped with deterministic AI priorities, fallback behavior, event triggers, reinforcement timing, and victory gates.")
+        }
+        let aiExecutionReport = NativeAIEventExecutionCatalog.report(for: scenario)
+        if aiExecutionReport.isNativeAIEventExecutionReady {
+            notes.append("Cycle 380 native AI/event execution resolves German priorities, fallbacks, reinforcements, scripted triggers, scenario rules, pacing, tutorial cues, and victory gates against live board snapshots.")
+        }
+        let balanceUXReport = NativeBalanceUXAuditCatalog.report(for: scenario)
+        if balanceUXReport.isNativeBalanceUXReady {
+            notes.append("Cycle 390 balance/UX audit is green for pacing, player agency, readable density, accessibility identifiers, save/load continuity, and failure/debrief reporting.")
         }
 
         let status: NativePlayabilityStatus

@@ -42,6 +42,16 @@ Cycle 370 update: cycles 351-370 are complete. The native Eastern Front 1941 pac
 
 Cycle 375 update: cycles 371-375 are complete. The first AI/event pass now covers all 19 battles with native reports that bind deterministic German AI priorities, fallback behavior, scripted triggers, reinforcement timing, pacing rules, scenario-system events, tutorial cues, and victory gates to real native battle instances. This establishes full-campaign AI/event readiness while leaving deeper event execution and scenario AI control tuning for cycles 376-380.
 
+Cycle 380 update: cycles 376-380 are complete. Native AI/event execution now resolves the cycle 375 bindings against live board snapshots for all 19 battles. Guderian AI movement uses scenario-authored objective priorities, and every mapped priority, fallback, reinforcement timing, scripted trigger, scenario rule, pacing rule, tutorial cue, and victory gate resolves to a concrete board objective, unit, deployment zone, mission, or scenario target.
+
+Cycle 390 update: cycles 381-390 are complete. Native balance/UX audits now cover all 19 battles with checks for playable pacing bands, player-agency score coverage, readable unit/objective/terrain density, full battle-flow accessibility identifiers, save/load continuity, and failure/debrief reporting.
+
+Cycle 400 update: cycles 391-400 are complete. The native full-campaign ship gate is green: all 19 battles are native playable, GuderianTest completes the campaign without failed or blocked battles, AI/event execution and balance/UX readiness cover every battle, and the cycle 250 metadata ship baseline remains green.
+
+Cycle 425 update: cycles 401-425 are complete. Post-ship after-action analysis now covers every battle with notes for player agency, AI pressure, event timing, historical framing, automation coverage, and scenario-specific tuning follow-ups.
+
+Cycle 450 update: cycles 426-450 are complete. Deterministic native campaign soak probes now run three seeded board diagnostics per battle across all 19 battles, producing stable replay signatures with no blocking board findings.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -172,9 +182,9 @@ Status through cycle 250: completed. The complete campaign milestone is reached.
 
 ## Native Playability Gap
 
-Cycle 250 completed the historical campaign shell: every scenario is hand-authored, annotated, balance-audited, AI-snapshotted, and proxy-loadable through the inherited `dzw` demo rules. It did not yet make Guderian a full playable battlefield game at the same level as DerZweiteWeltkrieg.
+Cycle 250 completed the historical campaign shell: every scenario is hand-authored, annotated, balance-audited, AI-snapshotted, and proxy-loadable through the inherited `dzw` demo rules. It did not yet make Guderian a full playable battlefield game at the same level as DerZweiteWeltkrieg; cycles 251-400 close that native playability gap.
 
-The remaining milestone is native Guderian playability: each campaign battle must launch into an interactive board with scenario-specific units, deployment zones, terrain, objectives, victory logic, reinforcements, event triggers, AI behavior, battle logs, and debriefs. The current `DZWScenarioLoader` is useful as a rules bridge, but it still maps Guderian scenarios onto inherited dzw force presets and the shared bocage-style proxy battlefield. That proxy must be replaced or extended with Guderian-owned scenario instances.
+The native Guderian playability milestone means each campaign battle must launch into an interactive board with scenario-specific units, deployment zones, terrain, objectives, victory logic, reinforcements, event triggers, AI behavior, battle logs, and debriefs. `DZWScenarioLoader` remains useful as a rules bridge, while native Guderian scenario instances now provide the campaign-specific battlefields and automation gates.
 
 ## Cycles 251-400: Native Playable Guderian
 
@@ -195,7 +205,14 @@ The remaining milestone is native Guderian playability: each campaign battle mus
 
 Native playable demo target: cycle 300. At that point the three demo battles should be playable like DerZweiteWeltkrieg, but the rest of the campaign may still be in conversion.
 
-Native full-campaign target: cycle 400. At that point all 19 campaign battles should launch into real Guderian battlefields with scenario-specific units, terrain, actions, AI pressure, scoring, and debriefs.
+Native full-campaign target: cycle 400. At that point all 19 campaign battles should launch into real Guderian battlefields with scenario-specific units, terrain, actions, AI pressure, scoring, and debriefs. Status: achieved.
+
+## Cycles 401-450: Post-Ship Automation Hardening
+
+| Cycles | Focus | Output |
+| --- | --- | --- |
+| 401-425 | After-action analysis | Add per-battle post-ship analysis for player agency, AI pressure, event timing, historical framing, automation coverage, and scenario-specific tuning follow-ups. |
+| 426-450 | Deterministic soak | Run seeded native board diagnostics across the full campaign, record replay signatures, and flag unstable actions, blocked phases, impossible reinforcements, or unwinnable gates. |
 
 Status through cycle 260: completed. The native playability boundary is now represented in code and tests; `GuderianTest` surfaces a native-playability warning for each battle while it still runs the inherited proxy loader. No `dzw` files were modified. The next implementation block is cycles 261-270: Guderian-owned playable battle instance models.
 
@@ -218,6 +235,16 @@ Status through cycle 350: completed. The first five cycles of the Eastern Front 
 Status through cycle 370: completed. The Eastern Front native pack is implemented and all seven 1941 battles are marked native playable through Guderian-owned board sessions, rule bindings, score/debrief flow, and completion records. At this point all 19 campaign battles have native completion paths. The next implementation block is cycles 371-380: battle-specific AI and event pass.
 
 Status through cycle 375: completed. The first half of the AI/event pass is implemented as full-campaign readiness mapping for German AI priorities, fallbacks, reinforcements, scripted triggers, scenario rules, pacing, tutorial cues, and victory gates. GuderianTest records AI/event readiness for every battle. The next implementation block is cycles 376-380: deeper event execution and scenario AI control tuning on real board state.
+
+Status through cycle 380: completed. The AI/event pass now executes against real board snapshots for every battle, and GuderianTest records the board-state execution readiness. Scenario AI movement now favors authored objective priorities instead of only nearest-objective movement. The next implementation block is cycles 381-390: balance and UX readiness.
+
+Status through cycle 390: completed. Balance/UX readiness now covers every battle for pacing, agency, density, accessibility identifiers, save/load continuity, and debrief/failure reporting. The next implementation block is cycles 391-400: native campaign ship verification.
+
+Status through cycle 400: completed. The native full-campaign ship gate is green: all 19 battles are native playable with completion records, GuderianTest automation completes the campaign, AI/event execution and balance/UX checks are ready, and the metadata release baseline remains green. The next implementation block is cycles 401-425: post-ship after-action analysis.
+
+Status through cycle 425: completed. Post-ship analysis now covers every battle with agency, AI pressure, event timing, historical-context, automation-coverage, and tuning-follow-up notes. The next implementation block is cycles 426-450: deterministic native campaign soak.
+
+Status through cycle 450: completed. The campaign now runs deterministic soak probes across all 19 native battles with three seeded diagnostics per battle, stable replay signatures, and no blocking board findings.
 
 ## Acceptance Criteria
 
