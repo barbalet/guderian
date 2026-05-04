@@ -150,6 +150,8 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 
 The campaign content and native automation layers are substantial, but the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 500 completes the Tuchola Forest pilot through debrief, persistence, screen-parity automation, reusable surface routing, and a per-battle rollout checklist. No cycles remain in the 451-500 correction plan; the next documented rollout begins with Wizna at cycles 501-505 and continues in five-cycle battle conversions through Moscow/Tula/Kashira.
 
+Remaining playable-screen estimate: battle 1, Tuchola Forest, is complete through cycle 500. Battles 2-19 require 90 documented cycles total, from cycles 501-590, at five cycles per battle. Larger Eastern Front battles may require one later 10-cycle hardening block if manual play exposes board-density, AI-stall, or readability flaws.
+
 ## App Identity
 
 The app icon uses a face-focused crop of the public-domain Wikimedia Commons portrait documented in `Resources/AppIconSource/README.md`. The crop is intentionally limited to historical subject identification.

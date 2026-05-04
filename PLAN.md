@@ -289,6 +289,43 @@ Status through cycle 495: completed. The Tuchola pilot has been extracted behind
 
 Status through cycle 500: completed. The campaign rollout checklist is now defined for every battle. Tuchola Forest is the completed pilot for cycles 451-500; Wizna is the next DZW-style screen conversion window for cycles 501-505; the remaining battles queue in five-cycle windows through Moscow/Tula/Kashira at cycles 586-590. The current 451-500 correction plan has no documented cycles remaining.
 
+## Cycles 501-590: Battles 2-19 Playable-Screen Estimate
+
+Battle 1, Tuchola Forest, is the completed DZW-style playable-screen pilot through cycle 500. The remaining campaign battles 2-19 are estimated at 18 battles x 5 cycles each, or 90 cycles total, to complete the same battle-selection-to-playable-screen flow with commandable units, terrain features, opposing AI pressure, blocked-action reporting, scoring, debrief, and screen-parity coverage.
+
+The five-cycle estimate assumes the reusable playable-battle surface from cycles 491-495 remains the common shell. Each battle packet is therefore scoped to scenario-specific unit, terrain, objective, AI, debrief, and test fidelity rather than rebuilding the engine or UI.
+
+| Battle | Cycles | Focus |
+| --- | --- | --- |
+| 2. Wizna | 501-505 | Bunkers, fortified line, Polish anti-tank and artillery delay, overwhelming German pressure, tutorial-safe debrief. |
+| 3. Brzesc Litewski | 506-510 | Fortress and citadel sectors, armored train support, obsolete armor, fallback routes, fortress-combat feedback. |
+| 4. Kobryn | 511-515 | Rearguard defense, town roadblocks, withdrawal lanes, German pursuit pressure, escape scoring. |
+| 5. Sedan | 516-520 | Meuse crossings, bridgeheads, engineers, air and artillery pressure, panzer exploitation. |
+| 6. Stonne | 521-525 | Village and heights fighting, Char B1 counterattack pressure, armor attrition, contested control scoring. |
+| 7. Montcornet | 526-530 | French armored raid, mobile German response, Luftwaffe pressure, timed withdrawal and disruption scoring. |
+| 8. Amiens-Abbeville | 531-535 | Somme bridge defense, mobile blocking positions, Channel-race pressure, corridor denial. |
+| 9. Boulogne | 536-540 | Port and harbor terrain, evacuation timing, naval support markers, demolition and perimeter defense. |
+| 10. Calais | 541-545 | Perimeter, citadel, and dock sectors, siege pressure, supply strain, Dunkirk-time scoring. |
+| 11. Dunkirk | 546-550 | Evacuation perimeter, canals, rearguard lines, German command caveat, evacuation-preservation scoring. |
+| 12. Fall Rot | 551-555 | Aisne, Marne, and Rhine crossing pressure, fortress-town stands, retreat corridors, collapse timing. |
+| 13. Bialystok-Minsk | 556-560 | Encirclement pockets, breakout lanes, pincer pressure, Minsk road and rail objectives. |
+| 14. Smolensk | 561-565 | Dnieper and Dvina crossings, pocket escape, reserve counterstroke, stretched German timetable. |
+| 15. Roslavl-Novozybkov | 566-570 | Spoiling offensive, reconnaissance friction, supply-column raids, operational delay scoring. |
+| 16. Kiev | 571-575 | Northern pincer pressure, Dnieper and Desna delay lines, command evacuation, breakout preservation. |
+| 17. Bryansk | 576-580 | Typhoon southern approach, encirclement pockets, Orel-Tula road pressure, autumn friction. |
+| 18. Mtsensk | 581-585 | T-34 and KV ambushes, wooded ridges, anti-tank screens, German armor-loss scoring. |
+| 19. Moscow/Tula/Kashira | 586-590 | Winter roads, Tula defense, Venev and Kashira pressure, German exhaustion and Soviet counteroffensive setup. |
+
+The repeating five-cycle packet for each battle is:
+
+1. Launch route, battle-selection wiring, and board framing.
+2. Scenario-specific unit labels, roles, starting positions, and commandability.
+3. Terrain, objective, scoring, and legal-action tuning.
+4. German AI turn behavior, blocked-action diagnostics, failure reporting, and debrief output.
+5. Screen-parity tests, GuderianTest coverage, documentation update, and manual-play notes.
+
+Risk buffer: larger Eastern Front battles, especially Kiev, Smolensk, and Moscow/Tula/Kashira, may need one additional 10-cycle hardening block after cycle 590 if hand play exposes unit-density, AI-stall, or readability problems. The baseline documented estimate remains 90 cycles for battles 2-19.
+
 ## Acceptance Criteria
 
 - `dzw` remains cleanly updatable because Guderian-specific engine hooks are guarded or externalized.
