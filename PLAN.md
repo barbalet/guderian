@@ -58,6 +58,10 @@ Cycle 460 update: cycles 451-460 are complete. Tuchola Forest now opens into a D
 
 Cycle 500 update: cycles 481-500 are complete. The Tuchola Forest DZW-style pilot now supports restart, visible debrief, score/result persistence into campaign progress, failure/debrief error reporting, a screen-parity harness that drives launch, selection, movement, phase flow, attack, blocked-action feedback, German AI, debrief, and persistence, plus a reusable playable-battle surface catalog with acceptance gates and per-battle rollout windows for converting Wizna through Moscow/Tula/Kashira.
 
+Cycle 545 update: cycles 501-545 are complete. The reusable DZW-style playable battle screen now routes battles 2-10, Wizna through Calais, from the battle-selection row into the same commandable board surface as Tuchola Forest. The generalized parity harness runs launch, selection, legal movement, phase flow, attack feedback, intentional blocked-action reporting, German AI movement, debrief, and campaign-progress persistence for all ten routed battles; GuderianTest now records playable-screen parity for those routed battles and surfaced a Boulogne harbor movement issue that was fixed by cycling legal active-unit movement probes around impassable terrain.
+
+Cycle 590 update: cycles 546-590 are complete. The DZW-style playable battle screen now routes the full 19-battle campaign from Tuchola Forest through Moscow/Tula/Kashira. Battles 11-19, Dunkirk through Moscow/Tula/Kashira, use the same selectable, commandable, terrain-backed board, German AI turn runner, blocked-action reporting, debrief persistence, and GuderianTest playable-screen parity reporting as the earlier routed battles. The rollout catalog has no queued battles remaining.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -325,6 +329,42 @@ The repeating five-cycle packet for each battle is:
 5. Screen-parity tests, GuderianTest coverage, documentation update, and manual-play notes.
 
 Risk buffer: larger Eastern Front battles, especially Kiev, Smolensk, and Moscow/Tula/Kashira, may need one additional 10-cycle hardening block after cycle 590 if hand play exposes unit-density, AI-stall, or readability problems. The baseline documented estimate remains 90 cycles for battles 2-19.
+
+Status through cycle 505: completed. Wizna now routes from the battle row into the DZW-style playable screen with fortified-line units, bunker objectives, German pressure, debrief persistence, and screen-parity coverage.
+
+Status through cycle 510: completed. Brzesc Litewski now routes through the playable screen with fortress/citadel terrain, rail and armored-train context, fallback objectives, native completion, and GuderianTest parity reporting.
+
+Status through cycle 515: completed. Kobryn now routes through the playable screen with rearguard units, roadblock/withdrawal objectives, German pursuit pressure, blocked-action feedback, and debrief persistence.
+
+Status through cycle 520: completed. Sedan now routes through the playable screen with Meuse crossings, bridgehead/engineer pressure, German AI movement, completion scoring, and parity automation.
+
+Status through cycle 525: completed. Stonne now routes through the playable screen with village/heights terrain, Char B1 counterattack pressure, armor-attrition objectives, and debrief persistence.
+
+Status through cycle 530: completed. Montcornet now routes through the playable screen with French armored raid units, mobile German response, Luftwaffe pressure, timed withdrawal scoring, and screen-parity coverage.
+
+Status through cycle 535: completed. Amiens-Abbeville now routes through the playable screen with Somme bridge terrain, mobile blocking positions, Channel-race objectives, German AI pressure, and GuderianTest reporting.
+
+Status through cycle 540: completed. Boulogne now routes through the playable screen with harbor/port terrain, evacuation and demolition objectives, naval support context, and hardened active-unit movement probing around impassable harbor geometry.
+
+Status through cycle 545: completed. Calais now routes through the playable screen with perimeter/citadel/docks objectives, siege pressure, supply and Dunkirk-time scoring, debrief persistence, and parity automation.
+
+Status through cycle 550: completed. Dunkirk now routes through the playable screen with evacuation perimeter terrain, canals, rearguard lines, Guderian-command caveat framing, German pressure, debrief persistence, and parity automation.
+
+Status through cycle 555: completed. Fall Rot now routes through the playable screen with Aisne/Marne/Rhine crossing pressure, fortress-town stands, retreat corridors, collapse timing, German AI movement, and screen-parity reporting.
+
+Status through cycle 560: completed. Bialystok-Minsk now routes through the playable screen with encirclement pockets, breakout lanes, pincer pressure, Minsk road/rail objectives, completion scoring, and GuderianTest parity coverage.
+
+Status through cycle 565: completed. Smolensk now routes through the playable screen with Dnieper/Dvina crossings, pocket escape, reserve counterstroke pressure, stretched German timetable, debrief persistence, and parity automation.
+
+Status through cycle 570: completed. Roslavl-Novozybkov now routes through the playable screen with spoiling-offensive pressure, reconnaissance friction, supply-column raids, German AI objectives, and blocked-action reporting.
+
+Status through cycle 575: completed. Kiev now routes through the playable screen with northern pincer pressure, Dnieper/Desna delay lines, command evacuation, breakout preservation, debrief persistence, and GuderianTest coverage.
+
+Status through cycle 580: completed. Bryansk now routes through the playable screen with Operation Typhoon southern approach, pocket pressure, Orel-Tula road objectives, autumn friction, German AI movement, and parity reporting.
+
+Status through cycle 585: completed. Mtsensk now routes through the playable screen with T-34/KV ambush pressure, wooded ridges, anti-tank screens, German armor-loss scoring, debrief persistence, and parity automation.
+
+Status through cycle 590: completed. Moscow/Tula/Kashira now routes through the playable screen with winter roads, Tula defense, Venev/Kashira pressure, German exhaustion, Soviet counteroffensive setup, and full campaign parity automation. The DZW-style playable-screen rollout has completed battles 1-19; there are no documented battle-parity cycles remaining.
 
 ## Acceptance Criteria
 

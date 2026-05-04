@@ -129,6 +129,10 @@ Cycle 480 update: Tuchola Forest now has the first fidelity pass on the DZW-styl
 
 Cycle 500 update: the Tuchola Forest DZW-style playable-screen pilot now runs from opening board to restart/debrief/scored completion with campaign-progress persistence and failure/debrief error reporting. A dedicated screen-parity harness drives launch, selection, movement, phase flow, attack attempts, blocked-action feedback, German AI, debrief, and persistence, and the reusable playable-battle surface catalog now defines acceptance gates and rollout windows for converting the rest of the campaign.
 
+Cycle 545 update: battles 2-10, Wizna through Calais, now route from the battle-selection row into the shared DZW-style playable screen. The generalized parity harness completes launch, selection, legal movement, phase flow, attack feedback, blocked-action reporting, German AI, debrief, and persistence for all ten routed battles, and GuderianTest records playable-screen parity for those routed battles.
+
+Cycle 590 update: the full 19-battle campaign now routes into the shared DZW-style playable screen. Dunkirk through Moscow/Tula/Kashira complete the same parity path as the earlier battles: terrain-backed board, selectable units, legal movement, phase flow, combat feedback, blocked-action reporting, German AI, debrief persistence, and GuderianTest playable-screen reporting.
+
 ## Run
 
 Build and test from the repository root:
@@ -148,9 +152,9 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 
 ## Ship Status
 
-The campaign content and native automation layers are substantial, but the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 500 completes the Tuchola Forest pilot through debrief, persistence, screen-parity automation, reusable surface routing, and a per-battle rollout checklist. No cycles remain in the 451-500 correction plan; the next documented rollout begins with Wizna at cycles 501-505 and continues in five-cycle battle conversions through Moscow/Tula/Kashira.
+The campaign content and native automation layers are substantial, and the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 590 completes playable-screen parity for all 19 battles, from Tuchola Forest through Moscow/Tula/Kashira, with debrief, persistence, screen-parity automation, reusable surface routing, and GuderianTest reporting.
 
-Remaining playable-screen estimate: battle 1, Tuchola Forest, is complete through cycle 500. Battles 2-19 require 90 documented cycles total, from cycles 501-590, at five cycles per battle. Larger Eastern Front battles may require one later 10-cycle hardening block if manual play exposes board-density, AI-stall, or readability flaws.
+Remaining playable-screen estimate: battles 1-19 are complete through cycle 590. There are no documented battle-parity cycles remaining; a separate 10-cycle hardening block can still be opened later if manual play exposes board-density, AI-stall, or readability flaws.
 
 ## App Identity
 

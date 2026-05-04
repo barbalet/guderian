@@ -109,6 +109,9 @@ public struct CampaignAutomationBattleReport: Identifiable, Codable, Hashable, S
     public let nativePostShipAnalysisSummary: String
     public let nativeSoakReady: Bool
     public let nativeSoakSummary: String
+    public let playableScreenParityCompleted: Bool
+    public let playableScreenParitySummary: String
+    public let playableScreenParityBlockers: [String]
     public let steps: [CampaignAutomationStep]
     public let issues: [CampaignAutomationIssue]
     public let engineLogTail: [String]
@@ -252,6 +255,7 @@ public enum CampaignAutomationRunner {
         recordNativeBalanceUXAudit(scenario, accumulator: &accumulator)
         recordNativePostShipAnalysis(scenario, accumulator: &accumulator)
         recordNativeCampaignSoak(scenario, accumulator: &accumulator)
+        recordPlayableScreenParityIfRouted(scenario, accumulator: &accumulator)
 
         let report = accumulator.finalize(loadout: loadout.summary, game: game)
         if report.status == .passed || (report.status == .warning && options.completeWarningRuns) {
@@ -433,6 +437,36 @@ public enum CampaignAutomationRunner {
     ) {
         let report = NativeCampaignSoakRunner.runBattle(scenario)
         accumulator.recordNativeCampaignSoak(report)
+    }
+
+    private static func recordPlayableScreenParityIfRouted(
+        _ scenario: GuderianScenario,
+        accumulator: inout AutomationAccumulator
+    ) {
+        guard PlayableBattleSurfaceCatalog.isRoutedToPlayableScreen(scenario.id) else {
+            return
+        }
+
+        do {
+            let result = try DZWPlayableScreenHarness.runBattleFlow(
+                for: scenario.id,
+                seed: UInt32(590_500 + scenario.order)
+            )
+            accumulator.recordPlayableScreenParity(result)
+        } catch {
+            accumulator.issue(
+                .failure,
+                "Playable Screen Parity",
+                "DZW-style playable screen harness failed",
+                "\(scenario.title) could not finish the routed playable-screen path: \(error)."
+            )
+            accumulator.step(
+                "Playable Screen Parity",
+                .failed,
+                "DZW-style playable screen harness failed",
+                "\(error)"
+            )
+        }
     }
 
     private static func validateScenarioData(
@@ -915,6 +949,9 @@ private struct AutomationAccumulator {
     var nativePostShipAnalysisSummary = ""
     var nativeSoakReady = false
     var nativeSoakSummary = ""
+    var playableScreenParityCompleted = false
+    var playableScreenParitySummary = ""
+    var playableScreenParityBlockers: [String] = []
 
     mutating func step(_ stage: String, _ status: CampaignAutomationStatus, _ title: String, _ detail: String) {
         steps.append(
@@ -1102,6 +1139,23 @@ private struct AutomationAccumulator {
         )
     }
 
+    mutating func recordPlayableScreenParity(_ result: DZWPlayableScreenHarnessResult) {
+        playableScreenParityCompleted = result.completedAllStages
+        playableScreenParityBlockers = result.blockers
+        playableScreenParitySummary = "\(result.title) completed \(result.completedStages.count)/\(DZWPlayableScreenHarnessStage.allCases.count) DZW-style playable-screen stages via \(result.completion.sourceName)."
+        actionsAttempted += result.steps.count
+        actionsSucceeded += result.completedAllStages ? result.steps.count : result.steps.filter { $0.status != .blocked }.count
+        step(
+            "Playable Screen Parity",
+            result.completedAllStages ? .passed : .blocked,
+            result.completedAllStages ? "DZW-style playable screen completed" : "DZW-style playable screen blocked",
+            playableScreenParitySummary
+        )
+        for blocker in result.blockers {
+            issue(.blocker, "Playable Screen Parity", "Playable screen blocker", blocker)
+        }
+    }
+
     func finalize(loadout: AutomationLoadoutSummary?, game: OpaquePointer?) -> CampaignAutomationBattleReport {
         let gameView = game.map { game_view($0) }
         let mission = game.map { game_mission_view($0) }
@@ -1156,6 +1210,9 @@ private struct AutomationAccumulator {
             nativePostShipAnalysisSummary: nativePostShipAnalysisSummary,
             nativeSoakReady: nativeSoakReady,
             nativeSoakSummary: nativeSoakSummary,
+            playableScreenParityCompleted: playableScreenParityCompleted,
+            playableScreenParitySummary: playableScreenParitySummary,
+            playableScreenParityBlockers: playableScreenParityBlockers,
             steps: steps,
             issues: issues,
             engineLogTail: engineLogTail(in: game)

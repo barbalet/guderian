@@ -10,9 +10,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     @Published private(set) var lastError: String = ""
     @Published private(set) var completion: PlayableBattleCompletionSummary?
     @Published private(set) var debriefError: String?
-    @Published private(set) var aiTurnEvents: [String] = [
-        "German AI ready: XIX Corps will press Brda crossings, road hubs, and withdrawal lanes."
-    ]
+    @Published private(set) var aiTurnEvents: [String]
 
     let scenario: GuderianScenario
     private var session: NativeBoardSession?
@@ -21,7 +19,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     init(scenario: GuderianScenario) {
         self.scenario = scenario
-        aiTargetPriorities = ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities
+        let aiPlan = ScenarioContentCatalog.bundle(for: scenario).aiPlan
+        aiTargetPriorities = aiPlan.targetPriorities
+        aiTurnEvents = [
+            "German AI ready: \(aiPlan.postureName) will pressure \(Self.prioritySummary(aiPlan.targetPriorities))."
+        ]
         session = Self.makeSession(for: scenario, restartCount: restartCount)
         refresh()
     }
@@ -233,8 +235,9 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         session = Self.makeSession(for: scenario, restartCount: restartCount)
         completion = nil
         debriefError = nil
+        let aiPlan = ScenarioContentCatalog.bundle(for: scenario).aiPlan
         aiTurnEvents = [
-            "Battle restarted: German AI ready for \(scenario.title)."
+            "Battle restarted: \(aiPlan.postureName) ready for \(scenario.title)."
         ]
         refresh()
     }
@@ -274,6 +277,14 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     private static func makeSession(for scenario: GuderianScenario, restartCount: Int) -> NativeBoardSession? {
         NativeBoardSession(scenario: scenario, seed: UInt32(510_000 + scenario.order + restartCount * 97))
+    }
+
+    private static func prioritySummary(_ priorities: [String]) -> String {
+        let visiblePriorities = priorities.prefix(3)
+        guard !visiblePriorities.isEmpty else {
+            return "the scenario objectives"
+        }
+        return visiblePriorities.joined(separator: ", ")
     }
 }
 

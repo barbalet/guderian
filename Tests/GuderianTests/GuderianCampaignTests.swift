@@ -1446,9 +1446,10 @@ final class GuderianCampaignTests: XCTestCase {
         )
     }
 
-    func testCycle500DZWPlayableScreenHarnessAndRolloutPlanAreReady() throws {
-        XCTAssertEqual(DZWPlayableScreenHarness.cycleRange, 486...490)
-        XCTAssertEqual(PlayableBattleSurfaceCatalog.cycleRange, 491...500)
+    func testCycle590DZWPlayableScreenHarnessAndRolloutPlanAreReadyForFullCampaign() throws {
+        XCTAssertEqual(DZWPlayableScreenHarness.cycleRange, 486...590)
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.cycleRange, 491...590)
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.completedThroughCycle, 590)
 
         let harness = try DZWPlayableScreenHarness.runTucholaFlow(seed: 19390901)
         XCTAssertEqual(harness.id, .tucholaForest)
@@ -1466,11 +1467,27 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(harness.displayedAccessibilityIdentifiers.contains("battle-persisted-result"))
 
         let plans = PlayableBattleSurfaceCatalog.allPlans
+        let routedThroughCalais: [GuderianBattleID] = [
+            .tucholaForest,
+            .wizna,
+            .brzescLitewski,
+            .kobryn,
+            .sedan,
+            .stonne,
+            .montcornet,
+            .amiensAbbeville,
+            .boulogne,
+            .calais,
+        ]
+        let fullCampaignIDs = GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(\.id)
         XCTAssertEqual(plans.count, GuderianCampaignCatalog.all.count)
-        XCTAssertEqual(plans.map(\.id), GuderianCampaignCatalog.all.sorted { $0.order < $1.order }.map(\.id))
-        XCTAssertEqual(PlayableBattleSurfaceCatalog.routedBattleIDs, [.tucholaForest])
-        XCTAssertEqual(PlayableBattleSurfaceCatalog.nextRolloutIDs.first, .wizna)
-        XCTAssertEqual(PlayableBattleSurfaceCatalog.nextRolloutIDs.count, GuderianCampaignCatalog.all.count - 1)
+        XCTAssertEqual(plans.map(\.id), fullCampaignIDs)
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.routedBattleIDs, fullCampaignIDs)
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.completedBattleIDsThroughCycle545, routedThroughCalais)
+        XCTAssertEqual(PlayableBattleSurfaceCatalog.completedBattleIDsThroughCycle590, fullCampaignIDs)
+        XCTAssertTrue(PlayableBattleSurfaceCatalog.nextRolloutIDs.isEmpty)
 
         let tucholaPlan = try XCTUnwrap(PlayableBattleSurfaceCatalog.plan(for: .tucholaForest))
         XCTAssertEqual(tucholaPlan.readiness, .pilotComplete)
@@ -1478,13 +1495,30 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertEqual(tucholaPlan.acceptanceGates, PlayableBattleAcceptanceGate.allCases)
 
         let wiznaPlan = try XCTUnwrap(PlayableBattleSurfaceCatalog.plan(for: .wizna))
-        XCTAssertEqual(wiznaPlan.readiness, .nextRollout)
+        XCTAssertEqual(wiznaPlan.readiness, .playableParityComplete)
         XCTAssertEqual(wiznaPlan.cycleWindow, 501...505)
 
+        let calaisPlan = try XCTUnwrap(PlayableBattleSurfaceCatalog.plan(for: .calais))
+        XCTAssertEqual(calaisPlan.readiness, .playableParityComplete)
+        XCTAssertEqual(calaisPlan.cycleWindow, 541...545)
+
+        let dunkirkPlan = try XCTUnwrap(PlayableBattleSurfaceCatalog.plan(for: .dunkirk))
+        XCTAssertEqual(dunkirkPlan.readiness, .playableParityComplete)
+        XCTAssertEqual(dunkirkPlan.cycleWindow, 546...550)
+
         let finalPlan = try XCTUnwrap(PlayableBattleSurfaceCatalog.plan(for: .moscowTulaKashira))
+        XCTAssertEqual(finalPlan.readiness, .playableParityComplete)
         XCTAssertEqual(finalPlan.cycleWindow, 586...590)
         XCTAssertTrue(plans.allSatisfy { !$0.notes.isEmpty })
         XCTAssertTrue(plans.allSatisfy { $0.hostSurfaceName == PlayableBattleSurfaceCatalog.hostSurfaceName })
+        XCTAssertTrue(plans.allSatisfy { $0.readiness.isPlayableComplete })
+
+        let routedHarnesses = try DZWPlayableScreenHarness.runCompletedParityFlowsThroughCycle590()
+        XCTAssertEqual(routedHarnesses.map(\.id), fullCampaignIDs)
+        XCTAssertTrue(routedHarnesses.allSatisfy(\.completedAllStages), routedHarnesses.flatMap(\.blockers).joined(separator: "\n"))
+        XCTAssertTrue(routedHarnesses.allSatisfy { $0.completedStages == DZWPlayableScreenHarnessStage.allCases })
+        XCTAssertTrue(routedHarnesses.allSatisfy { $0.openingSnapshot.isScenarioBoardPlayable })
+        XCTAssertTrue(routedHarnesses.allSatisfy { $0.persistedProgress.completionRecord(for: $0.id) != nil })
     }
 
     func testGuderianTestAutomationRunsEveryBattleAndSurfacesDiagnostics() throws {
@@ -1497,6 +1531,7 @@ final class GuderianCampaignTests: XCTestCase {
         let franceIDs = Set(FranceCampaignSystemCatalog.franceScenarioIDs)
         let easternFrontIDs = Set(EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs)
         let nativePlayableIDs = Set(GuderianCampaignCatalog.demoIDs + PolishCampaignSystemCatalog.polishScenarioIDs + FranceCampaignSystemCatalog.franceScenarioIDs + EasternFrontCampaignSystemCatalog.easternFrontScenarioIDs)
+        let routedPlayableScreenIDs = Set(PlayableBattleSurfaceCatalog.routedBattleIDs)
 
         XCTAssertEqual(report.reports.map(\.id), orderedIDs)
         XCTAssertEqual(report.reports.count, GuderianCampaignCatalog.all.count)
@@ -1535,6 +1570,17 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertTrue(battle.nativeSoakReady, battle.title)
             XCTAssertFalse(battle.nativeSoakSummary.isEmpty)
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native Campaign Soak" && $0.status == .passed })
+
+            if routedPlayableScreenIDs.contains(battle.id) {
+                XCTAssertTrue(battle.playableScreenParityCompleted, battle.title)
+                XCTAssertFalse(battle.playableScreenParitySummary.isEmpty)
+                XCTAssertTrue(battle.playableScreenParityBlockers.isEmpty, battle.title)
+                XCTAssertTrue(battle.steps.contains { $0.stage == "Playable Screen Parity" && $0.status == .passed })
+            } else {
+                XCTAssertFalse(battle.playableScreenParityCompleted, battle.title)
+                XCTAssertTrue(battle.playableScreenParitySummary.isEmpty, battle.title)
+                XCTAssertTrue(battle.playableScreenParityBlockers.isEmpty, battle.title)
+            }
 
             if demoIDs.contains(battle.id) {
                 XCTAssertTrue(battle.nativeDemoBoardCompleted, battle.title)

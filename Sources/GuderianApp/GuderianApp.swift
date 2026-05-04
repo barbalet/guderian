@@ -563,8 +563,9 @@ struct ScenarioBriefingView: View {
             Label("Playable Screen Rollout", systemImage: "checkerboard.rectangle")
                 .font(.headline)
             if let plan {
+                let isPlayableComplete = plan.readiness.isPlayableComplete
                 HStack {
-                    Label(plan.readiness.rawValue, systemImage: plan.readiness == .pilotComplete ? "checkmark.circle" : "clock")
+                    Label(plan.readiness.rawValue, systemImage: isPlayableComplete ? "checkmark.circle" : "clock")
                     Label(plan.cycleLabel, systemImage: "calendar")
                     Label(plan.hostSurfaceName, systemImage: "rectangle.3.group")
                 }
@@ -572,9 +573,9 @@ struct ScenarioBriefingView: View {
                 .foregroundStyle(.secondary)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 8)], alignment: .leading, spacing: 8) {
                     ForEach(plan.acceptanceGates, id: \.self) { gate in
-                        Label(gate.rawValue, systemImage: scenario.id == .tucholaForest ? "checkmark.circle" : "circle")
+                        Label(gate.rawValue, systemImage: isPlayableComplete ? "checkmark.circle" : "circle")
                             .font(.caption)
-                            .foregroundStyle(scenario.id == .tucholaForest ? .green : .secondary)
+                            .foregroundStyle(isPlayableComplete ? .green : .secondary)
                     }
                 }
                 ForEach(plan.notes, id: \.self) { note in

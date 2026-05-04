@@ -69,6 +69,22 @@ struct GuderianBattleUISwiftTests {
         #expect(result.displayedAccessibilityIdentifiers.contains("battle-persisted-result"))
     }
 
+    @Test("Cycles 501-590 DZW-style playable screens complete the full campaign")
+    func dzwStylePlayableScreensCompleteFullCampaign() throws {
+        let results = try DZWPlayableScreenHarness.runCompletedParityFlowsThroughCycle590()
+
+        #expect(results.map(\.id) == PlayableBattleSurfaceCatalog.completedBattleIDsThroughCycle590)
+        #expect(results.count == GuderianCampaignCatalog.all.count)
+        #expect(results.allSatisfy { $0.completedAllStages })
+        #expect(results.allSatisfy { $0.blockers.isEmpty })
+        #expect(results.allSatisfy { $0.completedStages == DZWPlayableScreenHarnessStage.allCases })
+        #expect(results.allSatisfy { $0.displayedAccessibilityIdentifiers.contains("battle-screen") })
+        #expect(results.allSatisfy { $0.displayedAccessibilityIdentifiers.contains("battle-board") })
+        #expect(results.allSatisfy { $0.displayedAccessibilityIdentifiers.contains("german-turn-button") })
+        #expect(results.allSatisfy { $0.displayedAccessibilityIdentifiers.contains("battle-debrief-panel") })
+        #expect(results.allSatisfy { $0.persistedProgress.completionRecord(for: $0.id) != nil })
+    }
+
     private func runAndExpectComplete(_ id: GuderianBattleID) throws -> BattleUIFlowResult {
         let result = try BattleUIFlowRunner.runFullBattleFlow(for: id)
         let requiredStages = BattleUIFlowStage.allCases

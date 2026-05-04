@@ -248,6 +248,7 @@ struct GuderianTestBattleRow: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8)], alignment: .leading, spacing: 4) {
                     Text(report.map { "\($0.actionsSucceeded)/\($0.actionsAttempted) actions" } ?? "queued")
                     Text(report?.nativeBoardDiagnosticsPassed == true ? "board ok" : "board pending")
+                    Text(playableScreenLabel(report))
                     Text(report?.completionRecord.map { "\($0.score) VP" } ?? "score pending")
                     Text(report.map { $0.issues.isEmpty ? "no issues" : "\($0.issues.count) issues" } ?? "not run")
                 }
@@ -310,6 +311,16 @@ struct GuderianTestBattleRow: View {
         case .queued:
             return .secondary
         }
+    }
+
+    private func playableScreenLabel(_ report: CampaignAutomationBattleReport?) -> String {
+        guard PlayableBattleSurfaceCatalog.isRoutedToPlayableScreen(scenario.id) else {
+            return "screen queued"
+        }
+        guard let report else {
+            return "screen pending"
+        }
+        return report.playableScreenParityCompleted ? "screen ok" : "screen blocked"
     }
 }
 
@@ -474,6 +485,12 @@ struct GuderianTestReportDetail: View {
                 Label(report.nativeSoakSummary, systemImage: "repeat.circle")
                     .font(.callout)
                     .foregroundStyle(report.nativeSoakReady ? .green : .secondary)
+            }
+
+            if !report.playableScreenParitySummary.isEmpty {
+                Label(report.playableScreenParitySummary, systemImage: "checkerboard.rectangle")
+                    .font(.callout)
+                    .foregroundStyle(report.playableScreenParityCompleted ? .green : .orange)
             }
         }
     }
