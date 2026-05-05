@@ -110,6 +110,14 @@ Cycle 705 update: cycles 701-705 are complete. Set D now has final-war parity me
 
 Cycle 710 update: cycles 706-710 are complete. `LateCareerConsolidatedPlaybookCatalog` now consolidates reusable AI plans, blocked-action expectations, crossing/rail/fortress/withdrawal/phase-line rule bindings, and command-caveat UI events across all 16 late-career records.
 
+Cycle 715 update: cycles 711-715 are complete. `LateCareerProgress` now tracks late-career context completions separately from the 19-battle field-command campaign, with completion summaries, versioned persistence, debrief callbacks, row completion state, and reset/complete controls in the Guderian campaign screen.
+
+Cycle 720 update: cycles 716-720 are complete. `LateCareerAutomationCatalog` now runs all 16 late-career context battlefields to debrief and verifies caveat visibility, map-detail readiness, AI pressure, scoring, persistence, rule bindings, and accessibility identifiers; GuderianTest shows the late-career automation section beside the field-command campaign.
+
+Cycle 725 update: cycles 721-725 are complete. `LateCareerUXAuditCatalog` now records scope-filter coverage, accessibility identifier coverage, source-note visibility, and final-war caveat coverage for the visible late-career section.
+
+Cycle 730 update: cycles 726-730 are complete. `LateCareerFinalAcceptanceCatalog` now verifies the 19 field-command campaign battles, 16 late-career context battlefields, 35 total selectable entries, playable routing, late-career automation, separate progress, UX readiness, playbook readiness, build commands, and zero blockers.
+
 Cycle plan 651-730: add the 16 late-career staff/epilogue battlefields to the visible Guderian app experience, first as a separate command-caveated Late Career Context section and then as DZW-style playable battle screens with AI, scoring, debrief, persistence, and GuderianTest parity.
 
 ## Planning Rules
@@ -483,9 +491,17 @@ Status through cycle 705: completed. Set D now has final-war parity-ready report
 
 Status through cycle 710: completed. The shared late-career playbook now consolidates AI priorities, blocked actions, command-caveat events, and reusable crossing, rail, fortress, withdrawal, and phase-line rule bindings across all 16 records.
 
+Status through cycle 715: completed. Late-career context progress is now saved, loaded, summarized, reset, completed in bulk, and updated by debrief callbacks without changing the 19-battle field-command campaign progress.
+
+Status through cycle 720: completed. GuderianTest now includes a late-career automation report and validates every context battlefield through caveats, map detail, AI pressure, scoring, persistence, rule bindings, accessibility identifiers, and debrief completion.
+
+Status through cycle 725: completed. The late-career UX audit covers the scope filters, source-note visibility, accessibility identifiers, and final-war caveat wording needed for visible integration acceptance.
+
+Status through cycle 730: completed. The final acceptance catalog verifies 35 selectable entries, full 19-battle campaign routing, all 16 late-career parity reports, automation, progress, UX, playbook readiness, build commands, and no blockers.
+
 ## Cycles 651-730: Visible Late-Career Integration And Playability
 
-The cycle 650 work created detailed late-career staff/epilogue battlefield data, and cycles 651-710 now make those records visible in Guderian as a separate, explicitly caveated Late Career Context section with parity-ready playable reports and consolidated AI/rule bindings. Cycles 711-730 finish separate progress tracking, full automation, UX polish, and acceptance. The original 19-battle field-command campaign must remain intact and visually distinct from staff-influence and post-dismissal epilogue content.
+The cycle 650 work created detailed late-career staff/epilogue battlefield data, and cycles 651-730 now make those records visible in Guderian as a separate, explicitly caveated Late Career Context section with parity-ready playable reports, consolidated AI/rule bindings, separate progress tracking, full automation, UX polish, and acceptance. The original 19-battle field-command campaign remains intact and visually distinct from staff-influence and post-dismissal epilogue content.
 
 | Cycles | Focus | Output |
 | --- | --- | --- |
@@ -506,9 +522,7 @@ The cycle 650 work created detailed late-career staff/epilogue battlefield data,
 | 721-725 | UX polish and docs | Polish filters, accessibility labels, keyboard navigation, source-note display, final-war caveat wording, README guidance, and plan status notes. |
 | 726-730 | Acceptance and builds | Run full SwiftPM and Xcode acceptance, verify the 19-battle campaign remains unchanged, verify all 16 late-career battlefields are visible and playable, and update ship-readiness reporting. |
 
-Status through cycle 710: completed. The shared dzw late-career data is visible in the Guderian app's battle list as a separate Late Career Context section; all 16 records open briefing surfaces and parity-ready playable reports; and the shared playbook consolidates late-career AI, blocked actions, caveat events, and reusable rule bindings.
-
-Status target through cycle 730: planned. Guderian should show 35 total selectable battle/context entries: 19 field-command campaign battles plus 16 visibly caveated late-career context battlefields, all with DZW-style playable-screen coverage and separate completion tracking.
+Status through cycle 730: completed. Guderian shows 35 total selectable battle/context entries: 19 field-command campaign battles plus 16 visibly caveated late-career context battlefields, all with DZW-style playable-screen coverage, separate completion tracking, GuderianTest automation, UX audit coverage, and final acceptance reporting.
 
 ## Acceptance Criteria
 

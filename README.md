@@ -69,7 +69,7 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 - Cycles 401-450: post-ship hardening, adding after-action analysis and deterministic campaign soak probes across every native battle.
 - Cycles 451-500: `derZweiteWeltkrieg` playable-screen rebase, beginning with Tuchola Forest as the accepted DZW-style board/sidebar/unit-control pilot and then carrying that screen parity through the campaign.
 - Cycles 591-650: 400% map-detail improvement and late-career command-context expansion, with post-1941 scenarios labeled as staff-influence or epilogue context rather than direct field command.
-- Cycles 651-710: visible late-career integration, adding a separate Guderian Late Career Context section, shared dzw briefing maps, parity-ready reports for all 16 late-career records, and consolidated AI/rule bindings while preserving the 19-battle field-command campaign.
+- Cycles 651-730: visible late-career integration, adding a separate Guderian Late Career Context section, shared dzw briefing maps, parity-ready reports for all 16 late-career records, separate late-career progress, GuderianTest automation, UX audit coverage, and final acceptance while preserving the 19-battle field-command campaign.
 
 Cycle 451 correction: after running `derZweiteWeltkrieg`, the accepted playability bar is the actual DZW battle screen: terrain board, objectives, opposing units, direct unit selection, draggable movement, phase/action controls, pending-choice handling, and a visible combat log. Earlier cycle 400/450 reports proved native data, diagnostics, and automation stability, but they overstated product playability because the Guderian app still surfaced a simplified board instead of the full DZW-style playable screen.
 
@@ -183,6 +183,14 @@ Cycle 705 update: cycles 701-705 are complete. Set D now has final-war parity me
 
 Cycle 710 update: cycles 706-710 are complete. `LateCareerConsolidatedPlaybookCatalog` now consolidates AI priorities, blocked-action expectations, command-caveat events, and reusable crossing, rail, fortress, withdrawal, and phase-line rule bindings across all 16 late-career records.
 
+Cycle 715 update: cycles 711-715 are complete. Late-career context completions now have their own progress model, persistence codec, completion summary, row state, and debrief callback path separate from the 19-battle field-command campaign.
+
+Cycle 720 update: cycles 716-720 are complete. GuderianTest now surfaces late-career automation alongside the field-command campaign and verifies all 16 context battlefields through caveat visibility, map detail, AI pressure, scoring, persistence, rule bindings, and debrief completion.
+
+Cycle 725 update: cycles 721-725 are complete. The late-career UX audit now covers scope filters, accessibility identifiers, source-note display, and explicit final-war caveat visibility.
+
+Cycle 730 update: cycles 726-730 are complete. The final acceptance report verifies 19 field-command battles, 16 late-career context battlefields, 35 total selectable entries, full playable routing, late-career automation, separate progress tracking, UX readiness, and build commands.
+
 ## Run
 
 Build and test from the repository root:
@@ -212,9 +220,9 @@ Then upload `dist/Guderian-1.0.0.zip` to the GitHub release at `https://github.c
 
 ## Ship Status
 
-The campaign content and native automation layers are substantial, and the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 590 completes playable-screen parity for all 19 battles, from Tuchola Forest through Moscow/Tula/Kashira, with debrief, persistence, screen-parity automation, reusable surface routing, and GuderianTest reporting. Cycle 710 makes the late-career expansion visible in Guderian as 16 separate command-caveated context entries, all parity-ready with a consolidated AI/rule playbook.
+The campaign content and native automation layers are substantial, and the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 590 completes playable-screen parity for all 19 battles, from Tuchola Forest through Moscow/Tula/Kashira, with debrief, persistence, screen-parity automation, reusable surface routing, and GuderianTest reporting. Cycle 730 completes the late-career expansion as 16 separate command-caveated context entries with parity-ready play reports, separate progress tracking, GuderianTest automation, UX audit coverage, and final acceptance reporting.
 
-Remaining playable-screen estimate: battles 1-19 are complete through cycle 590. Map-detail auditing, schema expansion, geography cross-checking, Poland map enrichment, France map enrichment, Eastern Front map enrichment, late-career staff/epilogue sets A-D, and integration acceptance are complete through cycle 650. There are no cycles remaining in the current 60-cycle map/detail and late-career expansion plan.
+Remaining playable-screen estimate: battles 1-19 are complete through cycle 590. Map-detail auditing, schema expansion, geography cross-checking, Poland map enrichment, France map enrichment, Eastern Front map enrichment, late-career staff/epilogue sets A-D, visible integration, separate late-career progress, automation, UX polish, and acceptance are complete through cycle 730. There are no cycles remaining in the current 80-cycle visible late-career integration plan.
 
 ## App Identity
 

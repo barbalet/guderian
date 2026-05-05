@@ -51,10 +51,13 @@ public struct GuderianCampaignView: View {
     private let lateCareerEntries = LateCareerGuderianPresentationCatalog.allEntries
     @State private var selectedID: GuderianBattleID? = .tucholaForest
     @State private var progress = CampaignProgress()
+    @State private var lateCareerProgress = LateCareerProgress()
     @State private var playMode: CampaignPlayMode = .chronological
     @State private var lateCareerScopeFilter: LateCareerScopeFilter = .all
     @State private var hasLoadedSaveState = false
+    @State private var hasLoadedLateCareerState = false
     @AppStorage("guderian.campaignSaveState.v1") private var savedCampaignStateData = Data()
+    @AppStorage("guderian.lateCareerProgress.v1") private var savedLateCareerProgressData = Data()
 
     private var selectedScenario: GuderianScenario {
         scenarios.first { $0.id == selectedID } ?? scenarios[0]
@@ -62,6 +65,10 @@ public struct GuderianCampaignView: View {
 
     private var completionSummary: CampaignCompletionSummary {
         progress.completionSummary(catalog: scenarios)
+    }
+
+    private var lateCareerCompletionSummary: LateCareerCompletionSummary {
+        lateCareerProgress.completionSummary(catalog: lateCareerEntries)
     }
 
     private var shipReport: FullCampaignShipReport {
@@ -153,6 +160,25 @@ public struct GuderianCampaignView: View {
                     }
                     .buttonStyle(.borderless)
 
+                    HStack {
+                        Button {
+                            markAllLateCareerComplete()
+                        } label: {
+                            Label("Complete Late Career", systemImage: "checkmark.seal")
+                        }
+                        .accessibilityLabel("Mark all late career context battlefields complete")
+                        .accessibilityIdentifier("complete-all-late-career-button")
+
+                        Button {
+                            lateCareerProgress.reset()
+                        } label: {
+                            Label("Reset Late Career", systemImage: "arrow.counterclockwise.circle")
+                        }
+                        .accessibilityLabel("Reset late career context progress")
+                        .accessibilityIdentifier("reset-late-career-button")
+                    }
+                    .buttonStyle(.borderless)
+
                     RendererStatusView()
                 }
                     .padding(10)
@@ -162,12 +188,16 @@ public struct GuderianCampaignView: View {
         }
         .onAppear {
             loadSavedCampaignState()
+            loadSavedLateCareerState()
         }
         .onChange(of: selectedID) { _, _ in
             persistCampaignState()
         }
         .onChange(of: progress) { _, _ in
             persistCampaignState()
+        }
+        .onChange(of: lateCareerProgress) { _, _ in
+            persistLateCareerState()
         }
         .onChange(of: playMode) { _, _ in
             persistCampaignState()
@@ -188,10 +218,13 @@ public struct GuderianCampaignView: View {
                 Text("\(lateCareerEntries.count) late-career context battlefields | \(LateCareerPlayableSurfaceCatalog.routedEntries.count) routed")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text(lateCareerCompletionSummary.progressLabel)
+                    .font(.caption)
+                    .foregroundStyle(lateCareerCompletionSummary.isComplete ? .green : .secondary)
             }
             .padding(.vertical, 4)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(completionSummary.progressLabel), \(progress.availableScenarios(in: playMode, catalog: scenarios).count) available, \(lateCareerEntries.count) late-career context battlefields, \(shipReport.isShipReady ? "ship ready" : "ship blockers present")")
+            .accessibilityLabel("\(completionSummary.progressLabel), \(progress.availableScenarios(in: playMode, catalog: scenarios).count) available, \(lateCareerCompletionSummary.progressLabel), \(shipReport.isShipReady ? "ship ready" : "ship blockers present")")
 
             Picker("Play mode", selection: $playMode) {
                 Text(CampaignPlayMode.chronological.rawValue).tag(CampaignPlayMode.chronological)
@@ -231,10 +264,15 @@ public struct GuderianCampaignView: View {
 
             ForEach(visibleLateCareerEntries) { entry in
                 NavigationLink {
-                    LateCareerContextBriefingView(entry: entry)
+                    LateCareerContextBriefingView(
+                        entry: entry,
+                        completionRecord: lateCareerProgress.completionRecord(for: entry.id)
+                    ) { record in
+                        lateCareerProgress.recordCompletion(record)
+                    }
                         .navigationTitle(entry.title)
                 } label: {
-                    LateCareerContextRow(entry: entry)
+                    LateCareerContextRow(entry: entry, progress: lateCareerProgress)
                 }
                 .accessibilityIdentifier("late-career-row-link-\(entry.id)")
             }
@@ -254,6 +292,10 @@ public struct GuderianCampaignView: View {
                 )
             )
         }
+    }
+
+    private func markAllLateCareerComplete() {
+        lateCareerProgress.recordAllParityCompletions()
     }
 
     private func persistCampaignState() {
@@ -282,6 +324,25 @@ public struct GuderianCampaignView: View {
         if scenarios.contains(where: { $0.id == state.selectedScenarioID }) {
             selectedID = state.selectedScenarioID
         }
+    }
+
+    private func persistLateCareerState() {
+        if let data = try? LateCareerProgressCodec.encode(lateCareerProgress) {
+            savedLateCareerProgressData = data
+        }
+    }
+
+    private func loadSavedLateCareerState(force: Bool = false) {
+        guard force || !hasLoadedLateCareerState else {
+            return
+        }
+        hasLoadedLateCareerState = true
+        guard let progress = LateCareerProgressCodec.decodeIfCurrent(savedLateCareerProgressData) else {
+            persistLateCareerState()
+            return
+        }
+
+        lateCareerProgress = progress
     }
 }
 
@@ -342,6 +403,7 @@ struct ScenarioRow: View {
 
 struct LateCareerContextRow: View {
     let entry: LateCareerGuderianPresentation
+    let progress: LateCareerProgress
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -353,9 +415,9 @@ struct LateCareerContextRow: View {
                 Text("LC\(entry.order). \(entry.title)")
                     .font(.headline)
                 Spacer()
-                Text(entry.readinessLabel)
+                Text(progress.isCompleted(entry.id) ? "Complete" : entry.readinessLabel)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(entry.isSetAPlayablePilot ? .green : .secondary)
+                    .foregroundStyle(progress.isCompleted(entry.id) || entry.isSetAPlayablePilot ? .green : .secondary)
             }
             Text("\(entry.dateLabel) | \(entry.scopeLabel)")
                 .font(.caption)
@@ -367,11 +429,14 @@ struct LateCareerContextRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Late career \(entry.order), \(entry.title), \(entry.dateLabel), \(entry.scopeLabel), \(entry.readinessLabel)")
+        .accessibilityLabel("Late career \(entry.order), \(entry.title), \(entry.dateLabel), \(entry.scopeLabel), \(progress.isCompleted(entry.id) ? "complete" : entry.readinessLabel)")
         .accessibilityIdentifier("late-career-row-\(entry.id)")
     }
 
     private var rowIconName: String {
+        if progress.isCompleted(entry.id) {
+            return "checkmark.circle.fill"
+        }
         if entry.isParityReady {
             return "checkmark.seal"
         }
@@ -382,6 +447,9 @@ struct LateCareerContextRow: View {
     }
 
     private var rowIconColor: Color {
+        if progress.isCompleted(entry.id) {
+            return .green
+        }
         if entry.isParityReady {
             return .green
         }
@@ -394,12 +462,28 @@ struct LateCareerContextRow: View {
 
 struct LateCareerContextBriefingView: View {
     let entry: LateCareerGuderianPresentation
+    let completionRecord: LateCareerCompletionRecord?
+    let onCompletion: (LateCareerCompletionRecord) -> Void
     @State private var zoom: CGFloat = 1
     @State private var selectedForceID: String?
 
+    init(
+        entry: LateCareerGuderianPresentation,
+        completionRecord: LateCareerCompletionRecord? = nil,
+        onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }
+    ) {
+        self.entry = entry
+        self.completionRecord = completionRecord
+        self.onCompletion = onCompletion
+    }
+
     var body: some View {
         if entry.isRoutedToLateCareerPlayableSurface {
-            LateCareerPlayablePilotView(entry: entry)
+            LateCareerPlayablePilotView(
+                entry: entry,
+                completionRecord: completionRecord,
+                onCompletion: onCompletion
+            )
         } else {
             briefingWorkspace
         }
@@ -430,6 +514,7 @@ struct LateCareerContextBriefingView: View {
 
 struct LateCareerPlayablePilotView: View {
     let entry: LateCareerGuderianPresentation
+    let onCompletion: (LateCareerCompletionRecord) -> Void
     @State private var zoom: CGFloat = 1
     @State private var selectedForceID: String?
     @State private var phaseIndex = 0
@@ -438,8 +523,14 @@ struct LateCareerPlayablePilotView: View {
 
     private let phases = ["Briefing", "Player Pressure", "German Response", "Assessment"]
 
-    init(entry: LateCareerGuderianPresentation) {
+    init(
+        entry: LateCareerGuderianPresentation,
+        completionRecord: LateCareerCompletionRecord? = nil,
+        onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }
+    ) {
         self.entry = entry
+        self.onCompletion = onCompletion
+        _completionRecord = State(initialValue: completionRecord)
         _actionLog = State(initialValue: [Self.initialLogLine(for: entry)])
     }
 
@@ -527,7 +618,7 @@ struct LateCareerPlayablePilotView: View {
                 Label(completionRecord == nil ? "Debrief" : "Debriefed", systemImage: "rosette")
             }
             .disabled(report == nil || completionRecord != nil)
-            .accessibilityIdentifier("late-career-pilot-debrief-button-\(entry.id)")
+            .accessibilityIdentifier("late-career-pilot-complete-button-\(entry.id)")
         }
         .padding(12)
         .background(Color(nsColor: .textBackgroundColor))
@@ -603,6 +694,7 @@ struct LateCareerPlayablePilotView: View {
         }
 
         completionRecord = report.completionRecord
+        onCompletion(report.completionRecord)
         actionLog.insert("Debrief recorded: \(report.completionRecord.score) VP, \(report.completionRecord.victoryBand.rawValue), \(report.completionRecord.persistenceKey).", at: 0)
         actionLog = Array(actionLog.prefix(6))
     }

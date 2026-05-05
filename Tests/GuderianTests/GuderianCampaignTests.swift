@@ -1,4 +1,5 @@
 import DerZweiteWeltkriegCore
+import Foundation
 @testable import GuderianCore
 import XCTest
 
@@ -522,6 +523,89 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertTrue(entry.isParityReady, entry.title)
             XCTAssertEqual(catalog.ruleBindings(for: entry.id).count, LateCareerRuleFamily.allCases.count, entry.title)
         }
+    }
+
+    func testCycle715LateCareerProgressTracksSeparatelyFromFieldCampaign() throws {
+        var lateProgress = LateCareerProgress()
+        let firstReport = try XCTUnwrap(LateCareerPlayableSurfaceCatalog.parityReports.first)
+
+        lateProgress.recordCompletion(firstReport.completionRecord)
+        let partialSummary = lateProgress.completionSummary()
+        let fieldCampaignSummary = CampaignProgress().completionSummary(catalog: GuderianCampaignCatalog.all)
+
+        XCTAssertEqual(partialSummary.totalBattlefields, 16)
+        XCTAssertEqual(partialSummary.completedBattlefields, 1)
+        XCTAssertEqual(partialSummary.remainingBattlefieldIDs.count, 15)
+        XCTAssertEqual(partialSummary.totalScore, firstReport.completionRecord.score)
+        XCTAssertEqual(fieldCampaignSummary.totalScenarios, 19)
+        XCTAssertEqual(fieldCampaignSummary.completedScenarios, 0)
+        XCTAssertEqual(GuderianCampaignCatalog.all.count, 19)
+        XCTAssertEqual(LateCareerGuderianPresentationCatalog.totalSelectableEntryCount, 35)
+
+        let encoded = try LateCareerProgressCodec.encode(lateProgress)
+        let restored = try XCTUnwrap(LateCareerProgressCodec.decodeIfCurrent(encoded))
+        XCTAssertEqual(restored, lateProgress)
+
+        lateProgress.recordAllParityCompletions()
+        let completeSummary = lateProgress.completionSummary()
+        XCTAssertTrue(completeSummary.isComplete)
+        XCTAssertEqual(completeSummary.completedBattlefields, 16)
+        XCTAssertEqual(lateProgress.completionRecords.count, 16)
+    }
+
+    func testCycle720LateCareerAutomationRunsEveryContextBattleToDebrief() {
+        let report = LateCareerAutomationCatalog.runAll
+
+        XCTAssertEqual(report.cycleRange, 716...720)
+        XCTAssertEqual(report.reports.count, 16)
+        XCTAssertTrue(report.allPassed, report.reports.flatMap(\.issues).joined(separator: "\n"))
+        XCTAssertEqual(report.passedCount, 16)
+        XCTAssertEqual(report.issueCount, 0)
+        XCTAssertTrue(report.completionSummary.isComplete)
+
+        for battle in report.reports {
+            XCTAssertEqual(battle.status, .passed, battle.title)
+            XCTAssertTrue(battle.caveatVisible, battle.title)
+            XCTAssertTrue(battle.mapDetailReady, battle.title)
+            XCTAssertTrue(battle.aiPressureReady, battle.title)
+            XCTAssertTrue(battle.scoringReady, battle.title)
+            XCTAssertTrue(battle.persistenceReady, battle.title)
+            XCTAssertTrue(battle.ruleBindingReady, battle.title)
+            XCTAssertFalse(battle.accessibilityIdentifiers.isEmpty, battle.title)
+            XCTAssertTrue(battle.issues.isEmpty, battle.title)
+        }
+    }
+
+    func testCycle725LateCareerUXAuditCoversFiltersAccessibilitySourcesAndFinalWarCaveats() {
+        let report = LateCareerUXAuditCatalog.report
+
+        XCTAssertEqual(report.cycleRange, 721...725)
+        XCTAssertTrue(report.isReady)
+        XCTAssertTrue(report.items.allSatisfy(\.passed))
+        XCTAssertEqual(Set(LateCareerScopeFilterSpec.allCases.map(\.rawValue)), ["All", "Inspector", "General Staff", "Epilogue"])
+        XCTAssertGreaterThanOrEqual(report.accessibilityIdentifierCount, 64)
+        XCTAssertGreaterThanOrEqual(report.sourceLinkCount, 16)
+        XCTAssertEqual(report.finalWarCaveatCount, 2)
+    }
+
+    func testCycle730LateCareerFinalAcceptanceReportIsReady() {
+        let report = LateCareerFinalAcceptanceCatalog.report
+
+        XCTAssertEqual(report.cycleRange, 726...730)
+        XCTAssertTrue(report.isReadyForAcceptance, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.fieldCommandCampaignCount, 19)
+        XCTAssertEqual(report.lateCareerBattlefieldCount, 16)
+        XCTAssertEqual(report.totalSelectableEntryCount, 35)
+        XCTAssertEqual(report.playableCampaignRouteCount, 19)
+        XCTAssertEqual(report.lateCareerParityCount, 16)
+        XCTAssertTrue(report.lateCareerAutomationPassed)
+        XCTAssertTrue(report.lateCareerProgressReady)
+        XCTAssertTrue(report.lateCareerUXReady)
+        XCTAssertTrue(report.playbookReady)
+        XCTAssertTrue(report.buildCommands.contains("swift test"))
+        XCTAssertTrue(report.buildCommands.contains("swift build"))
+        XCTAssertTrue(report.buildCommands.contains { $0.contains("GuderianTest") })
+        XCTAssertTrue(report.blockers.isEmpty)
     }
 
     func testCampaignCatalogIsChronologicalWithinStableOrder() {

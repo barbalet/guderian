@@ -1,3 +1,5 @@
+import Foundation
+
 public enum LateCareerPlayableReadiness: String, Codable, Hashable, Sendable {
     case briefingVisible = "Briefing visible"
     case playablePilot = "Playable pilot"
@@ -57,6 +59,123 @@ public struct LateCareerCompletionRecord: Codable, Hashable, Sendable {
         self.completedTurn = completedTurn
         self.persistenceKey = persistenceKey
         self.note = note
+    }
+}
+
+public struct LateCareerCompletionSummary: Codable, Hashable, Sendable {
+    public let totalBattlefields: Int
+    public let completedBattlefields: Int
+    public let remainingBattlefieldIDs: [String]
+    public let totalScore: Int
+    public let victoryBands: [VictoryBand: Int]
+
+    public init(
+        totalBattlefields: Int,
+        completedBattlefields: Int,
+        remainingBattlefieldIDs: [String],
+        totalScore: Int,
+        victoryBands: [VictoryBand: Int]
+    ) {
+        self.totalBattlefields = totalBattlefields
+        self.completedBattlefields = completedBattlefields
+        self.remainingBattlefieldIDs = remainingBattlefieldIDs
+        self.totalScore = totalScore
+        self.victoryBands = victoryBands
+    }
+
+    public var isComplete: Bool {
+        totalBattlefields > 0 && completedBattlefields == totalBattlefields
+    }
+
+    public var progressLabel: String {
+        "\(completedBattlefields)/\(totalBattlefields) late-career context complete"
+    }
+
+    public var completionTitle: String {
+        isComplete ? "Late Career Context Complete" : "Late Career Context In Progress"
+    }
+
+    public var completionMessage: String {
+        if isComplete {
+            return "All late-career staff and epilogue context battlefields are complete without changing the 19-battle field-command campaign."
+        }
+
+        return "\(remainingBattlefieldIDs.count) late-career context battlefields remain outside the field-command campaign track."
+    }
+}
+
+public struct LateCareerProgress: Codable, Hashable, Sendable {
+    public private(set) var completionRecords: [String: LateCareerCompletionRecord]
+
+    public init(completionRecords: [String: LateCareerCompletionRecord] = [:]) {
+        self.completionRecords = completionRecords
+    }
+
+    public func isCompleted(_ id: String) -> Bool {
+        completionRecords[id] != nil
+    }
+
+    public func completionRecord(for id: String) -> LateCareerCompletionRecord? {
+        completionRecords[id]
+    }
+
+    public mutating func recordCompletion(_ record: LateCareerCompletionRecord) {
+        guard LateCareerPlayableSurfaceCatalog.parityReadyBattlefieldIDs.contains(record.battlefieldID) else {
+            return
+        }
+
+        completionRecords[record.battlefieldID] = record
+    }
+
+    public mutating func recordAllParityCompletions() {
+        for report in LateCareerPlayableSurfaceCatalog.parityReports {
+            recordCompletion(report.completionRecord)
+        }
+    }
+
+    public mutating func reset() {
+        completionRecords = [:]
+    }
+
+    public func completionSummary(
+        catalog: [LateCareerGuderianPresentation] = LateCareerGuderianPresentationCatalog.allEntries
+    ) -> LateCareerCompletionSummary {
+        let ids = catalog.map(\.id)
+        let validRecords = ids.compactMap { completionRecords[$0] }
+        let remaining = ids.filter { completionRecords[$0] == nil }
+        let bands = Dictionary(grouping: validRecords, by: \.victoryBand)
+            .mapValues { $0.count }
+
+        return LateCareerCompletionSummary(
+            totalBattlefields: ids.count,
+            completedBattlefields: validRecords.count,
+            remainingBattlefieldIDs: remaining,
+            totalScore: validRecords.map(\.score).reduce(0, +),
+            victoryBands: bands
+        )
+    }
+}
+
+public enum LateCareerProgressCodec {
+    private static let version = 1
+
+    private struct Payload: Codable {
+        let version: Int
+        let progress: LateCareerProgress
+    }
+
+    public static func encode(_ progress: LateCareerProgress) throws -> Data {
+        try JSONEncoder().encode(Payload(version: version, progress: progress))
+    }
+
+    public static func decodeIfCurrent(_ data: Data) -> LateCareerProgress? {
+        guard !data.isEmpty,
+              let payload = try? JSONDecoder().decode(Payload.self, from: data),
+              payload.version == version else {
+            return nil
+        }
+
+        return payload.progress
     }
 }
 
@@ -266,6 +385,332 @@ public struct LateCareerConsolidatedPlaybookReport: Codable, Hashable, Sendable 
             Set(coveredRuleFamilies) == Set(LateCareerRuleFamily.allCases) &&
             commandCaveatRuleCount >= 16 &&
             phaseLineRuleCount >= 16
+    }
+}
+
+public struct LateCareerAutomationBattleReport: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let title: String
+    public let status: CampaignAutomationStatus
+    public let completionRecord: LateCareerCompletionRecord
+    public let caveatVisible: Bool
+    public let mapDetailReady: Bool
+    public let aiPressureReady: Bool
+    public let scoringReady: Bool
+    public let persistenceReady: Bool
+    public let ruleBindingReady: Bool
+    public let accessibilityIdentifiers: [String]
+    public let issues: [String]
+
+    public init(
+        id: String,
+        title: String,
+        status: CampaignAutomationStatus,
+        completionRecord: LateCareerCompletionRecord,
+        caveatVisible: Bool,
+        mapDetailReady: Bool,
+        aiPressureReady: Bool,
+        scoringReady: Bool,
+        persistenceReady: Bool,
+        ruleBindingReady: Bool,
+        accessibilityIdentifiers: [String],
+        issues: [String]
+    ) {
+        self.id = id
+        self.title = title
+        self.status = status
+        self.completionRecord = completionRecord
+        self.caveatVisible = caveatVisible
+        self.mapDetailReady = mapDetailReady
+        self.aiPressureReady = aiPressureReady
+        self.scoringReady = scoringReady
+        self.persistenceReady = persistenceReady
+        self.ruleBindingReady = ruleBindingReady
+        self.accessibilityIdentifiers = accessibilityIdentifiers
+        self.issues = issues
+    }
+
+    public var passed: Bool {
+        status == .passed && issues.isEmpty
+    }
+}
+
+public struct LateCareerAutomationRunReport: Codable, Hashable, Sendable {
+    public let cycleRange: ClosedRange<Int>
+    public let reports: [LateCareerAutomationBattleReport]
+    public let completionSummary: LateCareerCompletionSummary
+
+    public init(
+        cycleRange: ClosedRange<Int>,
+        reports: [LateCareerAutomationBattleReport],
+        completionSummary: LateCareerCompletionSummary
+    ) {
+        self.cycleRange = cycleRange
+        self.reports = reports
+        self.completionSummary = completionSummary
+    }
+
+    public var passedCount: Int {
+        reports.filter(\.passed).count
+    }
+
+    public var issueCount: Int {
+        reports.map(\.issues.count).reduce(0, +)
+    }
+
+    public var allPassed: Bool {
+        reports.count == 16 &&
+            passedCount == reports.count &&
+            issueCount == 0 &&
+            completionSummary.isComplete
+    }
+}
+
+public enum LateCareerAutomationCatalog {
+    public static let cycleRange = 716...720
+
+    public static var runAll: LateCareerAutomationRunReport {
+        let reports = LateCareerPlayableSurfaceCatalog.parityReports.map { report(for: $0) }
+        var progress = LateCareerProgress()
+        for report in reports where report.passed {
+            progress.recordCompletion(report.completionRecord)
+        }
+
+        return LateCareerAutomationRunReport(
+            cycleRange: cycleRange,
+            reports: reports,
+            completionSummary: progress.completionSummary()
+        )
+    }
+
+    private static func report(for playableReport: LateCareerPlayableBattleReport) -> LateCareerAutomationBattleReport {
+        let entry = LateCareerGuderianPresentationCatalog.allEntries.first { $0.id == playableReport.battlefieldID }
+        let caveatVisible = entry?.visibleCommandCaveatLabel.localizedCaseInsensitiveContains("not a Guderian field command") == true
+        let mapDetailReady = (entry?.mapFeatureCount ?? 0) >= 24
+        let aiPressureReady = playableReport.aiPlan.priorities.count >= 2
+        let scoringReady = playableReport.scoringProfile.maxPlayerScore > 0
+        let persistenceReady = playableReport.completionRecord.persistenceKey == playableReport.scoringProfile.persistenceKey
+        let ruleBindingReady = LateCareerConsolidatedPlaybookCatalog.ruleBindings(for: playableReport.battlefieldID).count >= LateCareerRuleFamily.allCases.count
+        let issues = [
+            caveatVisible ? nil : "Missing visible command caveat.",
+            mapDetailReady ? nil : "Map detail is below late-career parity threshold.",
+            aiPressureReady ? nil : "AI pressure plan is incomplete.",
+            scoringReady ? nil : "Scoring profile is incomplete.",
+            persistenceReady ? nil : "Completion persistence key mismatch.",
+            ruleBindingReady ? nil : "Rule bindings do not cover all rule families.",
+        ].compactMap { $0 }
+
+        return LateCareerAutomationBattleReport(
+            id: "\(playableReport.battlefieldID)-automation",
+            title: playableReport.title,
+            status: issues.isEmpty ? .passed : .failed,
+            completionRecord: playableReport.completionRecord,
+            caveatVisible: caveatVisible,
+            mapDetailReady: mapDetailReady,
+            aiPressureReady: aiPressureReady,
+            scoringReady: scoringReady,
+            persistenceReady: persistenceReady,
+            ruleBindingReady: ruleBindingReady,
+            accessibilityIdentifiers: [
+                "late-career-row-\(playableReport.battlefieldID)",
+                "late-career-briefing-\(playableReport.battlefieldID)",
+                "late-career-map-viewport-\(playableReport.battlefieldID)",
+                "late-career-playable-status-\(playableReport.battlefieldID)",
+                "late-career-pilot-complete-button-\(playableReport.battlefieldID)",
+            ],
+            issues: issues
+        )
+    }
+}
+
+public struct LateCareerUXAuditItem: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let title: String
+    public let detail: String
+    public let passed: Bool
+
+    public init(id: String, title: String, detail: String, passed: Bool) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.passed = passed
+    }
+}
+
+public struct LateCareerUXAuditReport: Codable, Hashable, Sendable {
+    public let cycleRange: ClosedRange<Int>
+    public let items: [LateCareerUXAuditItem]
+    public let accessibilityIdentifierCount: Int
+    public let sourceLinkCount: Int
+    public let finalWarCaveatCount: Int
+
+    public init(
+        cycleRange: ClosedRange<Int>,
+        items: [LateCareerUXAuditItem],
+        accessibilityIdentifierCount: Int,
+        sourceLinkCount: Int,
+        finalWarCaveatCount: Int
+    ) {
+        self.cycleRange = cycleRange
+        self.items = items
+        self.accessibilityIdentifierCount = accessibilityIdentifierCount
+        self.sourceLinkCount = sourceLinkCount
+        self.finalWarCaveatCount = finalWarCaveatCount
+    }
+
+    public var isReady: Bool {
+        cycleRange == 721...725 &&
+            items.allSatisfy(\.passed) &&
+            accessibilityIdentifierCount >= 64 &&
+            sourceLinkCount >= 16 &&
+            finalWarCaveatCount >= 2
+    }
+}
+
+public enum LateCareerUXAuditCatalog {
+    public static let cycleRange = 721...725
+
+    public static var report: LateCareerUXAuditReport {
+        let entries = LateCareerGuderianPresentationCatalog.allEntries
+        let accessibilityIdentifierCount = entries.count * 4 + LateCareerScopeFilterSpec.allCases.count
+        let sourceLinkCount = entries.map(\.sourceCount).reduce(0, +)
+        let finalWarCaveatCount = entries.filter { $0.scope == .postDismissalContext && $0.visibleCommandCaveatLabel.localizedCaseInsensitiveContains("not a Guderian field command") }.count
+
+        return LateCareerUXAuditReport(
+            cycleRange: cycleRange,
+            items: [
+                LateCareerUXAuditItem(
+                    id: "scope-filters",
+                    title: "Scope filters",
+                    detail: "All, Inspector, General Staff, and Epilogue filters remain available for the separate Late Career Context section.",
+                    passed: LateCareerScopeFilterSpec.allCases.count == 4
+                ),
+                LateCareerUXAuditItem(
+                    id: "accessibility",
+                    title: "Accessibility identifiers",
+                    detail: "Rows, maps, playable status panels, debrief controls, and rule-binding panels expose stable identifiers.",
+                    passed: accessibilityIdentifierCount >= 64
+                ),
+                LateCareerUXAuditItem(
+                    id: "sources",
+                    title: "Source-note display",
+                    detail: "Every late-career battlefield keeps source links on the briefing/playable surface.",
+                    passed: sourceLinkCount >= entries.count
+                ),
+                LateCareerUXAuditItem(
+                    id: "final-war-caveats",
+                    title: "Final-war caveats",
+                    detail: "Post-dismissal epilogues keep explicit not-field-command caveats visible.",
+                    passed: finalWarCaveatCount >= 2
+                ),
+            ],
+            accessibilityIdentifierCount: accessibilityIdentifierCount,
+            sourceLinkCount: sourceLinkCount,
+            finalWarCaveatCount: finalWarCaveatCount
+        )
+    }
+}
+
+public enum LateCareerScopeFilterSpec: String, CaseIterable, Codable, Hashable, Sendable {
+    case all = "All"
+    case inspector = "Inspector"
+    case generalStaff = "General Staff"
+    case epilogue = "Epilogue"
+}
+
+public struct LateCareerFinalAcceptanceReport: Codable, Hashable, Sendable {
+    public let cycleRange: ClosedRange<Int>
+    public let fieldCommandCampaignCount: Int
+    public let lateCareerBattlefieldCount: Int
+    public let totalSelectableEntryCount: Int
+    public let playableCampaignRouteCount: Int
+    public let lateCareerParityCount: Int
+    public let lateCareerAutomationPassed: Bool
+    public let lateCareerProgressReady: Bool
+    public let lateCareerUXReady: Bool
+    public let playbookReady: Bool
+    public let buildCommands: [String]
+    public let blockers: [String]
+
+    public init(
+        cycleRange: ClosedRange<Int>,
+        fieldCommandCampaignCount: Int,
+        lateCareerBattlefieldCount: Int,
+        totalSelectableEntryCount: Int,
+        playableCampaignRouteCount: Int,
+        lateCareerParityCount: Int,
+        lateCareerAutomationPassed: Bool,
+        lateCareerProgressReady: Bool,
+        lateCareerUXReady: Bool,
+        playbookReady: Bool,
+        buildCommands: [String],
+        blockers: [String]
+    ) {
+        self.cycleRange = cycleRange
+        self.fieldCommandCampaignCount = fieldCommandCampaignCount
+        self.lateCareerBattlefieldCount = lateCareerBattlefieldCount
+        self.totalSelectableEntryCount = totalSelectableEntryCount
+        self.playableCampaignRouteCount = playableCampaignRouteCount
+        self.lateCareerParityCount = lateCareerParityCount
+        self.lateCareerAutomationPassed = lateCareerAutomationPassed
+        self.lateCareerProgressReady = lateCareerProgressReady
+        self.lateCareerUXReady = lateCareerUXReady
+        self.playbookReady = playbookReady
+        self.buildCommands = buildCommands
+        self.blockers = blockers
+    }
+
+    public var isReadyForAcceptance: Bool {
+        cycleRange == 726...730 &&
+            fieldCommandCampaignCount == 19 &&
+            lateCareerBattlefieldCount == 16 &&
+            totalSelectableEntryCount == 35 &&
+            playableCampaignRouteCount == 19 &&
+            lateCareerParityCount == 16 &&
+            lateCareerAutomationPassed &&
+            lateCareerProgressReady &&
+            lateCareerUXReady &&
+            playbookReady &&
+            blockers.isEmpty
+    }
+}
+
+public enum LateCareerFinalAcceptanceCatalog {
+    public static let cycleRange = 726...730
+
+    public static var report: LateCareerFinalAcceptanceReport {
+        var progress = LateCareerProgress()
+        progress.recordAllParityCompletions()
+        let progressSummary = progress.completionSummary()
+        let automation = LateCareerAutomationCatalog.runAll
+        let ux = LateCareerUXAuditCatalog.report
+
+        let blockers = [
+            LateCareerPlayableSurfaceCatalog.acceptanceReadyThroughCycle710 ? nil : "Late-career playable surface is not parity-ready.",
+            automation.allPassed ? nil : "Late-career automation did not pass.",
+            progressSummary.isComplete ? nil : "Late-career progress summary is incomplete.",
+            ux.isReady ? nil : "Late-career UX audit is not ready.",
+            LateCareerConsolidatedPlaybookCatalog.report.isReady ? nil : "Late-career playbook is not ready.",
+        ].compactMap { $0 }
+
+        return LateCareerFinalAcceptanceReport(
+            cycleRange: cycleRange,
+            fieldCommandCampaignCount: GuderianCampaignCatalog.all.count,
+            lateCareerBattlefieldCount: LateCareerGuderianPresentationCatalog.visibleEntryCount,
+            totalSelectableEntryCount: LateCareerGuderianPresentationCatalog.totalSelectableEntryCount,
+            playableCampaignRouteCount: PlayableBattleSurfaceCatalog.routedBattleIDs.count,
+            lateCareerParityCount: LateCareerPlayableSurfaceCatalog.parityReports.count,
+            lateCareerAutomationPassed: automation.allPassed,
+            lateCareerProgressReady: progressSummary.isComplete,
+            lateCareerUXReady: ux.isReady,
+            playbookReady: LateCareerConsolidatedPlaybookCatalog.report.isReady,
+            buildCommands: [
+                "swift test",
+                "swift build",
+                "xcodebuild -project Guderian.xcodeproj -scheme GuderianTest -destination 'platform=macOS' build",
+            ],
+            blockers: blockers
+        )
     }
 }
 

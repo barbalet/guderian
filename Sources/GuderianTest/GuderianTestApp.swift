@@ -24,6 +24,7 @@ struct GuderianTestApp: App {
 @MainActor
 final class GuderianTestViewModel: ObservableObject {
     @Published private(set) var reports: [CampaignAutomationBattleReport] = []
+    @Published private(set) var lateCareerReport = LateCareerAutomationCatalog.runAll
     @Published private(set) var isRunning = false
     @Published private(set) var focusedID: GuderianBattleID? = GuderianCampaignCatalog.all.first?.id
 
@@ -70,6 +71,7 @@ final class GuderianTestViewModel: ObservableObject {
         }
 
         reports = []
+        lateCareerReport = LateCareerAutomationCatalog.runAll
         isRunning = true
         runTask = Task {
             var progress = CampaignProgress()
@@ -103,6 +105,7 @@ final class GuderianTestViewModel: ObservableObject {
     func reset() {
         stop()
         reports = []
+        lateCareerReport = LateCareerAutomationCatalog.runAll
         focusedID = GuderianCampaignCatalog.all.first?.id
     }
 }
@@ -171,6 +174,9 @@ struct GuderianTestDashboard: View {
                     Text(viewModel.summary.completionSummary.progressLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text(viewModel.lateCareerReport.completionSummary.progressLabel)
+                        .font(.caption)
+                        .foregroundStyle(viewModel.lateCareerReport.allPassed ? .green : .secondary)
                     Text(viewModel.isRunning ? "Automation is running through the campaign." : "Open a battle row to inspect the full automation playback.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -188,6 +194,7 @@ struct GuderianTestDashboard: View {
                 SummaryBadge(title: "Failed", value: viewModel.summary.failedCount, systemImage: "xmark.octagon.fill", color: .red)
                 SummaryBadge(title: "Blocked", value: viewModel.summary.blockedCount, systemImage: "hand.raised.fill", color: .purple)
                 SummaryBadge(title: "Issues", value: viewModel.summary.issueCount, systemImage: "list.bullet.clipboard", color: .blue)
+                SummaryBadge(title: "Late", value: viewModel.lateCareerReport.passedCount, systemImage: "checkmark.seal.fill", color: .green)
             }
         }
         .padding(16)
@@ -195,20 +202,110 @@ struct GuderianTestDashboard: View {
 
     private var battleList: some View {
         List {
-            ForEach(GuderianCampaignCatalog.all.sorted(by: { $0.order < $1.order })) { scenario in
-                let report = viewModel.reports.first { $0.id == scenario.id }
-                NavigationLink(value: scenario.id) {
-                    GuderianTestBattleRow(
-                        scenario: scenario,
-                        report: report,
-                        isFocused: viewModel.focusedID == scenario.id
-                    )
+            Section("Field Command Campaign") {
+                ForEach(GuderianCampaignCatalog.all.sorted(by: { $0.order < $1.order })) { scenario in
+                    let report = viewModel.reports.first { $0.id == scenario.id }
+                    NavigationLink(value: scenario.id) {
+                        GuderianTestBattleRow(
+                            scenario: scenario,
+                            report: report,
+                            isFocused: viewModel.focusedID == scenario.id
+                        )
+                    }
+                    .accessibilityIdentifier("guderian-test-row-link-\(scenario.id.rawValue)")
                 }
-                .accessibilityIdentifier("guderian-test-row-link-\(scenario.id.rawValue)")
+            }
+
+            Section("Late Career Context") {
+                ForEach(viewModel.lateCareerReport.reports) { report in
+                    LateCareerTestContextRow(report: report)
+                }
             }
         }
         .listStyle(.inset)
         .accessibilityIdentifier("guderian-test-battle-list")
+    }
+}
+
+struct LateCareerTestContextRow: View {
+    let report: LateCareerAutomationBattleReport
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: iconName)
+                .foregroundStyle(color)
+                .frame(width: 24)
+                .accessibilityLabel(report.status.rawValue)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(report.title)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(report.completionRecord.note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 8)], alignment: .leading, spacing: 4) {
+                    Text(report.caveatVisible ? "caveat ok" : "caveat blocked")
+                    Text(report.mapDetailReady ? "map ok" : "map blocked")
+                    Text(report.aiPressureReady ? "AI ok" : "AI blocked")
+                    Text(report.scoringReady ? "\(report.completionRecord.score) VP" : "score blocked")
+                    Text(report.persistenceReady ? "save ok" : "save blocked")
+                    Text(report.ruleBindingReady ? "rules ok" : "rules blocked")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if report.passed {
+                Label("Debriefed", systemImage: "rosette")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.green)
+            } else {
+                Label("\(report.issues.count) issues", systemImage: "exclamationmark.triangle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("guderian-test-late-career-row-\(report.id)")
+    }
+
+    private var iconName: String {
+        switch report.status {
+        case .passed:
+            return "checkmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .failed:
+            return "xmark.octagon.fill"
+        case .blocked:
+            return "hand.raised.fill"
+        case .running:
+            return "play.circle.fill"
+        case .queued:
+            return "circle"
+        }
+    }
+
+    private var color: Color {
+        switch report.status {
+        case .passed:
+            return .green
+        case .warning:
+            return .orange
+        case .failed:
+            return .red
+        case .blocked:
+            return .purple
+        case .running:
+            return .blue
+        case .queued:
+            return .secondary
+        }
     }
 }
 
