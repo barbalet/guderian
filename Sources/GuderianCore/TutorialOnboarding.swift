@@ -360,9 +360,9 @@ public enum GuderianTutorialCatalog {
             TutorialPage(
                 id: "firstRunHistory-guderian",
                 title: "Guderian In History",
-                body: "Heinz Guderian was a German officer whose name became closely associated with armored warfare, radio coordination, and rapid combined-arms operations. He wrote influential arguments for concentrated mechanized forces before the Second World War and then helped lead campaigns that made those ideas visible across Europe. This game does not present him as a hero. It studies the battles connected to his career because military systems, command choices, and battlefield pressure shaped real lives. Understanding that history requires looking at both operational skill and the destructive political cause it served.",
+                body: "Heinz Guderian was a German officer in World War II whose name became closely associated with armored warfare, radio coordination, and rapid combined-arms operations. He served Nazi Germany, held senior commands under Adolf Hitler, and both benefited from and argued with Hitler's direction of the war; those disputes do not separate him from the Nazi regime he helped wage war for. This game does not present him as a hero. It studies battles connected to his career because military systems, command choices, and battlefield pressure shaped real lives. Understanding that history requires looking at operational skill beside the destructive Nazi cause it served.",
                 accessibilityIdentifier: "first-run-history-page-guderian",
-                requiredTopics: ["Heinz Guderian", "armored warfare", "not present him as a hero"]
+                requiredTopics: ["Heinz Guderian", "World War II", "Nazi Germany", "Adolf Hitler", "armored warfare", "not present him as a hero"]
             ),
             TutorialPage(
                 id: "firstRunHistory-opposition",

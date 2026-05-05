@@ -1152,6 +1152,11 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(flow.pages.allSatisfy { (80...125).contains($0.wordCount) })
         XCTAssertTrue(flow.pages.allSatisfy(\.containsRequiredTopics))
         XCTAssertTrue(flow.pages.allSatisfy { $0.accessibilityIdentifier.hasPrefix("first-run-history-page-") })
+        let openingPage = try XCTUnwrap(flow.pages.first)
+        XCTAssertTrue(openingPage.body.contains("World War II"))
+        XCTAssertTrue(openingPage.body.contains("Nazi Germany"))
+        XCTAssertTrue(openingPage.body.contains("Adolf Hitler"))
+        XCTAssertTrue(openingPage.body.localizedCaseInsensitiveContains("Nazi regime"))
 
         var progress = TutorialProgress()
         XCTAssertTrue(progress.shouldPresent(flow))
