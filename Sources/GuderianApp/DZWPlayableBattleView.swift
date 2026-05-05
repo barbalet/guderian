@@ -12,6 +12,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     @Published private(set) var completion: PlayableBattleCompletionSummary?
     @Published private(set) var debriefError: String?
     @Published private(set) var aiTurnEvents: [String]
+    @Published private(set) var playableTestGameResult: PlayableTestGameBattleResult?
 
     let scenario: GuderianScenario
     private var session: NativeBoardSession?
@@ -236,11 +237,35 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         session = Self.makeSession(for: scenario, restartCount: restartCount)
         completion = nil
         debriefError = nil
+        playableTestGameResult = nil
         let aiPlan = ScenarioContentCatalog.bundle(for: scenario).aiPlan
         aiTurnEvents = [
             "Battle restarted: \(aiPlan.postureName) ready for \(scenario.title)."
         ]
         refresh()
+    }
+
+    func playBattleToEnd() -> CampaignCompletionRecord? {
+        guard let session else {
+            debriefError = "Board session unavailable."
+            return nil
+        }
+
+        do {
+            let result = try PlayableTestGameRunner.runBattle(from: session)
+            playableTestGameResult = result
+            completion = result.completion
+            debriefError = nil
+            refresh()
+            recordAIEvent("Playable test game completed: \(result.antiGuderianStepCount) Anti-Guderian AI steps, \(result.germanStepCount) German AI steps.")
+            return result.completion.completionRecord
+        } catch {
+            completion = nil
+            playableTestGameResult = nil
+            debriefError = "\(error)"
+            refresh()
+            return nil
+        }
     }
 
     func completeBattle() -> CampaignCompletionRecord? {
@@ -252,6 +277,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         do {
             let result = try PlayableBattleCompletionResolver.completeBattle(from: session)
             completion = result
+            playableTestGameResult = nil
             debriefError = nil
             refresh()
             recordAIEvent("Debrief recorded: \(result.completionRecord.score) VP, \(result.completionRecord.victoryBand.rawValue).")
@@ -556,6 +582,16 @@ private struct DZWPlayableBattlePanelWindow: View {
                 .accessibilityIdentifier("german-turn-button")
 
                 Button {
+                    if let record = model.playBattleToEnd() {
+                        onCompletion(record)
+                    }
+                } label: {
+                    Label("Play To End", systemImage: "forward.end.alt.fill")
+                }
+                .disabled(model.hasCompletion)
+                .accessibilityIdentifier("play-to-end-button")
+
+                Button {
                     model.advancePhase()
                 } label: {
                     Label("Next Phase", systemImage: "forward.end.fill")
@@ -708,6 +744,15 @@ private struct DZWPlayableBattlePanelWindow: View {
                 Text(completion.sourceName)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+                if let playableTestGameResult = model.playableTestGameResult {
+                    Text("\(playableTestGameResult.antiGuderianStepCount) Anti-Guderian AI steps | \(playableTestGameResult.germanStepCount) German AI steps")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(playableTestGameResult.completedToEnd ? .green : .orange)
+                    Text(playableTestGameResult.summary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
                 Text(completion.debriefSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -981,6 +1026,16 @@ struct DZWPlayableBattleView: View {
                 .accessibilityIdentifier("german-turn-button")
 
                 Button {
+                    if let record = model.playBattleToEnd() {
+                        onCompletion(record)
+                    }
+                } label: {
+                    Label("Play To End", systemImage: "forward.end.alt.fill")
+                }
+                .disabled(model.hasCompletion)
+                .accessibilityIdentifier("play-to-end-button")
+
+                Button {
                     model.advancePhase()
                 } label: {
                     Label("Next Phase", systemImage: "forward.end.fill")
@@ -1182,6 +1237,15 @@ struct DZWPlayableBattleView: View {
                 Text(completion.sourceName)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+                if let playableTestGameResult = model.playableTestGameResult {
+                    Text("\(playableTestGameResult.antiGuderianStepCount) Anti-Guderian AI steps | \(playableTestGameResult.germanStepCount) German AI steps")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(playableTestGameResult.completedToEnd ? .green : .orange)
+                    Text(playableTestGameResult.summary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
                 Text(completion.debriefSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)

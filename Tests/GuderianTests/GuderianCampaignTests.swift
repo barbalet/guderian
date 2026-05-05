@@ -1570,6 +1570,10 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertTrue(battle.nativeSoakReady, battle.title)
             XCTAssertFalse(battle.nativeSoakSummary.isEmpty)
             XCTAssertTrue(battle.steps.contains { $0.stage == "Native Campaign Soak" && $0.status == .passed })
+            XCTAssertTrue(battle.playableTestGameCompleted, battle.title)
+            XCTAssertFalse(battle.playableTestGameSummary.isEmpty, battle.title)
+            XCTAssertTrue(battle.playableTestGameBlockers.isEmpty, battle.title)
+            XCTAssertTrue(battle.steps.contains { $0.stage == "Playable Test Game" && $0.status == .passed })
 
             if routedPlayableScreenIDs.contains(battle.id) {
                 XCTAssertTrue(battle.playableScreenParityCompleted, battle.title)

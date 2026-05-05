@@ -85,6 +85,20 @@ struct GuderianBattleUISwiftTests {
         #expect(results.allSatisfy { $0.persistedProgress.completionRecord(for: $0.id) != nil })
     }
 
+    @Test("GuderianTest playable test game uses AI for both sides and completes every scenario")
+    func guderianTestPlayableGameCompletesFullCampaignWithBothAIs() throws {
+        let suite = try PlayableTestGameRunner.runCampaign()
+
+        #expect(suite.battleIDs == GuderianCampaignCatalog.all.map(\.id))
+        #expect(suite.results.count == GuderianCampaignCatalog.all.count)
+        #expect(suite.completedAllBattlesToEnd)
+        #expect(suite.summary.completedScenarios == GuderianCampaignCatalog.all.count)
+        #expect(suite.results.allSatisfy { $0.automatedSides.isSuperset(of: [.player, .guderianAI]) })
+        #expect(suite.results.allSatisfy { $0.antiGuderianStepCount > 0 && $0.germanStepCount > 0 })
+        #expect(suite.results.allSatisfy { !$0.antiGuderianPlan.targetPriorities.isEmpty })
+        #expect(suite.results.allSatisfy { $0.completion.completionRecord.scenarioID == $0.id })
+    }
+
     private func runAndExpectComplete(_ id: GuderianBattleID) throws -> BattleUIFlowResult {
         let result = try BattleUIFlowRunner.runFullBattleFlow(for: id)
         let requiredStages = BattleUIFlowStage.allCases

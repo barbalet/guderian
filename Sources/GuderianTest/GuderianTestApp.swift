@@ -258,6 +258,7 @@ struct GuderianTestBattleRow: View {
                     Text(report.map { "\($0.actionsSucceeded)/\($0.actionsAttempted) actions" } ?? "queued")
                     Text(report?.nativeBoardDiagnosticsPassed == true ? "board ok" : "board pending")
                     Text(playableScreenLabel(report))
+                    Text(playableTestGameLabel(report))
                     Text(report?.completionRecord.map { "\($0.score) VP" } ?? "score pending")
                     Text(report.map { $0.issues.isEmpty ? "no issues" : "\($0.issues.count) issues" } ?? "not run")
                 }
@@ -330,6 +331,13 @@ struct GuderianTestBattleRow: View {
             return "screen pending"
         }
         return report.playableScreenParityCompleted ? "screen ok" : "screen blocked"
+    }
+
+    private func playableTestGameLabel(_ report: CampaignAutomationBattleReport?) -> String {
+        guard let report else {
+            return "test game pending"
+        }
+        return report.playableTestGameCompleted ? "test game ok" : "test game blocked"
     }
 }
 
@@ -500,6 +508,12 @@ struct GuderianTestReportDetail: View {
                 Label(report.playableScreenParitySummary, systemImage: "checkerboard.rectangle")
                     .font(.callout)
                     .foregroundStyle(report.playableScreenParityCompleted ? .green : .orange)
+            }
+
+            if !report.playableTestGameSummary.isEmpty {
+                Label(report.playableTestGameSummary, systemImage: "person.2.wave.2")
+                    .font(.callout)
+                    .foregroundStyle(report.playableTestGameCompleted ? .green : .orange)
             }
         }
     }
