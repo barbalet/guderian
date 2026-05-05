@@ -560,11 +560,8 @@ struct UnifiedLateCareerBattleDestinationView: View {
 
     var body: some View {
         if UnifiedPlayableBoardRouteCatalog.isRoutedToPlayableBattleView(.lateCareer(entry.id)) {
-            LateCareerUnifiedPlayableBoardView(
-                entry: entry,
-                completionRecord: completionRecord,
-                onCompletion: onCompletion
-            )
+            DZWPlayableBattleView(lateCareerEntry: entry, onCompletion: onCompletion)
+                .id(entry.id)
         } else {
             LateCareerSharedBriefingView(
                 entry: entry,

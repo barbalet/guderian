@@ -216,6 +216,8 @@ Cycle 825 update: cycles 821-825 are complete. `UnifiedBuildRegressionHardeningC
 
 Cycle 830 update: cycles 826-830 are complete. `UnifiedCampaignAcceptanceCatalog` verifies the single 35-battle playable campaign: every battle uses the same UI and completion flow, README lists all 35 battles, caveats remain historical labels only, no separate late-career gameplay tier remains, and zero development cycles remain in this plan.
 
+Cycle 890 correction/update: cycles 831-890 repair the product-level UI parity gap behind the cycle 830 metadata claim. Battles 20-35 now launch through the generalized `DZWPlayableBattleView` path with the same live native board snapshot, board renderer, unit selection, movement, phase, combat, German AI, debrief, and persistence surface as battles 1-19; `LateCareerUnifiedPlayableBoardView` and `LateCareerMapSurface` are no longer accepted playable destinations.
+
 ## Run
 
 Build and test from the repository root:
@@ -245,9 +247,9 @@ Then upload `dist/Guderian-1.0.0.zip` to the GitHub release at `https://github.c
 
 ## Ship Status
 
-The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira. Cycle 830 completes the unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same battle list, playable surface, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19.
+The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19.
 
-Remaining playable-screen estimate: battles 1-35 are complete through cycle 830. There are no cycles remaining in the current unified 35-battle playable-campaign plan.
+Remaining playable-screen estimate: battles 1-35 are complete through cycle 890. There are no cycles remaining in the current unified 35-battle playable-campaign plan.
 
 ## App Identity
 

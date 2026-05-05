@@ -1102,6 +1102,35 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(report.blockers.isEmpty)
     }
 
+    func testCycle890LateCareerBattlesUseRealDZWPlayableBoardParity() throws {
+        let catalog = UnifiedRealDZWPlayableParityCatalog.self
+        let report = catalog.report
+
+        XCTAssertEqual(report.cycleRange, 831...890)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle890, report.blockers.joined(separator: "\n"))
+        XCTAssertTrue(report.isReady, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.totalBattleCount, 35)
+        XCTAssertEqual(report.fieldCommandBattleCount, 19)
+        XCTAssertEqual(report.lateCareerBattleCount, 16)
+        XCTAssertEqual(report.requiredHostSurfaceName, PlayableBattleSurfaceCatalog.hostSurfaceName)
+        XCTAssertTrue(report.forbiddenHostSurfaceNames.contains("LateCareerUnifiedPlayableBoardView"))
+        XCTAssertTrue(report.forbiddenHostSurfaceNames.contains("LateCareerMapSurface"))
+        XCTAssertEqual(report.lateCareerReports.map(\.id), UnifiedPlayableBoardRouteCatalog.lateCareerRoutedIDsThroughCycle780)
+        XCTAssertTrue(report.lateCareerReports.allSatisfy(\.passesRealDZWParity), report.blockers.joined(separator: "\n"))
+        XCTAssertTrue(report.lateCareerReports.allSatisfy { $0.snapshotTypeName == "NativeBoardSnapshot" })
+        XCTAssertTrue(report.lateCareerReports.allSatisfy { $0.hostSurfaceName == PlayableBattleSurfaceCatalog.hostSurfaceName })
+        XCTAssertTrue(report.lateCareerReports.allSatisfy { !$0.forbiddenSurfaceNames.contains($0.hostSurfaceName) })
+        XCTAssertTrue(report.lateCareerReports.allSatisfy { $0.commandActionStatus != .idle })
+        XCTAssertTrue(report.lateCareerReports.allSatisfy(\.phaseAdvanced))
+
+        let kursk = try XCTUnwrap(report.lateCareerReports.first { $0.id == "kursk-armored-force-pressure" })
+        XCTAssertGreaterThan(kursk.openingUnitCount, 0)
+        XCTAssertGreaterThan(kursk.openingObjectiveCount, 0)
+        XCTAssertGreaterThan(kursk.openingZoneCount, 0)
+        XCTAssertFalse(kursk.selectedUnitName.isEmpty)
+        XCTAssertTrue(kursk.completionPersistenceKey.contains("kursk-armored-force-pressure"))
+    }
+
     private func readmeText() throws -> String {
         let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("README.md")

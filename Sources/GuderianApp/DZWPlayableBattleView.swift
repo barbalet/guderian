@@ -2,6 +2,147 @@ import GuderianCore
 import AppKit
 import SwiftUI
 
+private protocol DZWPlayableBoardSession: AnyObject {
+    func playableBoardSnapshot() -> NativeBoardSnapshot
+    func selectUnit(_ id: Int)
+    func selectTarget(_ id: Int)
+    func selectFirstActiveUnit()
+    func selectNearestEnemyToSelectedUnit()
+    @discardableResult
+    func moveSelectedUnitTowardNearestObjective(maxDistance: Double) -> Bool
+    @discardableResult
+    func moveSelectedUnitTowardPriorityObjective(named priorityNames: [String], maxDistance: Double) -> Bool
+    @discardableResult
+    func moveUnit(_ id: Int, to point: NativeBattleCoordinate) -> Bool
+    @discardableResult
+    func rotateUnit(_ id: Int, to facingDegrees: Double) -> Bool
+    @discardableResult
+    func toggleCover(for id: Int, enabled: Bool) -> Bool
+    @discardableResult
+    func toggleHullDown(for id: Int, enabled: Bool) -> Bool
+    @discardableResult
+    func shootUnit(_ attackerID: Int, targetID: Int) -> Bool
+    @discardableResult
+    func assaultUnit(_ attackerID: Int, targetID: Int, advance: Bool) -> Bool
+    @discardableResult
+    func shootSelectedTarget() -> Bool
+    @discardableResult
+    func resolveFirstPendingChoice() -> Bool
+    func advancePhase()
+}
+
+extension NativeBoardSession: DZWPlayableBoardSession {
+    func playableBoardSnapshot() -> NativeBoardSnapshot {
+        snapshot()
+    }
+}
+
+extension LateCareerNativeBoardSession: DZWPlayableBoardSession {}
+
+private enum DZWPlayableCompletionRecord {
+    case fieldCommand(CampaignCompletionRecord)
+    case lateCareer(LateCareerCompletionRecord)
+}
+
+private struct DZWPlayableBattleCompletionDisplay {
+    let sourceName: String
+    let score: Int
+    let victoryBandLabel: String
+    let completedTurn: Int
+    let debriefSummary: String
+    let record: DZWPlayableCompletionRecord
+
+    init(fieldCommand summary: PlayableBattleCompletionSummary) {
+        sourceName = summary.sourceName
+        score = summary.completionRecord.score
+        victoryBandLabel = summary.completionRecord.victoryBand.rawValue
+        completedTurn = summary.completionRecord.completedTurn
+        debriefSummary = summary.debriefSummary
+        record = .fieldCommand(summary.completionRecord)
+    }
+
+    init(lateCareer summary: UnifiedLateCareerPlayableCompletionSummary) {
+        sourceName = summary.sourceName
+        score = summary.completionRecord.score
+        victoryBandLabel = summary.completionRecord.victoryBand.rawValue
+        completedTurn = summary.completionRecord.completedTurn
+        debriefSummary = summary.debriefSummary
+        record = .lateCareer(summary.completionRecord)
+    }
+}
+
+private enum DZWPlayableBattleSource {
+    case fieldCommand(GuderianScenario)
+    case lateCareer(LateCareerGuderianPresentation)
+
+    var boardTitle: String {
+        "\(battleTitle) Operations Map"
+    }
+
+    var battleTitle: String {
+        switch self {
+        case .fieldCommand(let scenario):
+            return scenario.title
+        case .lateCareer(let entry):
+            return entry.title
+        }
+    }
+
+    var nativeScenarioLabel: String {
+        switch self {
+        case .fieldCommand:
+            return "\(battleTitle) native scenario"
+        case .lateCareer:
+            return "\(battleTitle) unified native scenario"
+        }
+    }
+
+    var matchupText: String {
+        switch self {
+        case .fieldCommand(let scenario):
+            return "\(scenario.playerForceSummary) vs \(scenario.guderianCommand)"
+        case .lateCareer(let entry):
+            return "\(entry.playerRole) vs \(entry.germanContext)"
+        }
+    }
+
+    var aiTargetPriorities: [String] {
+        switch self {
+        case .fieldCommand(let scenario):
+            return ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities
+        case .lateCareer(let entry):
+            return LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)?.priorities.map(\.targetName) ?? []
+        }
+    }
+
+    var aiPostureName: String {
+        switch self {
+        case .fieldCommand(let scenario):
+            return ScenarioContentCatalog.bundle(for: scenario).aiPlan.postureName
+        case .lateCareer:
+            return "Unified German AI"
+        }
+    }
+
+    var targetTurnUpperBound: Int {
+        switch self {
+        case .fieldCommand(let scenario):
+            return ScenarioBalanceCatalog.profile(for: scenario).targetTurns.upperBound
+        case .lateCareer(let entry):
+            return LateCareerPlayableSurfaceCatalog.report(for: entry.id)?.scoringProfile.targetTurnUpperBound ?? 8
+        }
+    }
+
+    func makeSession(restartCount: Int) -> DZWPlayableBoardSession? {
+        switch self {
+        case .fieldCommand(let scenario):
+            return NativeBoardSession(scenario: scenario, seed: UInt32(510_000 + scenario.order + restartCount * 97))
+        case .lateCareer(let entry):
+            return LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(890_000 + entry.order + restartCount * 97))
+        }
+    }
+}
+
 @MainActor
 private final class DZWPlayableBattleViewModel: ObservableObject {
     static let boardWidth: CGFloat = 72
@@ -9,24 +150,33 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     @Published private(set) var snapshot: NativeBoardSnapshot?
     @Published private(set) var lastError: String = ""
-    @Published private(set) var completion: PlayableBattleCompletionSummary?
+    @Published private(set) var completion: DZWPlayableBattleCompletionDisplay?
     @Published private(set) var debriefError: String?
     @Published private(set) var aiTurnEvents: [String]
     @Published private(set) var playableTestGameResult: PlayableTestGameBattleResult?
 
-    let scenario: GuderianScenario
-    private var session: NativeBoardSession?
+    let source: DZWPlayableBattleSource
+    private var session: DZWPlayableBoardSession?
     private let aiTargetPriorities: [String]
     private var restartCount = 0
 
     init(scenario: GuderianScenario) {
-        self.scenario = scenario
-        let aiPlan = ScenarioContentCatalog.bundle(for: scenario).aiPlan
-        aiTargetPriorities = aiPlan.targetPriorities
+        self.source = .fieldCommand(scenario)
+        aiTargetPriorities = source.aiTargetPriorities
         aiTurnEvents = [
-            "German AI ready: \(aiPlan.postureName) will pressure \(Self.prioritySummary(aiPlan.targetPriorities))."
+            "German AI ready: \(source.aiPostureName) will pressure \(Self.prioritySummary(aiTargetPriorities))."
         ]
-        session = Self.makeSession(for: scenario, restartCount: restartCount)
+        session = source.makeSession(restartCount: restartCount)
+        refresh()
+    }
+
+    init(lateCareerEntry: LateCareerGuderianPresentation) {
+        self.source = .lateCareer(lateCareerEntry)
+        aiTargetPriorities = source.aiTargetPriorities
+        aiTurnEvents = [
+            "German AI ready: \(source.aiPostureName) will pressure \(Self.prioritySummary(aiTargetPriorities))."
+        ]
+        session = source.makeSession(restartCount: restartCount)
         refresh()
     }
 
@@ -47,11 +197,15 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     var title: String {
-        "\(scenario.title) Operations Map"
+        source.boardTitle
+    }
+
+    var nativeScenarioLabel: String {
+        source.nativeScenarioLabel
     }
 
     var matchupText: String {
-        "\(scenario.playerForceSummary) vs \(scenario.guderianCommand)"
+        source.matchupText
     }
 
     var activeUnits: [NativeBoardUnitSnapshot] {
@@ -201,7 +355,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         case .assault:
             _ = session?.resolveFirstPendingChoice()
         }
-        let actionDetail = session?.snapshot().lastAction.detail ?? "No action resolved."
+        let actionDetail = session?.playableBoardSnapshot().lastAction.detail ?? "No action resolved."
         session?.advancePhase()
         refresh()
         recordAIEvent("\(before): \(actionDetail)")
@@ -234,65 +388,114 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     func restartBattle() {
         restartCount += 1
-        session = Self.makeSession(for: scenario, restartCount: restartCount)
+        session = source.makeSession(restartCount: restartCount)
         completion = nil
         debriefError = nil
         playableTestGameResult = nil
-        let aiPlan = ScenarioContentCatalog.bundle(for: scenario).aiPlan
         aiTurnEvents = [
-            "Battle restarted: \(aiPlan.postureName) ready for \(scenario.title)."
+            "Battle restarted: \(source.aiPostureName) ready for \(source.battleTitle)."
         ]
         refresh()
     }
 
-    func playBattleToEnd() -> CampaignCompletionRecord? {
+    func playBattleToEnd() -> DZWPlayableCompletionRecord? {
         guard let session else {
             debriefError = "Board session unavailable."
             return nil
         }
 
-        do {
-            let result = try PlayableTestGameRunner.runBattle(from: session)
-            playableTestGameResult = result
-            completion = result.completion
-            debriefError = nil
-            refresh()
-            recordAIEvent("Playable test game completed: \(result.antiGuderianStepCount) Anti-Guderian AI steps, \(result.germanStepCount) German AI steps.")
-            return result.completion.completionRecord
-        } catch {
-            completion = nil
+        switch source {
+        case .fieldCommand:
+            guard let nativeSession = session as? NativeBoardSession else {
+                debriefError = "Field-command board session unavailable."
+                return nil
+            }
+            do {
+                let result = try PlayableTestGameRunner.runBattle(from: nativeSession)
+                let display = DZWPlayableBattleCompletionDisplay(fieldCommand: result.completion)
+                playableTestGameResult = result
+                completion = display
+                debriefError = nil
+                refresh()
+                recordAIEvent("Playable test game completed: \(result.antiGuderianStepCount) Anti-Guderian AI steps, \(result.germanStepCount) German AI steps.")
+                return display.record
+            } catch {
+                completion = nil
+                playableTestGameResult = nil
+                debriefError = "\(error)"
+                refresh()
+                return nil
+            }
+        case .lateCareer:
             playableTestGameResult = nil
-            debriefError = "\(error)"
-            refresh()
-            return nil
+            runSharedAutoplayToDebrief()
+            return completeBattle()
         }
     }
 
-    func completeBattle() -> CampaignCompletionRecord? {
+    func completeBattle() -> DZWPlayableCompletionRecord? {
         guard let session else {
             debriefError = "Board session unavailable."
             return nil
         }
 
-        do {
-            let result = try PlayableBattleCompletionResolver.completeBattle(from: session)
-            completion = result
+        switch source {
+        case .fieldCommand:
+            guard let nativeSession = session as? NativeBoardSession else {
+                debriefError = "Field-command board session unavailable."
+                return nil
+            }
+            do {
+                let result = try PlayableBattleCompletionResolver.completeBattle(from: nativeSession)
+                let display = DZWPlayableBattleCompletionDisplay(fieldCommand: result)
+                completion = display
+                playableTestGameResult = nil
+                debriefError = nil
+                refresh()
+                recordAIEvent("Debrief recorded: \(display.score) VP, \(display.victoryBandLabel).")
+                return display.record
+            } catch {
+                completion = nil
+                debriefError = "\(error)"
+                refresh()
+                return nil
+            }
+        case .lateCareer:
+            guard let lateCareerSession = session as? LateCareerNativeBoardSession,
+                  let result = UnifiedLateCareerCompletionResolver.completeBattle(from: lateCareerSession) else {
+                completion = nil
+                debriefError = "Late-career debrief is unavailable for \(source.battleTitle)."
+                refresh()
+                return nil
+            }
+            let display = DZWPlayableBattleCompletionDisplay(lateCareer: result)
+            completion = display
             playableTestGameResult = nil
             debriefError = nil
             refresh()
-            recordAIEvent("Debrief recorded: \(result.completionRecord.score) VP, \(result.completionRecord.victoryBand.rawValue).")
-            return result.completionRecord
-        } catch {
-            completion = nil
-            debriefError = "\(error)"
-            refresh()
-            return nil
+            recordAIEvent("Debrief recorded: \(display.score) VP, \(display.victoryBandLabel).")
+            return display.record
         }
     }
 
     private func refresh() {
-        snapshot = session?.snapshot()
+        snapshot = session?.playableBoardSnapshot()
         lastError = snapshot?.lastAction.detail ?? "Board session unavailable."
+    }
+
+    private func runSharedAutoplayToDebrief() {
+        let maxPhaseAdvances = max(24, source.targetTurnUpperBound * 8)
+        var phaseAdvances = 0
+
+        while let snapshot,
+              snapshot.turnNumber <= source.targetTurnUpperBound,
+              snapshot.mission.winner == .none,
+              phaseAdvances < maxPhaseAdvances {
+            runAutomatedActiveStep()
+            phaseAdvances += 1
+        }
+
+        recordAIEvent("Playable test game completed through \(phaseAdvances) shared board phases.")
     }
 
     private func recordAIEvent(_ message: String) {
@@ -300,10 +503,6 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         if aiTurnEvents.count > 8 {
             aiTurnEvents.removeFirst(aiTurnEvents.count - 8)
         }
-    }
-
-    private static func makeSession(for scenario: GuderianScenario, restartCount: Int) -> NativeBoardSession? {
-        NativeBoardSession(scenario: scenario, seed: UInt32(510_000 + scenario.order + restartCount * 97))
     }
 
     private static func prioritySummary(_ priorities: [String]) -> String {
@@ -360,7 +559,7 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
     func showDefaults(
         model: DZWPlayableBattleViewModel,
         assaultAdvance: Binding<Bool>,
-        onCompletion: @escaping (CampaignCompletionRecord) -> Void
+        onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
         for panel in [DZWPlayableBattlePanel.command, .inspector] {
             show(panel, model: model, assaultAdvance: assaultAdvance, onCompletion: onCompletion)
@@ -371,7 +570,7 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         _ panel: DZWPlayableBattlePanel,
         model: DZWPlayableBattleViewModel,
         assaultAdvance: Binding<Bool>,
-        onCompletion: @escaping (CampaignCompletionRecord) -> Void
+        onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
         if visiblePanels.contains(panel) {
             hide(panel)
@@ -384,7 +583,7 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         _ panel: DZWPlayableBattlePanel,
         model: DZWPlayableBattleViewModel,
         assaultAdvance: Binding<Bool>,
-        onCompletion: @escaping (CampaignCompletionRecord) -> Void
+        onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
         let window = windows[panel] ?? makeWindow(for: panel)
         window.contentViewController = NSHostingController(
@@ -502,7 +701,7 @@ private struct DZWPlayableBattlePanelWindow: View {
     let panel: DZWPlayableBattlePanel
     @ObservedObject var model: DZWPlayableBattleViewModel
     @Binding var assaultAdvance: Bool
-    let onCompletion: (CampaignCompletionRecord) -> Void
+    let onCompletion: (DZWPlayableCompletionRecord) -> Void
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
@@ -551,7 +750,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                 Text(model.title)
                     .font(.system(size: 26, weight: .black, design: .rounded))
                     .accessibilityIdentifier("battle-title")
-                Text("\(model.scenario.title) native scenario")
+                Text(model.nativeScenarioLabel)
                     .font(.headline)
                     .foregroundStyle(Color(red: 0.55, green: 0.39, blue: 0.12))
                 Text("Turn \(snapshot.turnNumber) | \(snapshot.activePlayer.rawValue) | \(snapshot.phase.rawValue)")
@@ -736,10 +935,10 @@ private struct DZWPlayableBattlePanelWindow: View {
                 .font(.headline)
 
             if let completion = model.completion {
-                Label(completion.completionRecord.victoryBand.rawValue, systemImage: "rosette")
+                Label(completion.victoryBandLabel, systemImage: "rosette")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.green)
-                Text("\(completion.completionRecord.score) VP | turn \(completion.completionRecord.completedTurn)")
+                Text("\(completion.score) VP | turn \(completion.completedTurn)")
                     .font(.caption.monospaced())
                 Text(completion.sourceName)
                     .font(.caption.weight(.semibold))
@@ -858,11 +1057,24 @@ struct DZWPlayableBattleView: View {
     @State private var dragPreview: [Int: CGPoint] = [:]
     @State private var assaultAdvance = true
     @State private var battlefieldZoom: CGFloat = 1
-    private let onCompletion: (CampaignCompletionRecord) -> Void
+    private let onCompletion: (DZWPlayableCompletionRecord) -> Void
 
     init(scenario: GuderianScenario, onCompletion: @escaping (CampaignCompletionRecord) -> Void = { _ in }) {
         _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(scenario: scenario))
-        self.onCompletion = onCompletion
+        self.onCompletion = { record in
+            if case .fieldCommand(let completionRecord) = record {
+                onCompletion(completionRecord)
+            }
+        }
+    }
+
+    init(lateCareerEntry: LateCareerGuderianPresentation, onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }) {
+        _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(lateCareerEntry: lateCareerEntry))
+        self.onCompletion = { record in
+            if case .lateCareer(let completionRecord) = record {
+                onCompletion(completionRecord)
+            }
+        }
     }
 
     var body: some View {
@@ -992,7 +1204,7 @@ struct DZWPlayableBattleView: View {
                     .font(.system(size: 31, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("battle-title")
-                Text("\(model.scenario.title) native scenario")
+                Text(model.nativeScenarioLabel)
                     .font(.headline)
                     .foregroundStyle(Color(red: 0.92, green: 0.78, blue: 0.42))
                 Text("Turn \(snapshot.turnNumber) | \(snapshot.activePlayer.rawValue) | \(snapshot.phase.rawValue)")
@@ -1229,10 +1441,10 @@ struct DZWPlayableBattleView: View {
                 .font(.headline)
 
             if let completion = model.completion {
-                Label(completion.completionRecord.victoryBand.rawValue, systemImage: "rosette")
+                Label(completion.victoryBandLabel, systemImage: "rosette")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.green)
-                Text("\(completion.completionRecord.score) VP | turn \(completion.completionRecord.completedTurn)")
+                Text("\(completion.score) VP | turn \(completion.completedTurn)")
                     .font(.caption.monospaced())
                 Text(completion.sourceName)
                     .font(.caption.weight(.semibold))
