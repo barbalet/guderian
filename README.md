@@ -68,6 +68,7 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 - Cycles 301-400: native full campaign, converting all 19 battles to scenario-specific units, terrain, actions, AI pressure, scoring, and debriefs.
 - Cycles 401-450: post-ship hardening, adding after-action analysis and deterministic campaign soak probes across every native battle.
 - Cycles 451-500: `derZweiteWeltkrieg` playable-screen rebase, beginning with Tuchola Forest as the accepted DZW-style board/sidebar/unit-control pilot and then carrying that screen parity through the campaign.
+- Cycles 591-650: 400% map-detail improvement and late-career command-context expansion, with post-1941 scenarios labeled as staff-influence or epilogue context rather than direct field command.
 
 Cycle 451 correction: after running `derZweiteWeltkrieg`, the accepted playability bar is the actual DZW battle screen: terrain board, objectives, opposing units, direct unit selection, draggable movement, phase/action controls, pending-choice handling, and a visible combat log. Earlier cycle 400/450 reports proved native data, diagnostics, and automation stability, but they overstated product playability because the Guderian app still surfaced a simplified board instead of the full DZW-style playable screen.
 
@@ -133,6 +134,30 @@ Cycle 545 update: battles 2-10, Wizna through Calais, now route from the battle-
 
 Cycle 590 update: the full 19-battle campaign now routes into the shared DZW-style playable screen. Dunkirk through Moscow/Tula/Kashira complete the same parity path as the earlier battles: terrain-backed board, selectable units, legal movement, phase flow, combat feedback, blocked-action reporting, German AI, debrief persistence, and GuderianTest playable-screen reporting.
 
+Cycle 595 update: the new career-scope ledger is in place for the map/detail expansion. The current 19 battles are classified by command relationship, Dunkirk is explicitly marked as adjacent campaign pressure, Moscow/Tula/Kashira carries an end-date caveat, and 15 late-career withdrawal/final-war candidates are cataloged only as Inspector General, Army General Staff, or post-dismissal context.
+
+Cycle 600 update: map-detail auditing is now in place for all 19 existing battlefields. The audit measures total map features, water, roads, railways, crossings, settlements, terrain, fortifications, objectives, deployment zones, pressure markers, annotations, line/marker balance, and coordinate density, then assigns a four-times-current target for each battle.
+
+Cycle 605 update: the map schema now supports canals, lakes, marshes, railways, fords, ferries, villages, urban districts, phase lines, and source-note metadata on maps, features, and deployment zones. These types are wired through rendering, native battle conversion, board terrain classification, readiness checks, and map-detail auditing.
+
+Cycle 610 update: the geography pipeline now creates cross-check records for every current battle. Each record includes a modern map visual guide, scenario-source references, feature anchors inferred from the scenario's map-feature intent, hand-authored abstract-coordinate workflow steps, and source notes that are appended to the current layouts before the 400% enrichment passes begin.
+
+Cycle 615 update: the Poland 1939 map enrichment pass is complete for Tuchola Forest, Wizna, Brzesc Litewski, and Kobryn. Those four maps now meet the cycle-600 four-times feature baseline with denser rivers, marshes, roads, railways, crossings, named villages or urban districts, fallback routes, and phase lines while preserving the playable battle flow.
+
+Cycle 620 update: the France 1940 map enrichment pass is complete for Sedan, Stonne, Montcornet, Amiens-Abbeville, Boulogne, Calais, Dunkirk, and Fall Rot. These eight maps now meet the cycle-600 four-times feature baseline with denser Meuse, Somme, Channel coast, harbor, canal, fortress, road, rail, crossing, urban, ridge, marsh, evacuation, withdrawal, and phase-line geography in the shared dzw layouts used by both Guderian and GuderianTest.
+
+Cycle 625 update: the 1941 Eastern Front map enrichment pass is complete for Bialystok-Minsk, Smolensk, Roslavl-Novozybkov, Kiev, Bryansk, Mtsensk, and Moscow/Tula/Kashira. These seven maps now meet the cycle-600 four-times feature baseline with denser river systems, rail corridors, road nets, pocket exits, forest belts, named settlements, urban districts, armor ambush terrain, winter lanes, crossings, marshes, and phase lines in the shared dzw layouts.
+
+Cycle 630 update: late-career set A is now concrete shared dzw staff-context data. Kursk armored-force pressure, Dnieper withdrawal and bridgeheads, Korsun-Cherkassy, and Kamenets-Podolsky have command-caveated battlefield records with maps, objectives, forces, and rules, but they remain outside the direct 19-battle Guderian field-command campaign until later integration.
+
+Cycle 635 update: late-career set B now covers 1944 withdrawal and bridgehead crises: Operation Bagration, Lvov-Sandomierz, Narew/Vistula bridgeheads, and the Warsaw-area defensive arcs. Each is shared dzw General Staff context data with detailed maps, objectives, forces, rules, and visible command caveats.
+
+Cycle 640 update: late-career set C now covers the 1945 collapse route through Vistula-Oder, Poznan, East Prussia/Elbing, and Kustrin/Oder bridgeheads. These battlefields add river, rail, fortress, lagoon, bridgehead, and withdrawal geography while remaining outside the direct field-command campaign.
+
+Cycle 645 update: late-career set D now covers Operation Solstice, East Pomeranian offensive, Seelow Heights epilogue, and Berlin/Halbe epilogue. The final two are explicitly post-dismissal context, and every record exposes a visible "not a Guderian field command" caveat for UI and tests.
+
+Cycle 650 update: the cycle 591-650 expansion is complete. The current 19-battle campaign remains fully routed to the DZW-style playable screen, the enriched maps remain acceptance-ready, and all 16 late-career staff/epilogue battlefields are linked to the shared dzw career ledger with command caveats.
+
 ## Run
 
 Build and test from the repository root:
@@ -162,9 +187,9 @@ Then upload `dist/Guderian-1.0.0.zip` to the GitHub release at `https://github.c
 
 ## Ship Status
 
-The campaign content and native automation layers are substantial, and the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 590 completes playable-screen parity for all 19 battles, from Tuchola Forest through Moscow/Tula/Kashira, with debrief, persistence, screen-parity automation, reusable surface routing, and GuderianTest reporting.
+The campaign content and native automation layers are substantial, and the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 590 completes playable-screen parity for all 19 battles, from Tuchola Forest through Moscow/Tula/Kashira, with debrief, persistence, screen-parity automation, reusable surface routing, and GuderianTest reporting. Cycle 595 starts the next expansion by locking the command-scope rules for richer maps and late-career context scenarios.
 
-Remaining playable-screen estimate: battles 1-19 are complete through cycle 590. There are no documented battle-parity cycles remaining; a separate 10-cycle hardening block can still be opened later if manual play exposes board-density, AI-stall, or readability flaws.
+Remaining playable-screen estimate: battles 1-19 are complete through cycle 590. Map-detail auditing, schema expansion, geography cross-checking, Poland map enrichment, France map enrichment, Eastern Front map enrichment, late-career staff/epilogue sets A-D, and integration acceptance are complete through cycle 650. There are no cycles remaining in the current 60-cycle map/detail and late-career expansion plan.
 
 ## App Identity
 

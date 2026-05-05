@@ -9,6 +9,301 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertEqual(Set(GuderianCampaignCatalog.all.map(\.id)).count, 19)
     }
 
+    func testCareerScopeLedgerSeparatesDirectBattlesFromLateCareerContext() {
+        XCTAssertEqual(GuderianCareerScopeCatalog.allCurrentScenarioIDs, Set(GuderianBattleID.allCases))
+        XCTAssertEqual(GuderianCareerScopeCatalog.record(for: .dunkirk)?.scope, .adjacentCampaignPressure)
+        XCTAssertTrue(GuderianCareerScopeCatalog.record(for: .dunkirk)?.requiresCommandCaveat == true)
+        XCTAssertEqual(GuderianCareerScopeCatalog.record(for: .tucholaForest)?.scope, .directFieldCommand)
+        XCTAssertEqual(GuderianCareerScopeCatalog.record(for: .sedan)?.scope, .directFieldCommand)
+
+        let lateCareer = GuderianCareerScopeCatalog.lateCareerExpansionCandidates
+        XCTAssertGreaterThanOrEqual(lateCareer.count, 15)
+        XCTAssertTrue(lateCareer.allSatisfy(\.requiresCommandCaveat))
+        XCTAssertTrue(lateCareer.contains { $0.title.contains("Vistula-Oder") })
+        XCTAssertTrue(lateCareer.contains { $0.scope == .postDismissalContext })
+    }
+
+    func testCycle600MapDetailAuditSetsPerBattleFourXTargets() {
+        let report = ScenarioMapDetailAuditCatalog.report()
+
+        XCTAssertEqual(report.scenarioCount, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(report.battleIDsNeedingEnrichment, GuderianCampaignCatalog.all.map(\.id))
+        XCTAssertEqual(report.minimumFeatureCount, report.currentFeatureCount * 4)
+        XCTAssertEqual(report.requiredAdditionalFeatureCount, report.currentFeatureCount * 3)
+        XCTAssertTrue(report.categoryGaps.contains(.totalMapFeatures))
+        XCTAssertTrue(report.categoryGaps.contains(.railways))
+
+        guard let tuchola = ScenarioMapDetailAuditCatalog.audit(for: .tucholaForest) else {
+            XCTFail("Tuchola Forest needs a map-detail audit")
+            return
+        }
+
+        XCTAssertEqual(tuchola.target.minimumFeatureCount, tuchola.metrics.mapFeatureCount * 4)
+        XCTAssertGreaterThan(tuchola.metrics.count(for: .water), 0)
+        XCTAssertGreaterThan(tuchola.metrics.count(for: .crossings), 0)
+    }
+
+    func testCycle605MapSchemaSupportsDetailedGeographyAndSourceNotes() {
+        let expectedKinds: Set<ScenarioMapElementKind> = [
+            .canal,
+            .lake,
+            .marsh,
+            .railway,
+            .ford,
+            .ferry,
+            .village,
+            .urbanDistrict,
+            .phaseLine,
+        ]
+
+        XCTAssertTrue(expectedKinds.isSubset(of: Set(ScenarioMapElementKind.allCases)))
+
+        let source = ScenarioMapSourceNote(
+            title: "Schema source",
+            url: URL(string: "https://example.com/schema"),
+            note: "Verifies source-note metadata without relying on real map data."
+        )
+        let layout = ScenarioMapLayout(
+            id: .sedan,
+            title: "Schema probe",
+            elements: [
+                ScenarioMapElement(id: "canal", name: "Canal", kind: .canal, points: [ScenarioMapPoint(1, 1), ScenarioMapPoint(4, 1)], sourceNotes: [source]),
+                ScenarioMapElement(id: "rail", name: "Railway", kind: .railway, points: [ScenarioMapPoint(1, 3), ScenarioMapPoint(4, 3)]),
+                ScenarioMapElement(id: "village", name: "Village", kind: .village, points: [ScenarioMapPoint(2, 5)], radius: 2),
+                ScenarioMapElement(id: "phase", name: "Phase line", kind: .phaseLine, points: [ScenarioMapPoint(0, 7), ScenarioMapPoint(8, 7)]),
+            ],
+            deploymentZones: [
+                ScenarioDeploymentZone(id: "player", name: "Player", side: .player, origin: ScenarioMapPoint(0, 0), width: 4, height: 4, note: "Start"),
+                ScenarioDeploymentZone(id: "ai", name: "AI", side: .guderianAI, origin: ScenarioMapPoint(4, 0), width: 4, height: 4, note: "Start"),
+            ],
+            sourceNotes: [source]
+        )
+        let metrics = ScenarioMapDetailMetrics(layout: layout)
+
+        XCTAssertEqual(metrics.count(for: .water), 1)
+        XCTAssertEqual(metrics.count(for: .railways), 1)
+        XCTAssertEqual(metrics.count(for: .settlements), 1)
+        XCTAssertEqual(metrics.count(for: .sourceNotes), 2)
+        XCTAssertFalse(ScenarioMapElementKind.phaseLine.isPlayableTerrainFeature)
+    }
+
+    func testCycle610GeographyPipelineCreatesCrossCheckRecordsAndMapSourceNotes() throws {
+        let report = ScenarioMapGeographyPipelineCatalog.report()
+
+        XCTAssertEqual(report.scenarioCount, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(report.readyScenarioIDs, GuderianCampaignCatalog.all.map(\.id))
+        XCTAssertEqual(report.modernVisualReferenceCount, GuderianCampaignCatalog.all.count)
+        XCTAssertGreaterThan(report.featureVisualReferenceCount, report.scenarioCount)
+
+        let tuchola = try XCTUnwrap(ScenarioMapGeographyPipelineCatalog.record(for: .tucholaForest))
+
+        XCTAssertTrue(tuchola.workflowSteps.contains(.traceWaterAndTerrain))
+        XCTAssertTrue(tuchola.workflowSteps.contains(.traceTransportAndCrossings))
+        XCTAssertTrue(tuchola.workflowSteps.contains(.handAuthorAbstractCoordinates))
+        XCTAssertTrue(tuchola.visualGuideReferences.contains { $0.url.absoluteString.contains("google.com/maps/search") })
+        XCTAssertTrue(tuchola.anchors.contains { $0.expectedKind == .bridge || $0.targetCategories.contains(.crossings) })
+        XCTAssertTrue(tuchola.requiredDetailCategories.contains(.settlements))
+
+        let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let layout = ScenarioMapCatalog.layout(for: scenario)
+
+        XCTAssertGreaterThanOrEqual(layout.sourceNotes.count, scenario.sourceLinks.count + 1)
+        XCTAssertTrue(layout.sourceNotes.allSatisfy { !$0.note.isEmpty })
+    }
+
+    func testCycle615PolandMapsMeetFourXEnrichmentBaseline() throws {
+        let cycle600BaselineFeatureCounts: [GuderianBattleID: Int] = [
+            .tucholaForest: 14,
+            .wizna: 9,
+            .brzescLitewski: 11,
+            .kobryn: 10,
+        ]
+        let polandIDs: [GuderianBattleID] = [.tucholaForest, .wizna, .brzescLitewski, .kobryn]
+
+        for id in polandIDs {
+            let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: id))
+            let layout = ScenarioMapCatalog.layout(for: scenario)
+            let metrics = ScenarioMapDetailMetrics(layout: layout)
+            let baseline = try XCTUnwrap(cycle600BaselineFeatureCounts[id])
+
+            XCTAssertGreaterThanOrEqual(metrics.mapFeatureCount, baseline * 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .water), 3, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .roads), 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .railways), 1, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .crossings), 3, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .settlements), 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .groundTerrain), 4, scenario.title)
+            XCTAssertTrue(layout.elements.contains { $0.kind == .phaseLine }, scenario.title)
+        }
+    }
+
+    func testCycle620FranceMapsMeetFourXEnrichmentBaseline() throws {
+        let cycle600BaselineFeatureCounts: [GuderianBattleID: Int] = [
+            .sedan: 10,
+            .stonne: 9,
+            .montcornet: 9,
+            .amiensAbbeville: 10,
+            .boulogne: 10,
+            .calais: 10,
+            .dunkirk: 11,
+            .fallRot: 10,
+        ]
+        let franceIDs: [GuderianBattleID] = [
+            .sedan,
+            .stonne,
+            .montcornet,
+            .amiensAbbeville,
+            .boulogne,
+            .calais,
+            .dunkirk,
+            .fallRot,
+        ]
+
+        for id in franceIDs {
+            let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: id))
+            let layout = ScenarioMapCatalog.layout(for: scenario)
+            let metrics = ScenarioMapDetailMetrics(layout: layout)
+            let baseline = try XCTUnwrap(cycle600BaselineFeatureCounts[id])
+
+            XCTAssertGreaterThanOrEqual(metrics.mapFeatureCount, baseline * 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .water), 3, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .roads), 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .railways), 1, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .crossings), 3, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .settlements), 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .groundTerrain), 4, scenario.title)
+            XCTAssertTrue(layout.elements.contains { $0.kind == .urbanDistrict }, scenario.title)
+            XCTAssertTrue(layout.elements.contains { $0.kind == .phaseLine }, scenario.title)
+        }
+    }
+
+    func testCycle625EasternFrontMapsMeetFourXEnrichmentBaseline() throws {
+        let cycle600BaselineFeatureCounts: [GuderianBattleID: Int] = [
+            .bialystokMinsk: 11,
+            .smolensk: 13,
+            .roslavlNovozybkov: 12,
+            .kiev: 12,
+            .bryansk: 13,
+            .mtsensk: 13,
+            .moscowTulaKashira: 16,
+        ]
+        let easternFrontIDs: [GuderianBattleID] = [
+            .bialystokMinsk,
+            .smolensk,
+            .roslavlNovozybkov,
+            .kiev,
+            .bryansk,
+            .mtsensk,
+            .moscowTulaKashira,
+        ]
+
+        for id in easternFrontIDs {
+            let scenario = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: id))
+            let layout = ScenarioMapCatalog.layout(for: scenario)
+            let metrics = ScenarioMapDetailMetrics(layout: layout)
+            let baseline = try XCTUnwrap(cycle600BaselineFeatureCounts[id])
+
+            XCTAssertGreaterThanOrEqual(metrics.mapFeatureCount, baseline * 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .water), 3, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .roads), 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .railways), 1, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .crossings), 3, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .settlements), 4, scenario.title)
+            XCTAssertGreaterThanOrEqual(metrics.count(for: .groundTerrain), 4, scenario.title)
+            XCTAssertTrue(layout.elements.contains { $0.kind == .railway }, scenario.title)
+            XCTAssertTrue(layout.elements.contains { $0.kind == .forest }, scenario.title)
+            XCTAssertTrue(layout.elements.contains { $0.kind == .urbanDistrict }, scenario.title)
+            XCTAssertTrue(layout.elements.contains { $0.kind == .phaseLine }, scenario.title)
+        }
+    }
+
+    func testCycle630LateCareerSetAStaffContextBattlefieldsAreReady() throws {
+        let catalog = LateCareerStaffBattlefieldSetACatalog.self
+        let currentBattleRawIDs = Set(GuderianBattleID.allCases.map(\.rawValue))
+
+        XCTAssertEqual(catalog.cycleRange, 626...630)
+        XCTAssertEqual(catalog.allBattlefields.map(\.id), GuderianCareerScopeCatalog.lateCareerSetACandidateIDs)
+        XCTAssertTrue(catalog.allBattlefieldsReady)
+        XCTAssertEqual(GuderianCampaignCatalog.all.count, 19)
+
+        for battlefield in catalog.allBattlefields {
+            let candidate = try XCTUnwrap(GuderianCareerScopeCatalog.expansionCandidate(for: battlefield.id))
+
+            XCTAssertFalse(currentBattleRawIDs.contains(battlefield.id), battlefield.title)
+            XCTAssertEqual(battlefield.title, candidate.title)
+            XCTAssertEqual(battlefield.scope, .inspectorGeneralInfluence, battlefield.title)
+            XCTAssertTrue(battlefield.requiresCommandCaveat, battlefield.title)
+            XCTAssertTrue(battlefield.commandCaveat.localizedCaseInsensitiveContains("not a Guderian field command"), battlefield.title)
+            XCTAssertTrue(battlefield.map.hasRequiredStaffContextDetail, battlefield.title)
+            XCTAssertGreaterThanOrEqual(battlefield.objectives.count, 4, battlefield.title)
+            XCTAssertGreaterThanOrEqual(battlefield.rules.count, 4, battlefield.title)
+            XCTAssertTrue(battlefield.forces.contains { $0.side == .player }, battlefield.title)
+            XCTAssertTrue(battlefield.forces.contains { $0.side == .guderianAI }, battlefield.title)
+            XCTAssertTrue(battlefield.map.elements.contains { $0.kind == .railway }, battlefield.title)
+            XCTAssertTrue(battlefield.map.elements.contains { $0.kind == .phaseLine }, battlefield.title)
+        }
+    }
+
+    func testCycle635Through645RemainingLateCareerSetsAreReady() throws {
+        XCTAssertEqual(LateCareerStaffBattlefieldSetBCatalog.cycleRange, 631...635)
+        XCTAssertEqual(LateCareerStaffBattlefieldSetCCatalog.cycleRange, 636...640)
+        XCTAssertEqual(LateCareerStaffBattlefieldSetDCatalog.cycleRange, 641...645)
+        XCTAssertTrue(LateCareerStaffBattlefieldSetBCatalog.allBattlefieldsReady)
+        XCTAssertTrue(LateCareerStaffBattlefieldSetCCatalog.allBattlefieldsReady)
+        XCTAssertTrue(LateCareerStaffBattlefieldSetDCatalog.allBattlefieldsReady)
+
+        let battlefields = LateCareerStaffBattlefieldSetBCatalog.allBattlefields +
+            LateCareerStaffBattlefieldSetCCatalog.allBattlefields +
+            LateCareerStaffBattlefieldSetDCatalog.allBattlefields
+
+        XCTAssertEqual(battlefields.count, 12)
+        XCTAssertEqual(Set(battlefields.map(\.id)).count, 12)
+        XCTAssertTrue(battlefields.contains { $0.id == "warsaw-defensive-arcs" })
+        XCTAssertTrue(battlefields.contains { $0.id == "kustrin-oder-bridgeheads" })
+
+        for battlefield in battlefields {
+            let candidate = try XCTUnwrap(GuderianCareerScopeCatalog.expansionCandidate(for: battlefield.id))
+
+            XCTAssertEqual(battlefield.title, candidate.title)
+            XCTAssertEqual(battlefield.scope, candidate.scope, battlefield.title)
+            XCTAssertTrue(battlefield.isLateCareerReady, battlefield.title)
+            XCTAssertTrue(battlefield.map.hasRequiredStaffContextDetail, battlefield.title)
+            XCTAssertTrue(battlefield.visibleCommandCaveatLabel.contains(battlefield.scope.rawValue), battlefield.title)
+            XCTAssertTrue(battlefield.visibleCommandCaveatLabel.localizedCaseInsensitiveContains("not a Guderian field command"), battlefield.title)
+            XCTAssertTrue(battlefield.objectives.contains { $0.side == .player }, battlefield.title)
+            XCTAssertTrue(battlefield.objectives.contains { $0.side == .guderianAI }, battlefield.title)
+            XCTAssertTrue(battlefield.forces.contains { $0.side == .player }, battlefield.title)
+            XCTAssertTrue(battlefield.forces.contains { $0.side == .guderianAI }, battlefield.title)
+        }
+
+        let epilogues = LateCareerStaffBattlefieldSetDCatalog.allBattlefields.filter { $0.scope == .postDismissalContext }
+        XCTAssertEqual(epilogues.map(\.id), ["seelow-heights-epilogue", "berlin-halbe-epilogue"])
+    }
+
+    func testCycle650LateCareerAcceptanceReportIsReady() {
+        let report = LateCareerStaffBattlefieldAcceptanceCatalog.report
+
+        XCTAssertEqual(LateCareerStaffBattlefieldAcceptanceCatalog.cycleRange, 646...650)
+        XCTAssertTrue(report.isReadyForAcceptance)
+        XCTAssertEqual(report.currentPlayableBattleCount, GuderianCampaignCatalog.all.count)
+        XCTAssertEqual(report.routedPlayableBattleCount, PlayableBattleSurfaceCatalog.routedBattleIDs.count)
+        XCTAssertEqual(report.currentPlayableBattleCount, 19)
+        XCTAssertEqual(report.lateCareerBattlefieldCount, 16)
+        XCTAssertEqual(report.commandCaveatCount, 16)
+        XCTAssertEqual(report.postDismissalBattlefieldCount, 2)
+        XCTAssertTrue(report.currentCampaignMapDetailReady)
+        XCTAssertTrue(report.allLateCareerBattlefieldsReady)
+        XCTAssertTrue(report.allBattlefieldIDsMatchLedger)
+        XCTAssertEqual(
+            LateCareerStaffBattlefieldAcceptanceCatalog.allLateCareerBattlefieldIDs,
+            GuderianCareerScopeCatalog.lateCareerBattlefieldCandidateIDs
+        )
+        XCTAssertEqual(
+            LateCareerStaffBattlefieldAcceptanceCatalog.allLateCareerBattlefields.map(\.order),
+            Array(1...16)
+        )
+    }
+
     func testCampaignCatalogIsChronologicalWithinStableOrder() {
         let scenarios = GuderianCampaignCatalog.all
 

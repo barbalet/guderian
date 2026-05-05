@@ -135,11 +135,15 @@ struct ScenarioMapView: View {
 
     private func color(for element: ScenarioMapElement) -> Color {
         switch element.kind {
-        case .road:
+        case .road, .phaseLine:
             return Color(red: 0.43, green: 0.39, blue: 0.34)
-        case .river:
+        case .river, .canal, .lake:
             return Color(red: 0.16, green: 0.45, blue: 0.72)
-        case .town:
+        case .marsh:
+            return Color(red: 0.32, green: 0.50, blue: 0.42)
+        case .railway:
+            return Color(red: 0.24, green: 0.23, blue: 0.22)
+        case .town, .village, .urbanDistrict:
             return Color(red: 0.56, green: 0.49, blue: 0.45)
         case .forest:
             return Color(red: 0.21, green: 0.47, blue: 0.27)
@@ -147,7 +151,7 @@ struct ScenarioMapView: View {
             return Color(red: 0.50, green: 0.44, blue: 0.29)
         case .bunker, .fortifiedLine:
             return Color(red: 0.36, green: 0.36, blue: 0.38)
-        case .bridge:
+        case .bridge, .ford, .ferry:
             return Color(red: 0.90, green: 0.64, blue: 0.20)
         case .objective:
             return Color(red: 0.40, green: 0.27, blue: 0.68)
@@ -175,10 +179,16 @@ struct ScenarioMapView: View {
         switch kind {
         case .road:
             return "road.lanes"
-        case .river:
+        case .river, .canal, .lake:
             return "water.waves"
-        case .town:
+        case .marsh:
+            return "leaf"
+        case .railway:
+            return "tram"
+        case .town, .urbanDistrict:
             return "building.2"
+        case .village:
+            return "house"
         case .forest:
             return "tree"
         case .ridge:
@@ -187,6 +197,10 @@ struct ScenarioMapView: View {
             return "shield"
         case .bridge:
             return "arrow.left.and.right"
+        case .ford:
+            return "figure.walk"
+        case .ferry:
+            return "ferry"
         case .objective:
             return "target"
         case .artillery:
@@ -195,6 +209,8 @@ struct ScenarioMapView: View {
             return "airplane"
         case .deployment:
             return "square.dashed"
+        case .phaseLine:
+            return "flag.checkered"
         }
     }
 }
