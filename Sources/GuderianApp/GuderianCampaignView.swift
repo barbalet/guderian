@@ -50,6 +50,7 @@ public struct GuderianCampaignView: View {
     private let scenarios = GuderianCampaignCatalog.all.sorted { $0.order < $1.order }
     private let lateCareerEntries = LateCareerGuderianPresentationCatalog.allEntries
     @State private var selectedID: GuderianBattleID? = .tucholaForest
+    @State private var selectedBattleID = UnifiedGuderianBattleID.fieldCommand(.tucholaForest)
     @State private var progress = CampaignProgress()
     @State private var lateCareerProgress = LateCareerProgress()
     @State private var playMode: CampaignPlayMode = .chronological
@@ -58,6 +59,7 @@ public struct GuderianCampaignView: View {
     @State private var hasLoadedLateCareerState = false
     @AppStorage("guderian.campaignSaveState.v1") private var savedCampaignStateData = Data()
     @AppStorage("guderian.lateCareerProgress.v1") private var savedLateCareerProgressData = Data()
+    @AppStorage("guderian.unifiedCampaignSave.v2") private var savedUnifiedCampaignStateData = Data()
 
     private var selectedScenario: GuderianScenario {
         scenarios.first { $0.id == selectedID } ?? scenarios[0]
@@ -69,6 +71,29 @@ public struct GuderianCampaignView: View {
 
     private var lateCareerCompletionSummary: LateCareerCompletionSummary {
         lateCareerProgress.completionSummary(catalog: lateCareerEntries)
+    }
+
+    private var unifiedProgress: UnifiedCampaignProgress {
+        UnifiedCampaignProgressCatalog.progress(
+            fieldCommandProgress: progress,
+            lateCareerProgress: lateCareerProgress
+        )
+    }
+
+    private var unifiedCompletionSummary: UnifiedCampaignCompletionSummary {
+        unifiedProgress.summary()
+    }
+
+    private var unifiedProgressLabel: String {
+        unifiedCompletionSummary.progressLabel
+    }
+
+    private var unifiedRows: [UnifiedCampaignListRow] {
+        UnifiedCampaignListCatalog.rows(
+            progress: progress,
+            lateCareerProgress: lateCareerProgress,
+            playMode: playMode
+        )
     }
 
     private var shipReport: FullCampaignShipReport {
@@ -85,11 +110,37 @@ public struct GuderianCampaignView: View {
         NavigationStack {
             List {
                 campaignStatusSection
-                scenarioListSection
-                lateCareerListSection
+                unifiedBattleListSection
             }
             .listStyle(.inset)
             .navigationTitle("Campaign")
+            .navigationDestination(for: UnifiedGuderianBattleID.self) { id in
+                switch id.kind {
+                case .fieldCommand:
+                    if let battleID = GuderianBattleID(rawValue: id.rawValue),
+                       let scenario = scenarios.first(where: { $0.id == battleID }) {
+                        ScenarioBriefingView(
+                            scenario: scenario,
+                            progress: progress,
+                            playMode: playMode,
+                            shipReport: shipReport
+                        ) { record in
+                            progress.recordCompletion(record)
+                        }
+                        .navigationTitle(scenario.title)
+                    }
+                case .lateCareer:
+                    if let entry = LateCareerGuderianPresentationCatalog.entry(for: id.rawValue) {
+                        UnifiedLateCareerBattleDestinationView(
+                            entry: entry,
+                            completionRecord: lateCareerProgress.completionRecord(for: entry.id)
+                        ) { record in
+                            lateCareerProgress.recordCompletion(record)
+                        }
+                        .navigationTitle(entry.title)
+                    }
+                }
+            }
             .navigationDestination(for: GuderianBattleID.self) { id in
                 if let scenario = scenarios.first(where: { $0.id == id }) {
                     ScenarioBriefingView(
@@ -107,36 +158,28 @@ public struct GuderianCampaignView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Button {
-                            let balance = ScenarioContentCatalog.bundle(for: selectedScenario).balance
-                            progress.recordCompletion(
-                                CampaignCompletionRecord(
-                                    scenarioID: selectedScenario.id,
-                                    score: balance.maxPlayerScore,
-                                    victoryBand: .operational,
-                                    completedTurn: balance.targetTurns.upperBound,
-                                    note: "Marked complete from the campaign workspace."
-                                )
-                            )
+                            markSelectedBattleComplete()
                         } label: {
-                            Label("Complete", systemImage: "checkmark.circle")
+                            Label("Complete Selected", systemImage: "checkmark.circle")
                         }
-                        .accessibilityLabel("Mark selected scenario complete")
+                        .accessibilityLabel("Mark selected battle complete")
                         .accessibilityIdentifier("complete-scenario-button")
 
                         Button {
-                            markAllScenariosComplete()
+                            markAllBattlesComplete()
                         } label: {
-                            Label("Complete All", systemImage: "checkmark.seal")
+                            Label("Complete All 35", systemImage: "checkmark.seal")
                         }
-                        .accessibilityLabel("Mark full campaign complete")
+                        .accessibilityLabel("Mark all 35 battles complete")
                         .accessibilityIdentifier("complete-all-scenarios-button")
 
                         Button {
                             progress.reset()
+                            lateCareerProgress.reset()
                         } label: {
-                            Label("Reset", systemImage: "arrow.counterclockwise")
+                            Label("Reset 35", systemImage: "arrow.counterclockwise")
                         }
-                        .accessibilityLabel("Reset campaign progress")
+                        .accessibilityLabel("Reset 35-battle campaign progress")
                         .accessibilityIdentifier("reset-campaign-button")
                     }
                     .buttonStyle(.borderless)
@@ -160,25 +203,6 @@ public struct GuderianCampaignView: View {
                     }
                     .buttonStyle(.borderless)
 
-                    HStack {
-                        Button {
-                            markAllLateCareerComplete()
-                        } label: {
-                            Label("Complete Late Career", systemImage: "checkmark.seal")
-                        }
-                        .accessibilityLabel("Mark all late career context battlefields complete")
-                        .accessibilityIdentifier("complete-all-late-career-button")
-
-                        Button {
-                            lateCareerProgress.reset()
-                        } label: {
-                            Label("Reset Late Career", systemImage: "arrow.counterclockwise.circle")
-                        }
-                        .accessibilityLabel("Reset late career context progress")
-                        .accessibilityIdentifier("reset-late-career-button")
-                    }
-                    .buttonStyle(.borderless)
-
                     RendererStatusView()
                 }
                     .padding(10)
@@ -191,6 +215,9 @@ public struct GuderianCampaignView: View {
             loadSavedLateCareerState()
         }
         .onChange(of: selectedID) { _, _ in
+            persistCampaignState()
+        }
+        .onChange(of: selectedBattleID) { _, _ in
             persistCampaignState()
         }
         .onChange(of: progress) { _, _ in
@@ -207,24 +234,21 @@ public struct GuderianCampaignView: View {
     private var campaignStatusSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                Text(completionSummary.progressLabel)
+                Text(unifiedProgressLabel)
                     .font(.headline)
-                Text("\(progress.availableScenarios(in: playMode, catalog: scenarios).count) available | \(playMode.rawValue)")
+                Text("\(unifiedRows.filter(\.isAvailable).count) available | \(playMode.rawValue)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(shipReport.isShipReady ? "Full campaign ship-ready" : "\(shipReport.blockers.count) ship blockers")
+                Text(UnifiedCampaignAcceptanceCatalog.acceptanceReadyThroughCycle830 ? UnifiedDocumentationCleanupCatalog.inAppUnifiedLabel : "\(UnifiedCampaignAcceptanceCatalog.report().blockers.count) unified blockers")
                     .font(.caption)
-                    .foregroundStyle(shipReport.isShipReady ? .green : .orange)
-                Text("\(lateCareerEntries.count) late-career context battlefields | \(LateCareerPlayableSurfaceCatalog.routedEntries.count) routed")
+                    .foregroundStyle(UnifiedCampaignAcceptanceCatalog.acceptanceReadyThroughCycle830 ? .green : .orange)
+                Text("\(UnifiedGuderianBattleCatalog.allEntries.count) battles | one \(UnifiedGuderianBattleCatalog.hostSurfaceName) UI")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text(lateCareerCompletionSummary.progressLabel)
-                    .font(.caption)
-                    .foregroundStyle(lateCareerCompletionSummary.isComplete ? .green : .secondary)
             }
             .padding(.vertical, 4)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(completionSummary.progressLabel), \(progress.availableScenarios(in: playMode, catalog: scenarios).count) available, \(lateCareerCompletionSummary.progressLabel), \(shipReport.isShipReady ? "ship ready" : "ship blockers present")")
+            .accessibilityLabel("\(unifiedProgressLabel), \(unifiedRows.filter(\.isAvailable).count) available, \(UnifiedCampaignAcceptanceCatalog.acceptanceReadyThroughCycle830 ? "unified 35-battle campaign ready" : "unified blockers present")")
 
             Picker("Play mode", selection: $playMode) {
                 Text(CampaignPlayMode.chronological.rawValue).tag(CampaignPlayMode.chronological)
@@ -232,6 +256,28 @@ public struct GuderianCampaignView: View {
             }
             .pickerStyle(.segmented)
             .accessibilityLabel("Campaign play mode")
+        }
+    }
+
+    private var unifiedBattleListSection: some View {
+        Section(UnifiedCampaignListCatalog.sectionTitle) {
+            ForEach(unifiedRows) { row in
+                NavigationLink(value: row.id) {
+                    UnifiedCampaignBattleRow(row: row)
+                }
+                .disabled(!row.isAvailable)
+                .simultaneousGesture(TapGesture().onEnded {
+                    guard row.isAvailable else {
+                        return
+                    }
+                    selectedBattleID = row.id
+                    if row.id.kind == .fieldCommand,
+                       let battleID = GuderianBattleID(rawValue: row.id.rawValue) {
+                        selectedID = battleID
+                    }
+                })
+                .accessibilityIdentifier(row.navigationAccessibilityIdentifier)
+            }
         }
     }
 
@@ -294,6 +340,35 @@ public struct GuderianCampaignView: View {
         }
     }
 
+    private func markSelectedBattleComplete() {
+        switch selectedBattleID.kind {
+        case .fieldCommand:
+            guard let battleID = GuderianBattleID(rawValue: selectedBattleID.rawValue),
+                  let scenario = scenarios.first(where: { $0.id == battleID }) else {
+                return
+            }
+            let balance = ScenarioContentCatalog.bundle(for: scenario).balance
+            progress.recordCompletion(
+                CampaignCompletionRecord(
+                    scenarioID: scenario.id,
+                    score: balance.maxPlayerScore,
+                    victoryBand: .operational,
+                    completedTurn: balance.targetTurns.upperBound,
+                    note: "Marked complete from the unified campaign workspace."
+                )
+            )
+        case .lateCareer:
+            if let summary = UnifiedLateCareerScoringDebriefCatalog.completionSummaries.first(where: { $0.completionRecord.battlefieldID == selectedBattleID.rawValue }) {
+                lateCareerProgress.recordCompletion(summary.completionRecord)
+            }
+        }
+    }
+
+    private func markAllBattlesComplete() {
+        markAllScenariosComplete()
+        markAllLateCareerComplete()
+    }
+
     private func markAllLateCareerComplete() {
         lateCareerProgress.recordAllParityCompletions()
     }
@@ -307,6 +382,7 @@ public struct GuderianCampaignView: View {
         if let data = try? CampaignSaveCodec.encode(state) {
             savedCampaignStateData = data
         }
+        persistUnifiedCampaignState()
     }
 
     private func loadSavedCampaignState(force: Bool = false) {
@@ -314,21 +390,40 @@ public struct GuderianCampaignView: View {
             return
         }
         hasLoadedSaveState = true
-        guard let state = CampaignSaveCodec.decodeIfCurrent(savedCampaignStateData) else {
-            persistCampaignState()
-            return
-        }
 
-        progress = state.progress
-        playMode = state.playMode
-        if scenarios.contains(where: { $0.id == state.selectedScenarioID }) {
-            selectedID = state.selectedScenarioID
+        let envelope = UnifiedCampaignSaveCodec.decodeOrMigrate(
+            unifiedData: savedUnifiedCampaignStateData,
+            legacyCampaignData: savedCampaignStateData,
+            legacyLateCareerData: savedLateCareerProgressData
+        )
+        progress = envelope.progress.fieldCommandProgress
+        lateCareerProgress = envelope.progress.lateCareerProgress
+        playMode = envelope.playMode
+        selectedBattleID = envelope.selectedBattleID
+        if envelope.selectedBattleID.kind == .fieldCommand,
+           let battleID = GuderianBattleID(rawValue: envelope.selectedBattleID.rawValue),
+           scenarios.contains(where: { $0.id == battleID }) {
+            selectedID = battleID
         }
+        hasLoadedLateCareerState = true
+        persistUnifiedCampaignState()
     }
 
     private func persistLateCareerState() {
         if let data = try? LateCareerProgressCodec.encode(lateCareerProgress) {
             savedLateCareerProgressData = data
+        }
+        persistUnifiedCampaignState()
+    }
+
+    private func persistUnifiedCampaignState() {
+        let envelope = UnifiedCampaignSaveEnvelope(
+            selectedBattleID: selectedBattleID,
+            playMode: playMode,
+            progress: unifiedProgress
+        )
+        if let data = try? UnifiedCampaignSaveCodec.encode(envelope) {
+            savedUnifiedCampaignStateData = data
         }
     }
 
@@ -398,6 +493,306 @@ struct ScenarioRow: View {
             return .accentColor
         }
         return .secondary
+    }
+}
+
+struct UnifiedCampaignBattleRow: View {
+    let row: UnifiedCampaignListRow
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Image(systemName: iconName)
+                    .foregroundStyle(iconColor)
+                    .frame(width: 18)
+                    .accessibilityHidden(true)
+                Text("\(row.numberLabel) \(row.title)")
+                    .font(.headline)
+                Spacer()
+                Label(row.playAffordanceTitle, systemImage: "play.circle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(row.isAvailable ? Color.accentColor : Color.secondary)
+            }
+            Text(row.dateLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(row.scopeLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let caveatLabel = row.caveatLabel {
+                Text(caveatLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(row.order). \(row.title), \(row.dateLabel), \(row.scopeLabel), \(row.completionState.rawValue), \(row.availability.rawValue)")
+        .accessibilityIdentifier(row.rowAccessibilityIdentifier)
+    }
+
+    private var iconName: String {
+        if row.completionState == .complete {
+            return "checkmark.circle.fill"
+        }
+        if row.isAvailable {
+            return "circle.dashed"
+        }
+        return "lock"
+    }
+
+    private var iconColor: Color {
+        if row.completionState == .complete {
+            return .green
+        }
+        if row.isAvailable {
+            return .accentColor
+        }
+        return .secondary
+    }
+}
+
+struct UnifiedLateCareerBattleDestinationView: View {
+    let entry: LateCareerGuderianPresentation
+    let completionRecord: LateCareerCompletionRecord?
+    let onCompletion: (LateCareerCompletionRecord) -> Void
+
+    var body: some View {
+        if UnifiedPlayableBoardRouteCatalog.isRoutedToPlayableBattleView(.lateCareer(entry.id)) {
+            LateCareerUnifiedPlayableBoardView(
+                entry: entry,
+                completionRecord: completionRecord,
+                onCompletion: onCompletion
+            )
+        } else {
+            LateCareerSharedBriefingView(
+                entry: entry,
+                completionRecord: completionRecord,
+                onCompletion: onCompletion
+            )
+        }
+    }
+}
+
+struct LateCareerSharedBriefingView: View {
+    let entry: LateCareerGuderianPresentation
+    let completionRecord: LateCareerCompletionRecord?
+    let onCompletion: (LateCareerCompletionRecord) -> Void
+    @State private var zoom: CGFloat = 1
+    @State private var selectedForceID: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                LateCareerHeader(entry: entry)
+                LateCareerMetricStrip(entry: entry)
+                LateCareerMapSurface(entry: entry, zoom: $zoom, height: 520)
+                LateCareerTextSection(title: "Player Force", text: entry.playerRole, icon: "person.crop.square")
+                LateCareerTextSection(title: "German Context", text: entry.germanContext, icon: "bolt.horizontal")
+                LateCareerTextSection(title: "Design Intent", text: entry.playableFraming, icon: "scope")
+                LateCareerObjectiveGrid(entry: entry)
+                LateCareerForceGrid(entry: entry, selectedForceID: $selectedForceID)
+                LateCareerRuleList(entry: entry)
+                LateCareerSourcesList(entry: entry)
+                if let completionRecord {
+                    Label("\(completionRecord.score) VP recorded", systemImage: "rosette")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .accessibilityIdentifier("battle-persisted-result")
+                }
+            }
+            .padding(28)
+            .frame(maxWidth: 1240, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityIdentifier("unified-battle-briefing-\(entry.id)")
+    }
+}
+
+struct LateCareerUnifiedPlayableBoardView: View {
+    let entry: LateCareerGuderianPresentation
+    let onCompletion: (LateCareerCompletionRecord) -> Void
+    @State private var zoom: CGFloat = 1
+    @State private var completionRecord: LateCareerCompletionRecord?
+    @State private var actionLog: [String]
+
+    init(
+        entry: LateCareerGuderianPresentation,
+        completionRecord: LateCareerCompletionRecord? = nil,
+        onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }
+    ) {
+        self.entry = entry
+        self.onCompletion = onCompletion
+        _completionRecord = State(initialValue: completionRecord)
+        _actionLog = State(initialValue: [Self.initialLogLine(for: entry)])
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
+                LateCareerHeader(entry: entry)
+                LateCareerMetricStrip(entry: entry)
+                LateCareerMapSurface(entry: entry, zoom: $zoom, height: 560)
+                    .accessibilityIdentifier("battle-board")
+            }
+            .padding(20)
+            .frame(minWidth: 680, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    playableControls
+                    routePanel
+                    LateCareerPlayableStatusPanel(entry: entry, report: report, completionRecord: completionRecord)
+                        .accessibilityIdentifier("battle-debrief-panel")
+                    LateCareerObjectiveGrid(entry: entry)
+                    LateCareerRuleList(entry: entry)
+                    LateCareerAIPlanPanel(plan: aiPlan)
+                    actionLogPanel
+                    LateCareerSourcesList(entry: entry)
+                }
+                .padding(18)
+            }
+            .frame(width: 390)
+            .background(Color(nsColor: .controlBackgroundColor))
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityIdentifier("battle-screen")
+    }
+
+    private var route: UnifiedPlayableBattleRoute? {
+        UnifiedPlayableBoardRouteCatalog.route(for: .lateCareer(entry.id))
+    }
+
+    private var report: LateCareerPlayableBattleReport? {
+        LateCareerPlayableSurfaceCatalog.report(for: entry.id)
+    }
+
+    private var aiPlan: LateCareerAIPlan? {
+        LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)
+    }
+
+    private var boardSnapshot: LateCareerNativeBoardSnapshot? {
+        LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(790_000 + entry.order))?.snapshot()
+    }
+
+    private var playableControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Battlefield", systemImage: "map")
+                .font(.headline)
+                .foregroundStyle(Color.accentColor)
+            Text(entry.visibleCommandCaveatLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Button {
+                    runGermanTurn()
+                } label: {
+                    Label("German Turn", systemImage: "forward.frame.fill")
+                }
+                .accessibilityIdentifier("german-turn-button")
+
+                Button {
+                    completeBattle()
+                } label: {
+                    Label(completionRecord == nil ? "Debrief" : "Debriefed", systemImage: "flag.checkered")
+                }
+                .disabled(report == nil || completionRecord != nil)
+                .accessibilityIdentifier("battle-debrief-button")
+            }
+
+            Label(actionLog.first ?? "Ready.", systemImage: "checkmark.circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("battle-action-feedback")
+
+            if completionRecord != nil {
+                Text("Persisted to campaign progress.")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .accessibilityIdentifier("battle-persisted-result")
+            }
+        }
+        .buttonStyle(.borderedProminent)
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var routePanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(route?.hostSurfaceName ?? UnifiedGuderianBattleCatalog.hostSurfaceName, systemImage: "play.circle")
+                .font(.headline)
+            if let boardSnapshot {
+                HStack {
+                    Label("\(boardSnapshot.unitCount) units", systemImage: "person.3")
+                    Label("\(boardSnapshot.objectiveCount) objectives", systemImage: "target")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                Text(boardSnapshot.mission.name)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            if let route {
+                Text(route.acceptanceGates.map(\.rawValue).joined(separator: ", "))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var actionLogPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Battle Log", systemImage: "list.bullet.rectangle")
+                .font(.headline)
+            ForEach(Array(actionLog.enumerated()), id: \.offset) { _, logEntry in
+                Text(logEntry)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func runGermanTurn() {
+        if let report = UnifiedLateCareerAIExecutionCatalog.report(for: entry.id, seed: UInt32(785_000 + entry.order)),
+           let firstStep = report.steps.first {
+            actionLog.insert("\(report.germanTurnRunnerName): \(firstStep.action.detail)", at: 0)
+        } else {
+            let priority = aiPlan?.priorities.first?.targetName ?? "the nearest objective"
+            actionLog.insert("German turn runner could not resolve live board pressure toward \(priority).", at: 0)
+        }
+        actionLog = Array(actionLog.prefix(6))
+    }
+
+    private func completeBattle() {
+        guard let session = LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(790_000 + entry.order)),
+              let summary = UnifiedLateCareerCompletionResolver.completeBattle(from: session) else {
+            actionLog.insert("Debrief is unavailable for \(entry.title).", at: 0)
+            actionLog = Array(actionLog.prefix(6))
+            return
+        }
+
+        completionRecord = summary.completionRecord
+        onCompletion(summary.completionRecord)
+        actionLog.insert("Debrief recorded: \(summary.completionRecord.score) VP, \(summary.completionRecord.victoryBand.rawValue), \(summary.persistenceKey).", at: 0)
+        actionLog = Array(actionLog.prefix(6))
+    }
+
+    private static func initialLogLine(for entry: LateCareerGuderianPresentation) -> String {
+        "\(entry.title) loaded through the unified DZW-style battle route."
     }
 }
 

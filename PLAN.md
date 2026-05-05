@@ -118,7 +118,49 @@ Cycle 725 update: cycles 721-725 are complete. `LateCareerUXAuditCatalog` now re
 
 Cycle 730 update: cycles 726-730 are complete. `LateCareerFinalAcceptanceCatalog` now verifies the 19 field-command campaign battles, 16 late-career context battlefields, 35 total selectable entries, playable routing, late-career automation, separate progress, UX readiness, playbook readiness, build commands, and zero blockers.
 
+Cycle 735 update: cycles 731-735 are complete. `UnifiedPlayableAcceptanceCatalog` now defines the 35-battle parity bar: all original campaign and late-career entries must share the DZW-style playable battle screen, full acceptance gates, AI/log/debrief/persistence flow, and historical caveats as labels only. The separate `LateCareerPlayablePilotView` is retired as an acceptance target.
+
+Cycle 740 update: cycles 736-740 are complete. `UnifiedGuderianBattleCatalog` now provides one stable identity and ordering layer for all 35 selectable battles, combining the 19 `GuderianBattleID` field-command battles and 16 late-career battlefield IDs behind the same host surface name while preserving command-scope caveat metadata.
+
+Cycle 745 update: cycles 741-745 are complete. `LateCareerNativeBattleInstanceCatalog` now adapts every late-career staff/epilogue battlefield into native battle-instance shape with terrain, deployment zones, objectives, generated units, rule events, AI priorities, victory profile, caveat labels, and engine-blueprint conversion.
+
+Cycle 750 update: cycles 746-750 are complete. `LateCareerNativeScenarioLoader` and `LateCareerNativeBoardSession` now create scenario-specific dzw skirmish boards for late-career entries using Soviet-versus-German army-list bridges, board terrain/objective hooks, deterministic deployment, and playable board snapshots.
+
+Cycle 755 update: cycles 751-755 are complete. `UnifiedCampaignListCatalog` now drives one campaign-facing `Battles` list for all 35 entries, using one row style, one play affordance, one navigation treatment, and unified completion/availability states while marking the old `Scenarios` and `Late Career Context` section titles as retired from the selectable-list contract.
+
+Cycle 760 update: cycles 756-760 are complete. `UnifiedBattleBriefingCatalog` now provides the shared briefing shell for all 35 battles with common overview, player-force, German-context, objectives, rules, sources, launch identifiers, and historical caveat labels; `LateCareerContextBriefingView` and `LateCareerPlayablePilotView` are retired as briefing acceptance targets.
+
+Cycle 765 update: cycles 761-765 are complete. Set A late-career battles--Kursk, Dnieper, Korsun-Cherkassy, and Kamenets-Podolsky--now have unified playable-board routes through the `DZWPlayableBattleView` surface contract with selectable units, movement, phase controls, combat actions, blocked-action feedback, logs, German AI pressure, and debrief persistence gates.
+
+Cycle 770 update: cycles 766-770 are complete. Set B late-career battles--Operation Bagration, Lvov-Sandomierz, Narew/Vistula bridgeheads, and Warsaw defensive arcs--now join the same unified playable-board route contract with General Staff caveats retained as historical labels only.
+
+Cycle 775 update: cycles 771-775 are complete. Set C late-career battles--Vistula-Oder breakthrough, Poznan corridor, East Prussia/Elbing, and Kustrin/Oder bridgeheads--now route into the same commandable battle-screen contract with scenario terrain, objectives, generated units, General Staff caveats, German pressure, and debrief persistence gates.
+
+Cycle 780 update: cycles 776-780 are complete. Set D late-career battles--Operation Solstice, East Pomeranian offensive, Seelow Heights epilogue, and Berlin/Halbe epilogue--now complete the 16-battle late-career route set through the unified playable-board contract, with the two post-dismissal caveats retained only as historical labels.
+
+Cycle 785 update: cycles 781-785 are complete. `UnifiedLateCareerAIExecutionCatalog` now runs every added battle through a live dzw board-backed German-turn execution report using the same `DZWPlayableBattleViewModel.runGermanTurn` contract, scenario objective priorities, legal board movement/shooting/assault attempts, blocked-action reporting, and playable board snapshots.
+
+Cycle 790 update: cycles 786-790 are complete. `UnifiedLateCareerCompletionResolver` and `UnifiedLateCareerScoringDebriefCatalog` now resolve all 16 added battles through the unified completion pattern with score bands, completed turns, debrief summaries, persistence keys, native-board-state proof, and explicit failure handling.
+
+Cycle 795 update: cycles 791-795 are complete. `UnifiedCampaignProgressCatalog` now presents all 35 completions through one progress model and one `35 of 35 complete` summary, while command-scope filters remain optional views and the old 19-battle/late-career summaries are retired as separate progress surfaces.
+
+Cycle 800 update: cycles 796-800 are complete. `UnifiedCampaignSaveEnvelope` and `UnifiedCampaignSaveCodec` now write the unified 35-battle save payload, migrate legacy `guderian.campaignSaveState.v1` and `guderian.lateCareerProgress.v1` data, preserve old completions, and let the app load/save through the new unified storage key.
+
+Cycle 805 update: cycles 801-805 are complete. `UnifiedPlayableScreenHarness` now runs all 35 battles through the same launch, selection, movement, phase flow, attack, blocked-action, AI-turn, debrief, and persistence stage checklist, wrapping the original 19-battle DZW harness and the 16 late-career native board routes.
+
+Cycle 810 update: cycles 806-810 are complete. `UnifiedUIParityAuditCatalog` now verifies one row style, one Play affordance, one host surface, one harness stage set, retired late-career pilot/context surfaces, and command-scope caveats as labels only with no lighter late-career gameplay tier.
+
+Cycle 815 update: cycles 811-815 are complete. `UnifiedBalancePacingAuditCatalog` now verifies the 16 added battles against the first-19 playable baseline for readable deployment starts, objective spacing, terrain density, mobility mix, victory bands, and live German AI pressure.
+
+Cycle 820 update: cycles 816-820 are complete. Documentation now describes a unified 35-battle playable campaign: the README Battle Chronology lists all 35 selectable battles with historical links and caveats, PLAN has final status notes, and the app status copy no longer exposes a separate added-battles control tier.
+
+Cycle 825 update: cycles 821-825 are complete. `UnifiedBuildRegressionHardeningCatalog` records SwiftPM build/test, GuderianTest, Xcode, 35-battle harness, save/load migration, UI parity, documentation, and balance/pacing gates for the unified campaign.
+
+Cycle 830 update: cycles 826-830 are complete. `UnifiedCampaignAcceptanceCatalog` verifies the single 35-battle playable campaign: all rows and battles use the same UI, all complete from launch to debrief/persistence, README lists all 35 battles, caveats remain historical labels only, no separate late-career gameplay tier remains, and zero cycles remain.
+
 Cycle plan 651-730: add the 16 late-career staff/epilogue battlefields to the visible Guderian app experience, first as a separate command-caveated Late Career Context section and then as DZW-style playable battle screens with AI, scoring, debrief, persistence, and GuderianTest parity.
+
+Cycle plan 731-830: remove the remaining UI/playability distinction between the 19 field-command battles and the 16 late-career staff/epilogue battlefields. All 35 selectable battles should route through the same DZW-style battle screen, command controls, AI turn flow, blocked-action feedback, debrief, persistence, and automation harness. Historical command-scope caveats remain visible as briefing/source labels only, not as a separate or lighter gameplay surface.
 
 ## Planning Rules
 
@@ -524,13 +566,52 @@ The cycle 650 work created detailed late-career staff/epilogue battlefield data,
 
 Status through cycle 730: completed. Guderian shows 35 total selectable battle/context entries: 19 field-command campaign battles plus 16 visibly caveated late-career context battlefields, all with DZW-style playable-screen coverage, separate completion tracking, GuderianTest automation, UX audit coverage, and final acceptance reporting.
 
+## Cycles 731-830: Unified 35-Battle Playable Campaign
+
+The cycle 730 state still preserves a product distinction between the original 19 field-command campaign battles and the 16 late-career staff/epilogue battlefields. Cycles 731-830 remove that distinction from the playable UI. The target is one campaign-facing battle experience: every selectable entry opens the same DZW-style board, uses the same command affordances, supports the same AI/debrief/persistence loop, and is verified by the same playable-screen harness. The only retained difference is historical framing: Inspector General, Army General Staff, adjacent-pressure, and post-dismissal caveats stay visible in briefing/source context, but they must not create a separate gameplay tier.
+
+| Cycles | Focus | Output |
+| --- | --- | --- |
+| 731-735 | Unified acceptance bar | Define the 35-battle parity requirement, retire the separate late-career pilot surface as an acceptance target, lock caveat placement to briefing/source labels, and document that all battles must share the same board, controls, AI, logs, blocked-action feedback, debrief, and persistence path. |
+| 736-740 | Unified battle identity | Add a battle-selection identity that can address both `GuderianBattleID` campaign battles and late-career battlefield IDs without forcing two UI sections, two navigation paths, or two progress concepts at the playable-screen boundary. |
+| 741-745 | Late-career board adapter | Convert `LateCareerStaffBattlefield` maps, objectives, forces, rules, source notes, and command-caveat metadata into the same native battle-instance shape used by the first 19 battles. |
+| 746-750 | Late-career session loader | Add a `NativeBoardSession` creation path for late-career entries with deterministic seeds, board terrain, objectives, mission target score, deployment zones, unit ownership, and scenario metadata. |
+| 751-755 | Unified campaign list | Replace the visible split between `Scenarios` and `Late Career Context` with one campaign list or one visually identical grouped list where all rows use the same play affordance, completion state, and navigation treatment. |
+| 756-760 | Shared briefing shell | Move late-career entries into the same pre-battle briefing shell used by the 19 original battles, preserving caveats as concise historical labels while removing separate context-only copy and pilot-specific wording. |
+| 761-765 | Set A board parity | Route Kursk, Dnieper, Korsun-Cherkassy, and Kamenets-Podolsky into `DZWPlayableBattleView` with selectable units, draggable movement, phase controls, combat actions, legal-action blocking, logs, AI pressure, and debrief persistence. |
+| 766-770 | Set B board parity | Route Operation Bagration, Lvov-Sandomierz, Narew/Vistula bridgeheads, and Warsaw defensive arcs into the same battle screen with General Staff caveats retained only as historical context labels. |
+| 771-775 | Set C board parity | Route Vistula-Oder, Poznan corridor, East Prussia/Elbing, and Kustrin/Oder bridgeheads into the same commandable battle screen with scenario-specific terrain, objectives, units, and German pressure. |
+| 776-780 | Set D board parity | Route Operation Solstice, East Pomeranian offensive, Seelow Heights, and Berlin/Halbe into the same commandable battle screen, with post-dismissal epilogue caveats visible but not changing the UI tier. |
+| 781-785 | Unified AI execution | Replace late-career metadata-only AI with live board AI execution that chooses priorities from scenario objectives, moves units through legal board actions, reports blocked moves, and uses the same German-turn runner as the first 19 battles. |
+| 786-790 | Unified scoring and debrief | Convert late-career scoring/debrief records to the same completion resolver pattern used by the 19 battles, including score bands, completed turn, debrief text, persistence keys, and failure handling. |
+| 791-795 | Progress unification | Present all 35 completions through one campaign progress summary, while preserving filters and historical scope labels as optional views rather than separate progress systems. |
+| 796-800 | Save/load migration | Migrate existing separate campaign and late-career save payloads into a unified save envelope that can read old progress, write the new 35-battle progress model, and avoid losing prior completions. |
+| 801-805 | Harness expansion | Expand `DZWPlayableScreenHarness` or a successor harness so every one of the 35 battles runs launch, selection, movement, phase flow, attack, blocked-action feedback, AI turn, debrief, and persistence through the same assertions. |
+| 806-810 | UI parity audit | Add tests and visual/identifier audits proving there is no remaining pilot-only late-career surface, no separate lighter gameplay path, and no row-level affordance difference beyond historical caveat labels. |
+| 811-815 | Balance and pacing pass | Tune late-career board starts, objective spacing, unit mobility, terrain density, victory bands, and AI pressure so the new 16 battles feel as playable and legible as the first 19. |
+| 816-820 | Documentation cleanup | Update README, PLAN status notes, source/caveat language, and in-app labels to describe a unified 35-battle playable campaign. Expand the README Battle Chronology from 19 to all 35 selectable battles with the same historical-link treatment, dates, command-scope caveats, opposing-force notes, results, and scenario design notes used by the first 19 battles. |
+| 821-825 | Build and regression hardening | Run SwiftPM, Xcode, GuderianTest, full 35-battle automation, save/load migration tests, and targeted UI checks; fix blockers surfaced by late-career board parity. |
+| 826-830 | Unified campaign acceptance | Ship the acceptance gate for a single 35-battle playable campaign: all battles look and play through the same UI, all complete from board launch to debrief/persistence, README lists all 35 battles with historical links, caveats remain historical only, and no separate late-career gameplay tier remains. |
+
+Status through cycle 810: completed. The unified acceptance bar, 35-battle identity catalog, native late-career board adapter/session loader, unified campaign list, shared briefing shell, all 16 late-career playable-board routes, live late-career German AI execution, unified scoring/debrief resolver, unified progress/save migration, full 35-battle harness, and UI parity audit are in place with regression coverage.
+
+Status through cycle 815: completed. `UnifiedBalancePacingAuditCatalog` checks the 16 added battles for readable board starts, objective spacing, terrain density, mobility variety, victory bands, and live German AI pressure against the first-19 playable baseline.
+
+Status through cycle 820: completed. The README Battle Chronology lists all 35 selectable battles with historical links, dates, command-scope caveats, opposing-force notes, results, and scenario design notes, and the app progress/status controls describe one unified 35-battle campaign rather than an added-battles tier.
+
+Status through cycle 825: completed. `UnifiedBuildRegressionHardeningCatalog` captures the SwiftPM, GuderianTest, Xcode, 35-battle harness, save/load migration, UI parity, documentation, and balance/pacing regression gates.
+
+Status through cycle 830: completed. `UnifiedCampaignAcceptanceCatalog` is the final acceptance gate for one 35-battle playable campaign. All battles use the same UI and completion flow, README coverage is 35/35, command-scope caveats are historical labels only, no separate late-career gameplay tier remains, and there are no development cycles remaining in this plan.
+
 ## Acceptance Criteria
 
 - `dzw` remains cleanly updatable because Guderian-specific engine hooks are guarded or externalized.
 - The demo ships with Wizna, Sedan, and Moscow/Tula playable from briefing to debrief.
 - The full campaign ships with every battle in the README chronology playable.
+- The README Battle Chronology lists all 35 selectable battles with historical links, dates, command-scope labels/caveats, opposing-force notes, results, and scenario design notes.
 - Every battle has source links, scenario notes, force data, objectives, balance status, and test coverage.
 - Existing and future maps hit the 400% detail-improvement target through denser sourceable geography rather than decorative markers.
 - Late-career battlefields after Guderian's 1941 dismissal are framed as Inspector General, Army General Staff, or post-dismissal context unless direct field command is proven.
+- All 35 selectable Guderian battles use the same visual and interactive playable-battle UI; command-scope caveats may appear as historical labels, but they must not create a separate or reduced playability mode.
 - The app clearly frames the player as opposing Guderian and treats the historical subject with sober context.
 - "Playable" means a DZW-style hand-playable Guderian battle screen with scenario-specific units, terrain, objectives, legal actions, scoring, AI pressure, blocked-action reporting, logs, and debriefs; proxy-loadable metadata or automation-only completion no longer satisfies the playable milestone.

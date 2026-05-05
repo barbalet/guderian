@@ -608,6 +608,533 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(report.blockers.isEmpty)
     }
 
+    func testCycle735UnifiedPlayableAcceptanceBarRetiresSeparateLateCareerTier() {
+        let report = UnifiedPlayableAcceptanceCatalog.report
+
+        XCTAssertEqual(report.cycleRange, 731...735)
+        XCTAssertTrue(report.isReadyForUnifiedRollout, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.totalBattleCount, 35)
+        XCTAssertEqual(report.fieldCommandBattleCount, 19)
+        XCTAssertEqual(report.lateCareerBattleCount, 16)
+        XCTAssertEqual(report.hostSurfaceName, PlayableBattleSurfaceCatalog.hostSurfaceName)
+        XCTAssertEqual(report.requiredGates, PlayableBattleAcceptanceGate.allCases)
+        XCTAssertTrue(report.retiredAcceptanceSurfaceNames.contains("LateCareerPlayablePilotView"))
+        XCTAssertTrue(report.caveatPolicy.localizedCaseInsensitiveContains("historical labels"))
+        XCTAssertTrue(report.blockers.isEmpty)
+    }
+
+    func testCycle740UnifiedBattleIdentityCoversAllThirtyFiveEntries() throws {
+        let catalog = UnifiedGuderianBattleCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 736...740)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle740)
+        XCTAssertEqual(catalog.allEntries.count, 35)
+        XCTAssertEqual(catalog.fieldCommandEntries.count, 19)
+        XCTAssertEqual(catalog.lateCareerEntries.count, 16)
+        XCTAssertEqual(catalog.allEntries.map(\.order), Array(1...35))
+        XCTAssertEqual(catalog.allEntries.map(\.hostSurfaceName), Array(repeating: PlayableBattleSurfaceCatalog.hostSurfaceName, count: 35))
+
+        let tuchola = try XCTUnwrap(catalog.entry(for: .fieldCommand(.tucholaForest)))
+        XCTAssertEqual(tuchola.title, "Battle of Tuchola Forest")
+        XCTAssertNil(tuchola.caveatLabel)
+
+        let kursk = try XCTUnwrap(catalog.entry(for: .lateCareer("kursk-armored-force-pressure")))
+        XCTAssertEqual(kursk.order, 20)
+        XCTAssertEqual(kursk.commandScope, .inspectorGeneralInfluence)
+        XCTAssertTrue(kursk.caveatLabel?.localizedCaseInsensitiveContains("not a Guderian field command") == true)
+    }
+
+    func testCycle745LateCareerBoardAdapterCreatesNativeBattleShape() throws {
+        let catalog = LateCareerNativeBattleInstanceCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 741...745)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle745)
+        XCTAssertEqual(catalog.allInstances.count, 16)
+
+        let kursk = try XCTUnwrap(catalog.instance(for: "kursk-armored-force-pressure"))
+        XCTAssertTrue(kursk.isModeledForUnifiedNativeGameplay)
+        XCTAssertEqual(kursk.commandScope, .inspectorGeneralInfluence)
+        XCTAssertGreaterThanOrEqual(kursk.units.filter { $0.side == .player }.count, 2)
+        XCTAssertGreaterThanOrEqual(kursk.units.filter { $0.side == .guderianAI }.count, 1)
+        XCTAssertGreaterThanOrEqual(kursk.terrain.count, 20)
+        XCTAssertGreaterThanOrEqual(kursk.objectives.count, 4)
+        XCTAssertFalse(kursk.aiProfile.targetPriorities.isEmpty)
+        XCTAssertTrue(kursk.caveatLabel.localizedCaseInsensitiveContains("not a Guderian field command"))
+
+        let blueprint = kursk.engineBlueprint(seed: 745_001)
+        XCTAssertTrue(blueprint.isCompleteForScenarioLoader)
+        XCTAssertEqual(blueprint.id, kursk.id)
+        XCTAssertEqual(blueprint.missionTargetScore, kursk.victory.missionTargetScore)
+    }
+
+    func testCycle750LateCareerSessionLoaderCreatesScenarioSpecificBoard() throws {
+        let loader = LateCareerNativeScenarioLoader.self
+
+        XCTAssertEqual(loader.cycleRange, 746...750)
+        XCTAssertTrue(loader.acceptanceReadyThroughCycle750)
+        XCTAssertEqual(loader.allLoadouts.count, 16)
+        XCTAssertTrue(loader.allLoadouts.allSatisfy(\.canCreateSkirmishBridge))
+        XCTAssertTrue(loader.allLoadouts.allSatisfy(\.canApplyScenarioBoardHook))
+        XCTAssertTrue(loader.allLoadouts.allSatisfy { $0.playerArmyName == "Soviet" })
+        XCTAssertTrue(loader.allLoadouts.allSatisfy { $0.opponentArmyName == "German" })
+
+        let loadout = try XCTUnwrap(loader.load("kursk-armored-force-pressure", seed: 750_001))
+        XCTAssertTrue(loadout.warnings.isEmpty, loadout.warnings.map(\.detail).joined(separator: "\n"))
+
+        let game = try XCTUnwrap(loadout.makeGame())
+        XCTAssertTrue(game.boardReport.isScenarioSpecific, game.boardReport.notes.joined(separator: "\n"))
+        XCTAssertTrue(game.deploymentReport.placedAnyScenarioUnit, game.deploymentReport.notes.joined(separator: "\n"))
+        XCTAssertGreaterThan(Int(game_unit_count(game.handle)), 0)
+        XCTAssertGreaterThan(Int(game_objective_count(game.handle)), 0)
+        XCTAssertGreaterThan(Int(game_zone_count(game.handle)), 0)
+
+        let session = try XCTUnwrap(LateCareerNativeBoardSession(battlefieldID: "kursk-armored-force-pressure", seed: 750_002))
+        let snapshot = session.snapshot()
+        XCTAssertTrue(snapshot.isScenarioBoardPlayable)
+        XCTAssertEqual(snapshot.battlefieldID, "kursk-armored-force-pressure")
+        XCTAssertEqual(snapshot.mission.targetScore, loadout.blueprint.missionTargetScore)
+    }
+
+    func testCycle755UnifiedCampaignListRemovesVisibleSplit() throws {
+        let catalog = UnifiedCampaignListCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 751...755)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle755)
+        XCTAssertEqual(catalog.sectionTitle, "Battles")
+        XCTAssertTrue(catalog.legacySectionTitlesRemoved.contains("Scenarios"))
+        XCTAssertTrue(catalog.legacySectionTitlesRemoved.contains("Late Career Context"))
+
+        var campaignProgress = CampaignProgress()
+        let tuchola = try XCTUnwrap(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        campaignProgress.recordCompletion(
+            CampaignCompletionRecord(
+                scenarioID: tuchola.id,
+                score: 12,
+                victoryBand: .operational,
+                completedTurn: 3,
+                note: "Unified row state smoke completion."
+            )
+        )
+        var lateCareerProgress = LateCareerProgress()
+        lateCareerProgress.recordAllParityCompletions()
+
+        let rows = catalog.rows(
+            progress: campaignProgress,
+            lateCareerProgress: lateCareerProgress,
+            playMode: .standalone
+        )
+
+        XCTAssertEqual(rows.count, 35)
+        XCTAssertEqual(rows.map(\.order), Array(1...35))
+        XCTAssertTrue(rows.allSatisfy(\.usesUnifiedCampaignListTreatment))
+        XCTAssertTrue(rows.allSatisfy { $0.playAffordanceTitle == "Play" })
+        XCTAssertTrue(rows.allSatisfy { $0.hostSurfaceName == PlayableBattleSurfaceCatalog.hostSurfaceName })
+        XCTAssertEqual(Set(rows.map(\.rowStyleIdentifier)), Set([UnifiedCampaignListCatalog.rowStyleIdentifier]))
+
+        let tucholaRow = try XCTUnwrap(catalog.row(for: .fieldCommand(.tucholaForest), progress: campaignProgress))
+        XCTAssertEqual(tucholaRow.completionState, .complete)
+        XCTAssertEqual(tucholaRow.availability, .available)
+        XCTAssertEqual(tucholaRow.navigationTreatment, .playableBattle)
+
+        let kurskRow = try XCTUnwrap(catalog.row(for: .lateCareer("kursk-armored-force-pressure"), lateCareerProgress: lateCareerProgress))
+        XCTAssertEqual(kurskRow.order, 20)
+        XCTAssertEqual(kurskRow.completionState, .complete)
+        XCTAssertEqual(kurskRow.availability, .available)
+        XCTAssertTrue(kurskRow.caveatLabel?.localizedCaseInsensitiveContains("not a Guderian field command") == true)
+    }
+
+    func testCycle760UnifiedBriefingShellRemovesPilotContextCopy() throws {
+        let catalog = UnifiedBattleBriefingCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 756...760)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle760)
+        XCTAssertEqual(catalog.allShells.count, 35)
+        XCTAssertTrue(catalog.allShells.allSatisfy(\.usesSharedBriefingShell))
+        XCTAssertTrue(catalog.allShells.allSatisfy { $0.hostSurfaceName == PlayableBattleSurfaceCatalog.hostSurfaceName })
+        XCTAssertTrue(catalog.allShells.allSatisfy { $0.retiredSurfaceNames.contains("LateCareerPlayablePilotView") })
+        XCTAssertFalse(catalog.allShells.contains { $0.displayText.localizedCaseInsensitiveContains("pilot") })
+        XCTAssertFalse(catalog.allShells.contains { $0.displayText.localizedCaseInsensitiveContains("context-only") })
+
+        let smolensk = try XCTUnwrap(catalog.shell(for: .fieldCommand(.smolensk)))
+        XCTAssertTrue(smolensk.sectionKinds.contains(.playerForce))
+        XCTAssertTrue(smolensk.sectionKinds.contains(.germanContext))
+        XCTAssertTrue(smolensk.sectionKinds.contains(.objectives))
+
+        let kursk = try XCTUnwrap(catalog.shell(for: .lateCareer("kursk-armored-force-pressure")))
+        XCTAssertEqual(kursk.briefingAccessibilityIdentifier, "unified-battle-briefing-kursk-armored-force-pressure")
+        XCTAssertTrue(kursk.caveatLabels.joined(separator: " ").localizedCaseInsensitiveContains("not a Guderian field command"))
+        XCTAssertTrue(kursk.sectionKinds.contains(.rules))
+        XCTAssertFalse(kursk.sourceLinks.isEmpty)
+    }
+
+    func testCycle765SetABoardParityRoutesInspectorGeneralBattles() throws {
+        let catalog = UnifiedPlayableBoardRouteCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 761...780)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle765)
+        XCTAssertEqual(catalog.lateCareerRoutedIDsThroughCycle765, LateCareerStaffBattlefieldSetACatalog.battlefieldIDs)
+        XCTAssertEqual(catalog.lateCareerRoutesThroughCycle765.count, 4)
+        XCTAssertTrue(catalog.lateCareerRoutesThroughCycle765.allSatisfy(\.isFullPlayableBoardRoute))
+        XCTAssertTrue(catalog.lateCareerRoutesThroughCycle765.allSatisfy { $0.commandScope == .inspectorGeneralInfluence })
+
+        let kurskRoute = try XCTUnwrap(catalog.route(for: .lateCareer("kursk-armored-force-pressure")))
+        XCTAssertEqual(kurskRoute.cycleRange, 761...765)
+        XCTAssertEqual(kurskRoute.hostSurfaceName, PlayableBattleSurfaceCatalog.hostSurfaceName)
+        XCTAssertEqual(kurskRoute.acceptanceGates, PlayableBattleAcceptanceGate.allCases)
+        XCTAssertTrue(kurskRoute.supportsSelectableUnits)
+        XCTAssertTrue(kurskRoute.supportsDraggedMovement)
+        XCTAssertTrue(kurskRoute.supportsPhaseControls)
+        XCTAssertTrue(kurskRoute.supportsCombatActions)
+        XCTAssertTrue(kurskRoute.supportsBlockedActionFeedback)
+        XCTAssertTrue(kurskRoute.supportsGermanAIRunner)
+        XCTAssertTrue(kurskRoute.supportsDebriefPersistence)
+
+        let session = try XCTUnwrap(LateCareerNativeBoardSession(battlefieldID: "kursk-armored-force-pressure", seed: 765_001))
+        let snapshot = session.snapshot()
+        XCTAssertTrue(snapshot.isScenarioBoardPlayable)
+        XCTAssertGreaterThan(snapshot.unitCount, 0)
+        XCTAssertGreaterThan(snapshot.objectiveCount, 0)
+    }
+
+    func testCycle770SetBBoardParityRoutesGeneralStaffBattles() throws {
+        let catalog = UnifiedPlayableBoardRouteCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 761...780)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle770)
+        XCTAssertEqual(catalog.lateCareerRoutedIDsThroughCycle770, LateCareerStaffBattlefieldSetACatalog.battlefieldIDs + LateCareerStaffBattlefieldSetBCatalog.battlefieldIDs)
+        XCTAssertEqual(catalog.lateCareerRoutesThroughCycle770.count, 8)
+        XCTAssertEqual(catalog.allRoutesThroughCycle770.count, 27)
+        XCTAssertTrue(catalog.lateCareerRoutesThroughCycle770.allSatisfy(\.isFullPlayableBoardRoute))
+
+        let setBRoutes = Array(catalog.lateCareerRoutesThroughCycle770.suffix(4))
+        XCTAssertEqual(setBRoutes.map { $0.id.rawValue }, LateCareerStaffBattlefieldSetBCatalog.battlefieldIDs)
+        XCTAssertTrue(setBRoutes.allSatisfy { $0.commandScope == .armyGeneralStaffInfluence })
+        XCTAssertTrue(setBRoutes.allSatisfy { $0.caveatLabel?.localizedCaseInsensitiveContains("not a Guderian field command") == true })
+
+        let bagrationRoute = try XCTUnwrap(catalog.route(for: .lateCareer("operation-bagration-withdrawal")))
+        XCTAssertEqual(bagrationRoute.cycleRange, 766...770)
+        XCTAssertTrue(bagrationRoute.completionPersistenceKey.contains("operation-bagration-withdrawal"))
+
+        let loadout = try XCTUnwrap(LateCareerNativeScenarioLoader.load("operation-bagration-withdrawal", seed: 770_001))
+        let game = try XCTUnwrap(loadout.makeGame())
+        XCTAssertGreaterThan(Int(game_unit_count(game.handle)), 0)
+        XCTAssertGreaterThan(Int(game_objective_count(game.handle)), 0)
+        XCTAssertGreaterThan(Int(game_zone_count(game.handle)), 0)
+    }
+
+    func testCycle775SetCBoardParityRoutesGeneralStaffCollapseBattles() throws {
+        let catalog = UnifiedPlayableBoardRouteCatalog.self
+
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle775)
+        XCTAssertEqual(catalog.lateCareerRoutedIDsThroughCycle775, LateCareerStaffBattlefieldSetACatalog.battlefieldIDs + LateCareerStaffBattlefieldSetBCatalog.battlefieldIDs + LateCareerStaffBattlefieldSetCCatalog.battlefieldIDs)
+        XCTAssertEqual(catalog.lateCareerRoutesThroughCycle775.count, 12)
+        XCTAssertTrue(catalog.lateCareerRoutesThroughCycle775.allSatisfy(\.isFullPlayableBoardRoute))
+
+        let setCRoutes = Array(catalog.lateCareerRoutesThroughCycle775.suffix(4))
+        XCTAssertEqual(setCRoutes.map { $0.id.rawValue }, LateCareerStaffBattlefieldSetCCatalog.battlefieldIDs)
+        XCTAssertTrue(setCRoutes.allSatisfy { $0.commandScope == .armyGeneralStaffInfluence })
+
+        let vistulaOderRoute = try XCTUnwrap(catalog.route(for: .lateCareer("vistula-oder-breakthrough")))
+        XCTAssertEqual(vistulaOderRoute.cycleRange, 771...775)
+        XCTAssertTrue(vistulaOderRoute.supportsGermanAIRunner)
+
+        let session = try XCTUnwrap(LateCareerNativeBoardSession(battlefieldID: "vistula-oder-breakthrough", seed: 775_001))
+        let snapshot = session.snapshot()
+        XCTAssertTrue(snapshot.isScenarioBoardPlayable)
+        XCTAssertGreaterThan(snapshot.unitCount, 0)
+        XCTAssertGreaterThan(snapshot.objectiveCount, 0)
+    }
+
+    func testCycle780SetDBoardParityRoutesFinalWarAndEpilogueBattles() throws {
+        let catalog = UnifiedPlayableBoardRouteCatalog.self
+
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle780)
+        XCTAssertEqual(catalog.lateCareerRoutedIDsThroughCycle780, LateCareerStaffBattlefieldSetACatalog.battlefieldIDs + LateCareerStaffBattlefieldSetBCatalog.battlefieldIDs + LateCareerStaffBattlefieldSetCCatalog.battlefieldIDs + LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs)
+        XCTAssertEqual(catalog.lateCareerRoutesThroughCycle780.count, 16)
+        XCTAssertEqual(catalog.allRoutesThroughCycle780.count, 35)
+        XCTAssertTrue(catalog.lateCareerRoutesThroughCycle780.allSatisfy(\.isFullPlayableBoardRoute))
+
+        let setDRoutes = Array(catalog.lateCareerRoutesThroughCycle780.suffix(4))
+        XCTAssertEqual(setDRoutes.map { $0.id.rawValue }, LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs)
+        XCTAssertEqual(setDRoutes.filter { $0.commandScope == .postDismissalContext }.count, 2)
+        XCTAssertTrue(setDRoutes.allSatisfy { $0.caveatLabel?.localizedCaseInsensitiveContains("not a Guderian field command") == true })
+
+        let berlinRoute = try XCTUnwrap(catalog.route(for: .lateCareer("berlin-halbe-epilogue")))
+        XCTAssertEqual(berlinRoute.cycleRange, 776...780)
+        XCTAssertEqual(berlinRoute.commandScope, .postDismissalContext)
+        XCTAssertTrue(berlinRoute.supportsDebriefPersistence)
+
+        let loadout = try XCTUnwrap(LateCareerNativeScenarioLoader.load("berlin-halbe-epilogue", seed: 780_001))
+        let game = try XCTUnwrap(loadout.makeGame())
+        XCTAssertGreaterThan(Int(game_unit_count(game.handle)), 0)
+        XCTAssertGreaterThan(Int(game_objective_count(game.handle)), 0)
+    }
+
+    func testCycle785UnifiedLateCareerAIExecutesLiveBoardRunner() throws {
+        let catalog = UnifiedLateCareerAIExecutionCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 781...785)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle785)
+        XCTAssertEqual(catalog.allReports.count, 16)
+        XCTAssertEqual(catalog.allReports.map(\.battlefieldID), UnifiedPlayableBoardRouteCatalog.lateCareerRoutedIDsThroughCycle780)
+        XCTAssertTrue(catalog.allReports.allSatisfy(\.completedGermanTurnRunner))
+        XCTAssertTrue(catalog.allReports.allSatisfy { $0.germanTurnRunnerName == UnifiedLateCareerAIExecutionCatalog.germanTurnRunnerName })
+
+        let report = try XCTUnwrap(catalog.report(for: "kustrin-oder-bridgeheads", seed: 785_001))
+        XCTAssertTrue(report.completedGermanTurnRunner, report.blockers.joined(separator: "\n"))
+        XCTAssertTrue(report.steps.contains { $0.activePlayer == .guderianAI })
+        XCTAssertTrue(report.steps.contains { $0.usedLegalBoardAction || $0.reportedBlockedMove })
+        XCTAssertFalse(report.targetPriorityNames.isEmpty)
+        XCTAssertTrue(report.boardSnapshot.isScenarioBoardPlayable)
+    }
+
+    func testCycle790UnifiedScoringAndDebriefUsesCompletionResolverPattern() throws {
+        let catalog = UnifiedLateCareerScoringDebriefCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 786...790)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle790)
+        XCTAssertEqual(catalog.completionSummaries.count, 16)
+        XCTAssertEqual(catalog.failureSummaries.count, 16)
+        XCTAssertTrue(catalog.completionSummaries.allSatisfy(\.isResolvedThroughUnifiedPattern))
+        XCTAssertTrue(catalog.failureSummaries.allSatisfy(\.isResolvedThroughUnifiedPattern))
+        XCTAssertEqual(Set(catalog.completionSummaries.map(\.persistenceKey)).count, 16)
+        XCTAssertTrue(catalog.failureSummaries.allSatisfy { $0.completionRecord.victoryBand == .historicalPressure })
+
+        let session = try XCTUnwrap(LateCareerNativeBoardSession(battlefieldID: "berlin-halbe-epilogue", seed: 790_001))
+        let summary = try XCTUnwrap(UnifiedLateCareerCompletionResolver.completeBattle(from: session))
+        XCTAssertEqual(summary.sourceName, UnifiedLateCareerCompletionResolver.sourceName)
+        XCTAssertTrue(summary.isResolvedThroughUnifiedPattern)
+        XCTAssertTrue(summary.persistenceKey.contains("berlin-halbe-epilogue"))
+        XCTAssertTrue(summary.scoreBands.contains { $0.victoryBand == .operational })
+        XCTAssertTrue(summary.scoreBands.contains { $0.victoryBand == .historicalPressure })
+        XCTAssertTrue(summary.failureHandling.localizedCaseInsensitiveContains("failure"))
+        XCTAssertEqual(summary.completionRecord.note, summary.debriefSummary)
+    }
+
+    func testCycle795UnifiedProgressPresentsOneThirtyFiveBattleSummary() throws {
+        let catalog = UnifiedCampaignProgressCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 791...795)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle795)
+
+        let progress = catalog.completedProgress
+        let summary = progress.summary()
+        XCTAssertTrue(summary.isComplete)
+        XCTAssertEqual(summary.totalBattleCount, 35)
+        XCTAssertEqual(summary.completedBattleCount, 35)
+        XCTAssertEqual(summary.progressLabel, "35 of 35 complete")
+        XCTAssertEqual(summary.completionTitle, "Unified Campaign Complete")
+        XCTAssertTrue(summary.remainingBattleIDs.isEmpty)
+        XCTAssertTrue(summary.filtersAreOptionalViews)
+        XCTAssertEqual(progress.fieldCommandProgress.completedCount, 19)
+        XCTAssertEqual(progress.lateCareerProgress.completionSummary().completedBattlefields, 16)
+
+        let berlin = UnifiedGuderianBattleID.lateCareer("berlin-halbe-epilogue")
+        XCTAssertTrue(progress.isCompleted(berlin))
+        XCTAssertEqual(progress.completionRecord(for: berlin)?.source, .lateCareer)
+    }
+
+    func testCycle800UnifiedSaveEnvelopeMigratesLegacyCampaignAndLateCareerSaves() throws {
+        let codec = UnifiedCampaignSaveCodec.self
+
+        XCTAssertEqual(codec.cycleRange, 796...800)
+        XCTAssertTrue(codec.acceptanceReadyThroughCycle800)
+
+        var campaignProgress = CampaignProgress()
+        campaignProgress.recordCompletion(
+            CampaignCompletionRecord(
+                scenarioID: .tucholaForest,
+                score: 12,
+                victoryBand: .operational,
+                completedTurn: 4,
+                note: "Legacy campaign completion."
+            )
+        )
+        let campaignState = CampaignSaveState(
+            selectedScenarioID: .tucholaForest,
+            playMode: .standalone,
+            progress: campaignProgress
+        )
+        var lateCareerProgress = LateCareerProgress()
+        let lateSummary = try XCTUnwrap(UnifiedLateCareerScoringDebriefCatalog.completionSummaries.first)
+        lateCareerProgress.recordCompletion(lateSummary.completionRecord)
+
+        let migrated = codec.migrate(campaignState: campaignState, lateCareerProgress: lateCareerProgress)
+        XCTAssertTrue(migrated.isCurrentSchema)
+        XCTAssertTrue(migrated.preservesLegacyProgress)
+        XCTAssertEqual(migrated.selectedBattleID, .fieldCommand(.tucholaForest))
+        XCTAssertEqual(migrated.playMode, .standalone)
+        XCTAssertEqual(migrated.progress.completedCount, 2)
+        XCTAssertEqual(migrated.migratedFromCampaignSaveVersion, CampaignSaveState.currentSchemaVersion)
+        XCTAssertEqual(migrated.migratedLateCareerProgressVersion, 1)
+        XCTAssertTrue(migrated.migrationNote.localizedCaseInsensitiveContains("migrated"))
+
+        let encoded = try codec.encode(migrated)
+        let decoded = try XCTUnwrap(codec.decodeIfCurrent(encoded))
+        XCTAssertEqual(decoded.schemaVersion, migrated.schemaVersion)
+        XCTAssertEqual(decoded.selectedBattleID, migrated.selectedBattleID)
+        XCTAssertEqual(decoded.playMode, migrated.playMode)
+        XCTAssertEqual(decoded.progress, migrated.progress)
+        XCTAssertEqual(decoded.migratedFromCampaignSaveVersion, migrated.migratedFromCampaignSaveVersion)
+        XCTAssertEqual(decoded.migratedLateCareerProgressVersion, migrated.migratedLateCareerProgressVersion)
+    }
+
+    func testCycle805UnifiedPlayableHarnessRunsAllThirtyFiveBattles() throws {
+        let harness = UnifiedPlayableScreenHarness.self
+
+        XCTAssertEqual(harness.cycleRange, 801...805)
+        XCTAssertTrue(harness.acceptanceReadyThroughCycle805)
+
+        let results = try harness.runAll35FlowsThroughCycle805()
+        XCTAssertEqual(results.count, 35)
+        XCTAssertEqual(results.map(\.id), UnifiedGuderianBattleCatalog.allEntries.map(\.id))
+        XCTAssertTrue(results.allSatisfy(\.completedAllStages))
+        XCTAssertTrue(results.allSatisfy(\.usesUnifiedHarnessSurface))
+        XCTAssertTrue(results.allSatisfy { $0.completedStages == DZWPlayableScreenHarnessStage.allCases })
+        XCTAssertTrue(results.allSatisfy { $0.displayedAccessibilityIdentifiers.contains("battle-action-feedback") })
+        XCTAssertTrue(results.allSatisfy { $0.displayedAccessibilityIdentifiers.contains("battle-debrief-panel") })
+        XCTAssertEqual(results.filter { $0.id.kind == .fieldCommand }.count, 19)
+        XCTAssertEqual(results.filter { $0.id.kind == .lateCareer }.count, 16)
+
+        let berlin = try XCTUnwrap(results.first { $0.id == .lateCareer("berlin-halbe-epilogue") })
+        XCTAssertTrue(berlin.completionPersistenceKey.contains("berlin-halbe-epilogue"))
+        XCTAssertTrue(berlin.displayedAccessibilityIdentifiers.contains("german-turn-button"))
+    }
+
+    func testCycle810UnifiedUIParityAuditFindsNoSeparateLateCareerTier() {
+        let catalog = UnifiedUIParityAuditCatalog.self
+        let report = catalog.report
+
+        XCTAssertEqual(report.cycleRange, 806...810)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle810)
+        XCTAssertTrue(report.isReady)
+        XCTAssertEqual(report.totalBattleCount, 35)
+        XCTAssertEqual(Set(report.rowStyleIdentifiers), Set([UnifiedCampaignListCatalog.rowStyleIdentifier]))
+        XCTAssertEqual(Set(report.playAffordanceTitles), Set([UnifiedCampaignListCatalog.playAffordanceTitle]))
+        XCTAssertEqual(Set(report.hostSurfaceNames), Set([UnifiedGuderianBattleCatalog.hostSurfaceName]))
+        XCTAssertTrue(report.retiredSurfaceNames.contains("LateCareerPlayablePilotView"))
+        XCTAssertTrue(report.retiredSurfaceNames.contains("LateCareerContextBriefingView"))
+        XCTAssertTrue(report.items.allSatisfy(\.passed))
+        XCTAssertEqual(report.caveatLabelOnlyCount, UnifiedGuderianBattleCatalog.allEntries.filter { $0.caveatLabel != nil }.count)
+    }
+
+    func testCycle815UnifiedBalancePacingAuditCoversLateCareerBattles() {
+        let report = UnifiedBalancePacingAuditCatalog.report
+
+        XCTAssertEqual(report.cycleRange, 811...815)
+        XCTAssertTrue(UnifiedBalancePacingAuditCatalog.acceptanceReadyThroughCycle815, report.blockers.joined(separator: "\n"))
+        XCTAssertTrue(report.isReady, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.firstNineteenReferenceBattleCount, 19)
+        XCTAssertEqual(report.lateCareerAuditCount, 16)
+        XCTAssertEqual(report.passedLateCareerIDs, UnifiedPlayableBoardRouteCatalog.lateCareerRoutedIDsThroughCycle780)
+        XCTAssertTrue(report.audits.allSatisfy(\.isPlayableLikeFirstNineteen))
+        XCTAssertTrue(report.audits.allSatisfy { $0.terrainFeatureCount >= report.minimumTerrainFeatureCount })
+        XCTAssertTrue(report.audits.allSatisfy { $0.mobilityProfileCount >= report.minimumMobilityProfileCount })
+        XCTAssertTrue(report.audits.allSatisfy { $0.minimumObjectiveSpacing >= report.minimumObjectiveSpacing })
+        XCTAssertTrue(report.blockers.isEmpty)
+    }
+
+    func testCycle820ReadmeBattleChronologyListsAllThirtyFiveWithLinks() throws {
+        let report = UnifiedDocumentationCleanupCatalog.report
+        let readme = try readmeText()
+        let chronologyRows = battleChronologyRows(in: readme)
+
+        XCTAssertEqual(report.cycleRange, 816...820)
+        XCTAssertTrue(report.isReady, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(chronologyRows.count, 35)
+        XCTAssertEqual(report.expectedBattleChronologyRowCount, 35)
+        XCTAssertEqual(report.lateCareerChronologyRowCount, 16)
+
+        for expected in report.expectedRows.filter({ $0.id.kind == .lateCareer }) {
+            let row = try XCTUnwrap(
+                chronologyRows.first { $0.contains("| \(expected.order) |") },
+                "README needs chronology row \(expected.order) for \(expected.title)"
+            )
+            XCTAssertTrue(row.contains(expected.title), expected.title)
+            XCTAssertTrue(row.contains(expected.primarySourceURL.absoluteString), expected.title)
+            XCTAssertTrue(row.contains(expected.commandScopeLabel), expected.title)
+            XCTAssertTrue(row.localizedCaseInsensitiveContains("not a Guderian field command"), expected.title)
+        }
+
+        for phrase in report.requiredReadmePhrases {
+            XCTAssertTrue(readme.localizedCaseInsensitiveContains(phrase), phrase)
+        }
+        XCTAssertTrue(readme.contains("Cycle 830 update"))
+        XCTAssertTrue(readme.contains("no cycles remaining"))
+    }
+
+    func testCycle825UnifiedBuildRegressionHardeningReportIsReady() {
+        let report = UnifiedBuildRegressionHardeningCatalog.report
+
+        XCTAssertEqual(report.cycleRange, 821...825)
+        XCTAssertTrue(UnifiedBuildRegressionHardeningCatalog.acceptanceReadyThroughCycle825, report.blockers.joined(separator: "\n"))
+        XCTAssertTrue(report.isReady, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.fullHarnessBattleCount, 35)
+        XCTAssertTrue(report.saveMigrationReady)
+        XCTAssertTrue(report.uiParityReady)
+        XCTAssertTrue(report.balancePacingReady)
+        XCTAssertTrue(report.documentationReady)
+        XCTAssertTrue(report.gates.allSatisfy(\.passed))
+        XCTAssertTrue(report.buildCommands.contains("swift build"))
+        XCTAssertTrue(report.buildCommands.contains("swift test"))
+        XCTAssertTrue(report.buildCommands.contains("swift run GuderianTest"))
+        XCTAssertTrue(report.buildCommands.contains { $0.contains("xcodebuild") && $0.contains("GuderianTest") })
+    }
+
+    func testCycle830UnifiedCampaignAcceptanceShipsSingleThirtyFiveBattleCampaign() throws {
+        let readme = try readmeText()
+        let chronologyRows = battleChronologyRows(in: readme)
+        let report = UnifiedCampaignAcceptanceCatalog.report(readmeBattleChronologyRows: chronologyRows.count)
+
+        XCTAssertEqual(report.cycleRange, 826...830)
+        XCTAssertTrue(UnifiedCampaignAcceptanceCatalog.acceptanceReadyThroughCycle830, report.blockers.joined(separator: "\n"))
+        XCTAssertTrue(report.isReadyForUnifiedCampaignShip, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.totalBattleCount, 35)
+        XCTAssertEqual(report.fieldCommandBattleCount, 19)
+        XCTAssertEqual(report.lateCareerBattleCount, 16)
+        XCTAssertEqual(report.readmeBattleChronologyRows, 35)
+        XCTAssertEqual(report.hostSurfaceName, PlayableBattleSurfaceCatalog.hostSurfaceName)
+        XCTAssertTrue(report.allBattlesUseSameUI)
+        XCTAssertTrue(report.allBattlesCompleteFromLaunchToPersistence)
+        XCTAssertTrue(report.caveatsRemainHistoricalOnly)
+        XCTAssertTrue(report.noSeparateLateCareerGameplayTier)
+        XCTAssertEqual(report.remainingCycles, 0)
+        XCTAssertTrue(report.blockers.isEmpty)
+    }
+
+    private func readmeText() throws -> String {
+        let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("README.md")
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func battleChronologyRows(in readme: String) -> [String] {
+        var rows: [String] = []
+        var isInChronology = false
+
+        for line in readme.components(separatedBy: .newlines) {
+            if line == "## Battle Chronology" {
+                isInChronology = true
+                continue
+            }
+            if isInChronology && line.hasPrefix("## ") {
+                break
+            }
+            guard isInChronology, line.hasPrefix("| ") else {
+                continue
+            }
+
+            let cells = line
+                .split(separator: "|", omittingEmptySubsequences: false)
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+            if cells.count > 2, Int(cells[1]) != nil {
+                rows.append(line)
+            }
+        }
+
+        return rows
+    }
+
     func testCampaignCatalogIsChronologicalWithinStableOrder() {
         let scenarios = GuderianCampaignCatalog.all
 
