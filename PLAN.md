@@ -158,9 +158,13 @@ Cycle 825 update: cycles 821-825 are complete. `UnifiedBuildRegressionHardeningC
 
 Cycle 830 update: cycles 826-830 are complete. `UnifiedCampaignAcceptanceCatalog` verifies the single 35-battle playable campaign: all rows and battles use the same UI, all complete from launch to debrief/persistence, README lists all 35 battles, caveats remain historical labels only, no separate late-career gameplay tier remains, and zero cycles remain.
 
+Cycle 830 correction: the cycle 830 acceptance language overclaims actual product parity. Battles 20-35 have data, catalog, save/progress, README, and harness scaffolding, but they still route to `LateCareerUnifiedPlayableBoardView` with `LateCareerMapSurface` instead of the real `DZWPlayableBattleView` used by battles 1-19. Accessibility identifiers and catalog reports are not sufficient proof of same UI or same playability. Cycles 831-890 are added to fix the real interface and retire the acceptance/test debt that allowed this mismatch.
+
 Cycle plan 651-730: add the 16 late-career staff/epilogue battlefields to the visible Guderian app experience, first as a separate command-caveated Late Career Context section and then as DZW-style playable battle screens with AI, scoring, debrief, persistence, and GuderianTest parity.
 
 Cycle plan 731-830: remove the remaining UI/playability distinction between the 19 field-command battles and the 16 late-career staff/epilogue battlefields. All 35 selectable battles should route through the same DZW-style battle screen, command controls, AI turn flow, blocked-action feedback, debrief, persistence, and automation harness. Historical command-scope caveats remain visible as briefing/source labels only, not as a separate or lighter gameplay surface.
+
+Cycle plan 831-890: repair the cycle 830 overclaim by routing battles 20-35 through the real DZW-style playable battle implementation, not a lookalike late-career map surface. The plan also covers the known technical debt: duplicated late-career UI, scenario-only `DZWPlayableBattleViewModel` assumptions, metadata-only parity tests, weak screenshot/interaction verification, stale acceptance wording, and app/test paths that do not currently prove the real view is shared.
 
 ## Planning Rules
 
@@ -601,7 +605,37 @@ Status through cycle 820: completed. The README Battle Chronology lists all 35 s
 
 Status through cycle 825: completed. `UnifiedBuildRegressionHardeningCatalog` captures the SwiftPM, GuderianTest, Xcode, 35-battle harness, save/load migration, UI parity, documentation, and balance/pacing regression gates.
 
-Status through cycle 830: completed. `UnifiedCampaignAcceptanceCatalog` is the final acceptance gate for one 35-battle playable campaign. All battles use the same UI and completion flow, README coverage is 35/35, command-scope caveats are historical labels only, no separate late-career gameplay tier remains, and there are no development cycles remaining in this plan.
+Status through cycle 830: completed for data/catalog/documentation scaffolding, but corrected as incomplete for actual product UI parity. Battles 20-35 still use a separate late-career map/play surface rather than the same `DZWPlayableBattleView` path as battles 1-19. There are 60 newly planned cycles remaining to make the UI and playability claim true.
+
+## Cycles 831-890: Real DZW UI Parity And Debt Retirement
+
+The cycle 830 correction narrows the acceptance bar: battles 20-35 must render in the actual DZW-style battle screen used by battles 1-19, or in a shared generalized successor whose view model and interaction controls are the same implementation. Matching accessibility identifiers, catalog flags, or static map surfaces do not count. The player-visible standard is the battle 1-19 experience: the proper board, terrain zones, objectives, selectable units, draggable movement, phase controls, shooting, assaults, pending choices, live log, German AI turn runner, debrief, and persistence.
+
+Known technical debt covered by this block:
+
+- Battles 20-35 route to `LateCareerUnifiedPlayableBoardView` / `LateCareerMapSurface`, not the real DZW board view.
+- `DZWPlayableBattleViewModel` is scenario-centric and needs a battle-source abstraction that can load either `GuderianScenario` or late-career native loadouts.
+- Late-career sessions are rebuilt through report helpers instead of being held as a live UI session.
+- Tests assert identifiers/catalog readiness instead of proving the same view, renderer, board session, and interactions are used.
+- Acceptance catalogs and README/PLAN language overstate UI parity and need corrected gates.
+- GuderianTest needs to exercise battles 20-35 through the real shared playable view path, not only automation metadata.
+
+| Cycles | Focus | Output |
+| --- | --- | --- |
+| 831-835 | Corrected acceptance bar | Replace cycle-830 parity wording with a hard requirement that battles 20-35 instantiate the same playable battle implementation as battles 1-19. Add failing tests that detect `LateCareerMapSurface`/`LateCareerUnifiedPlayableBoardView` usage for selectable battles. |
+| 836-840 | Shared battle source model | Introduce a unified playable battle source/loadout abstraction that can represent original `GuderianScenario` battles and late-career native battles without branching into separate UI surfaces. |
+| 841-845 | Late-career live board session bridge | Expose battles 20-35 through a live board-session API with persistent selected unit, selected target, movement, shooting, assault, pending-choice, phase, mission, log, and completion state instead of per-action regenerated reports. |
+| 846-850 | Generalized DZW view model | Refactor `DZWPlayableBattleViewModel` so it consumes the shared battle source and live board session. Preserve battle 1-19 behavior while adding 20-35 as first-class inputs. |
+| 851-855 | Shared board rendering parity | Render battles 20-35 through the same DZW board renderer, terrain overlay, unit markers, objective markers, selection affordances, drag gestures, active-unit sidebar, and action controls used by battles 1-19. |
+| 856-860 | Route set A/B through real view | Route battles 20-27 into the generalized `DZWPlayableBattleView` path and remove their dependency on `LateCareerUnifiedPlayableBoardView` for playable launch. |
+| 861-865 | Route set C/D through real view | Route battles 28-35 into the generalized `DZWPlayableBattleView` path, including post-dismissal caveat labels as briefing/source context only. |
+| 866-870 | Remove duplicate playable surface | Delete or demote the late-career playable map surface to briefing-only usage. Ensure campaign navigation has one playable destination implementation for all 35 battles. |
+| 871-875 | Real interaction regression | Add tests that drive battles 20-35 through unit selection, legal drag movement, phase advancement, shooting/assault attempts, pending-choice resolution, blocked-action feedback, German AI turn, debrief, and persistence using the shared view model. |
+| 876-880 | Visual parity verification | Add screenshot or view-inspection checks that compare battle 20-35 screens against the battle 1-19 board/sidebar/control structure, proving the proper board is visible and not the late-career map surface. |
+| 881-885 | GuderianTest and save/load hardening | Update GuderianTest to open representative battles from all 35 through the real shared UI path, then verify unified save/load migration and completions still work after the view-model refactor. |
+| 886-890 | Final corrected acceptance | Ship a corrected final gate: all 35 battles use the same real playable UI implementation, the old metadata-only acceptance is retired, docs are corrected, tests/builds pass, and no known UI/playability technical debt remains. |
+
+Status through cycle 890: planned. This block is intended to cover all known technical debt behind the 20-35 UI/playability mismatch. Additional cycles should only be needed if implementation uncovers new engine limitations, such as late-career scenario boards requiring C-engine hooks beyond the current guarded Guderian hooks.
 
 ## Acceptance Criteria
 
@@ -612,6 +646,8 @@ Status through cycle 830: completed. `UnifiedCampaignAcceptanceCatalog` is the f
 - Every battle has source links, scenario notes, force data, objectives, balance status, and test coverage.
 - Existing and future maps hit the 400% detail-improvement target through denser sourceable geography rather than decorative markers.
 - Late-career battlefields after Guderian's 1941 dismissal are framed as Inspector General, Army General Staff, or post-dismissal context unless direct field command is proven.
-- All 35 selectable Guderian battles use the same visual and interactive playable-battle UI; command-scope caveats may appear as historical labels, but they must not create a separate or reduced playability mode.
+- All 35 selectable Guderian battles use the same visual and interactive playable-battle UI implementation; command-scope caveats may appear as historical labels, but they must not create a separate or reduced playability mode.
+- For battles 20-35, acceptance requires the real `DZWPlayableBattleView` path or a shared generalized successor with the same board renderer, view model, controls, gestures, session state, and interaction behavior as battles 1-19. `LateCareerMapSurface`, matching accessibility identifiers, catalog flags, and metadata-only harnesses do not satisfy playable UI parity.
+- Visual parity tests must prove battles 20-35 show the proper board/sidebar/control structure, not a briefing map or late-career-only surface.
 - The app clearly frames the player as opposing Guderian and treats the historical subject with sober context.
 - "Playable" means a DZW-style hand-playable Guderian battle screen with scenario-specific units, terrain, objectives, legal actions, scoring, AI pressure, blocked-action reporting, logs, and debriefs; proxy-loadable metadata or automation-only completion no longer satisfies the playable milestone.
