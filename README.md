@@ -69,6 +69,7 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 - Cycles 401-450: post-ship hardening, adding after-action analysis and deterministic campaign soak probes across every native battle.
 - Cycles 451-500: `derZweiteWeltkrieg` playable-screen rebase, beginning with Tuchola Forest as the accepted DZW-style board/sidebar/unit-control pilot and then carrying that screen parity through the campaign.
 - Cycles 591-650: 400% map-detail improvement and late-career command-context expansion, with post-1941 scenarios labeled as staff-influence or epilogue context rather than direct field command.
+- Cycles 651-710: visible late-career integration, adding a separate Guderian Late Career Context section, shared dzw briefing maps, parity-ready reports for all 16 late-career records, and consolidated AI/rule bindings while preserving the 19-battle field-command campaign.
 
 Cycle 451 correction: after running `derZweiteWeltkrieg`, the accepted playability bar is the actual DZW battle screen: terrain board, objectives, opposing units, direct unit selection, draggable movement, phase/action controls, pending-choice handling, and a visible combat log. Earlier cycle 400/450 reports proved native data, diagnostics, and automation stability, but they overstated product playability because the Guderian app still surfaced a simplified board instead of the full DZW-style playable screen.
 
@@ -158,6 +159,30 @@ Cycle 645 update: late-career set D now covers Operation Solstice, East Pomerani
 
 Cycle 650 update: the cycle 591-650 expansion is complete. The current 19-battle campaign remains fully routed to the DZW-style playable screen, the enriched maps remain acceptance-ready, and all 16 late-career staff/epilogue battlefields are linked to the shared dzw career ledger with command caveats.
 
+Cycle 655 update: cycles 651-655 are complete. `LateCareerGuderianPresentationCatalog` now wraps the 16 shared dzw late-career battlefield records for Guderian while keeping `GuderianCampaignCatalog.all` locked to the original 19 field-command battles.
+
+Cycle 660 update: cycles 656-660 are complete. The Guderian campaign screen now shows a separate Late Career Context section with scope filters and row-level command caveats for Inspector General, General Staff, and post-dismissal epilogue records.
+
+Cycle 665 update: cycles 661-665 are complete. Late-career context rows now open briefing screens with zoomable/scrollable maps, objectives, forces, rules, and sources reused directly from the shared dzw late-career battlefield data.
+
+Cycle 670 update: cycles 666-670 are complete. The four set-A late-career battlefields now route to a DZW-style pilot surface with board/sidebar layout, caveated setup metadata, force focus controls, phase advancement, and pilot log feedback.
+
+Cycle 675 update: cycles 671-675 are complete. Set A now has playable parity metadata: scoring profiles, debrief text, late-career completion records, persistence keys, AI priorities, blocked-action expectations, and regression coverage.
+
+Cycle 680 update: cycles 676-680 are complete. Set B now routes Operation Bagration withdrawal, Lvov-Sandomierz, Narew/Vistula bridgeheads, and Warsaw defensive arcs into the same late-career DZW-style surface with General Staff caveats visible.
+
+Cycle 685 update: cycles 681-685 are complete. Set B now has AI priorities, blocked-action expectations, scoring/debrief records, persistence keys, and tests proving parity readiness for all four set-B battlefields.
+
+Cycle 690 update: cycles 686-690 are complete. Set C now routes Vistula-Oder, Poznan corridor, East Prussia/Elbing, and Kustrin/Oder bridgeheads into the caveated late-career playable surface.
+
+Cycle 695 update: cycles 691-695 are complete. Set C now has playable parity metadata with scoring profiles, debrief text, late-career completion records, persistence keys, AI priorities, blocked-action expectations, and regression coverage.
+
+Cycle 700 update: cycles 696-700 are complete. Set D now routes Operation Solstice, East Pomeranian offensive, Seelow Heights epilogue, and Berlin/Halbe epilogue into the late-career DZW-style surface with post-dismissal caveats visible.
+
+Cycle 705 update: cycles 701-705 are complete. Set D now has final-war parity metadata with epilogue-aware debrief handling, persistence keys, completion records, AI pressure, blocked actions, and regression coverage.
+
+Cycle 710 update: cycles 706-710 are complete. `LateCareerConsolidatedPlaybookCatalog` now consolidates AI priorities, blocked-action expectations, command-caveat events, and reusable crossing, rail, fortress, withdrawal, and phase-line rule bindings across all 16 late-career records.
+
 ## Run
 
 Build and test from the repository root:
@@ -187,7 +212,7 @@ Then upload `dist/Guderian-1.0.0.zip` to the GitHub release at `https://github.c
 
 ## Ship Status
 
-The campaign content and native automation layers are substantial, and the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 590 completes playable-screen parity for all 19 battles, from Tuchola Forest through Moscow/Tula/Kashira, with debrief, persistence, screen-parity automation, reusable surface routing, and GuderianTest reporting. Cycle 595 starts the next expansion by locking the command-scope rules for richer maps and late-career context scenarios.
+The campaign content and native automation layers are substantial, and the accepted playable-game milestone is now tracked against the DZW-style hand-playable screen. Cycle 590 completes playable-screen parity for all 19 battles, from Tuchola Forest through Moscow/Tula/Kashira, with debrief, persistence, screen-parity automation, reusable surface routing, and GuderianTest reporting. Cycle 710 makes the late-career expansion visible in Guderian as 16 separate command-caveated context entries, all parity-ready with a consolidated AI/rule playbook.
 
 Remaining playable-screen estimate: battles 1-19 are complete through cycle 590. Map-detail auditing, schema expansion, geography cross-checking, Poland map enrichment, France map enrichment, Eastern Front map enrichment, late-career staff/epilogue sets A-D, and integration acceptance are complete through cycle 650. There are no cycles remaining in the current 60-cycle map/detail and late-career expansion plan.
 

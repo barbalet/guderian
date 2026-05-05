@@ -304,6 +304,226 @@ final class GuderianCampaignTests: XCTestCase {
         )
     }
 
+    func testCycle655LateCareerPresentationCatalogKeepsCampaignSeparate() {
+        let catalog = LateCareerGuderianPresentationCatalog.self
+        let currentBattleRawIDs = Set(GuderianBattleID.allCases.map(\.rawValue))
+
+        XCTAssertEqual(catalog.cycleRange, 651...670)
+        XCTAssertEqual(catalog.fieldCommandCampaignCount, 19)
+        XCTAssertEqual(GuderianCampaignCatalog.all.count, 19)
+        XCTAssertEqual(catalog.visibleEntryCount, 16)
+        XCTAssertEqual(catalog.totalSelectableEntryCount, 35)
+        XCTAssertEqual(
+            catalog.allEntries.map(\.id),
+            LateCareerStaffBattlefieldAcceptanceCatalog.allLateCareerBattlefieldIDs
+        )
+        XCTAssertTrue(catalog.allEntriesReadyForBriefing)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle670)
+
+        for entry in catalog.allEntries {
+            XCTAssertFalse(currentBattleRawIDs.contains(entry.id), entry.title)
+            XCTAssertTrue(entry.visibleCommandCaveatLabel.localizedCaseInsensitiveContains("not a Guderian field command"), entry.title)
+            XCTAssertFalse(entry.scope.allowsDirectBattlefieldScenario, entry.title)
+        }
+    }
+
+    func testCycle660LateCareerPresentationSupportsScopeFiltersAndVisibleRows() {
+        let catalog = LateCareerGuderianPresentationCatalog.self
+
+        XCTAssertEqual(catalog.sectionTitle, "Late Career Context")
+        XCTAssertEqual(catalog.entries(for: nil).count, 16)
+        XCTAssertEqual(catalog.entries(for: .inspectorGeneralInfluence).count, 4)
+        XCTAssertEqual(catalog.entries(for: .armyGeneralStaffInfluence).count, 10)
+        XCTAssertEqual(catalog.entries(for: .postDismissalContext).count, 2)
+        XCTAssertEqual(catalog.entries(for: .directFieldCommand).count, 0)
+        XCTAssertEqual(catalog.entries(for: .adjacentCampaignPressure).count, 0)
+        XCTAssertEqual(catalog.allEntries.map(\.order), Array(1...16))
+        XCTAssertEqual(catalog.entry(for: "kursk-armored-force-pressure")?.title, "Kursk Armored Force Pressure")
+        XCTAssertEqual(catalog.entry(for: "berlin-halbe-epilogue")?.scope, .postDismissalContext)
+    }
+
+    func testCycle665LateCareerBriefingSurfaceUsesSharedDZWData() {
+        for entry in LateCareerGuderianPresentationCatalog.allEntries {
+            let battlefield = entry.battlefield
+
+            XCTAssertEqual(entry.mapFeatureCount, battlefield.map.featureCount, entry.title)
+            XCTAssertEqual(entry.mapSourceNoteCount, battlefield.map.sourceNoteCount, entry.title)
+            XCTAssertEqual(entry.objectiveCount, battlefield.objectives.count, entry.title)
+            XCTAssertEqual(entry.forceCount, battlefield.forces.count, entry.title)
+            XCTAssertEqual(entry.ruleCount, battlefield.rules.count, entry.title)
+            XCTAssertEqual(entry.sourceCount, battlefield.sourceLinks.count, entry.title)
+            XCTAssertTrue(battlefield.map.hasRequiredStaffContextDetail, entry.title)
+            XCTAssertTrue(battlefield.map.elements.contains { $0.kind == .phaseLine }, entry.title)
+            XCTAssertGreaterThanOrEqual(battlefield.map.sourceNoteCount, 1, entry.title)
+            XCTAssertTrue(battlefield.objectives.contains { $0.side == .player }, entry.title)
+            XCTAssertTrue(battlefield.objectives.contains { $0.side == .guderianAI }, entry.title)
+        }
+    }
+
+    func testCycle670LateCareerSetAPlayablePilotIsRouted() {
+        let catalog = LateCareerGuderianPresentationCatalog.self
+        let setAIDs = LateCareerStaffBattlefieldSetACatalog.battlefieldIDs
+
+        XCTAssertEqual(catalog.setAPlayablePilotIDs, setAIDs)
+        XCTAssertEqual(catalog.setAPlayablePilotEntries.map(\.id), setAIDs)
+        XCTAssertEqual(catalog.setAPlayablePilotEntries.count, 4)
+        XCTAssertTrue(catalog.allSetAEntriesPlayablePilotReady)
+
+        for entry in catalog.allEntries {
+            if setAIDs.contains(entry.id) {
+                XCTAssertTrue(entry.isRoutedToLateCareerPlayableSurface, entry.title)
+                XCTAssertTrue(entry.isSetAPlayablePilot, entry.title)
+            } else {
+                XCTAssertFalse(entry.isSetAPlayablePilot, entry.title)
+            }
+        }
+    }
+
+    func testCycle675LateCareerSetAParityAddsScoringDebriefAndPersistence() {
+        let catalog = LateCareerPlayableSurfaceCatalog.self
+
+        XCTAssertEqual(catalog.cycleRange, 671...710)
+        XCTAssertEqual(catalog.setAParityIDs, LateCareerStaffBattlefieldSetACatalog.battlefieldIDs)
+        XCTAssertEqual(catalog.setAReports.map(\.battlefieldID), catalog.setAParityIDs)
+        XCTAssertEqual(catalog.setAReports.count, 4)
+
+        for report in catalog.setAReports {
+            XCTAssertEqual(report.set, .setA, report.title)
+            XCTAssertTrue(report.isParityReady, report.title)
+            XCTAssertEqual(report.status, .passed, report.title)
+            XCTAssertGreaterThanOrEqual(report.scoringProfile.maxPlayerScore, 12, report.title)
+            XCTAssertEqual(report.completionRecord.score, report.scoringProfile.maxPlayerScore, report.title)
+            XCTAssertEqual(report.completionRecord.victoryBand, .operational, report.title)
+            XCTAssertEqual(report.completionRecord.persistenceKey, report.scoringProfile.persistenceKey, report.title)
+            XCTAssertTrue(report.completionRecord.persistenceKey.contains(report.battlefieldID), report.title)
+            XCTAssertFalse(report.debriefProfile.operationalText.isEmpty, report.title)
+        }
+    }
+
+    func testCycle680LateCareerSetBRoutesIntoPlayableSurface() {
+        let catalog = LateCareerPlayableSurfaceCatalog.self
+        let setBIDs = LateCareerStaffBattlefieldSetBCatalog.battlefieldIDs
+
+        XCTAssertEqual(catalog.setBPlayableRouteIDs, setBIDs)
+        XCTAssertTrue(setBIDs.allSatisfy { catalog.isRoutedToPlayableSurface($0) })
+        XCTAssertEqual(
+            LateCareerGuderianPresentationCatalog.allEntries
+                .filter { setBIDs.contains($0.id) }
+                .map(\.readiness),
+            Array(repeating: LateCareerPlayableReadiness.playableParity, count: setBIDs.count)
+        )
+        XCTAssertEqual(Array(catalog.routedBattlefieldIDs.prefix(8).suffix(4)), setBIDs)
+    }
+
+    func testCycle685LateCareerSetBParityAddsAIAndBlockedActionCoverage() {
+        let catalog = LateCareerPlayableSurfaceCatalog.self
+
+        XCTAssertEqual(catalog.setBReports.map(\.battlefieldID), LateCareerStaffBattlefieldSetBCatalog.battlefieldIDs)
+        XCTAssertEqual(catalog.setBReports.count, 4)
+
+        for report in catalog.setBReports {
+            XCTAssertEqual(report.set, .setB, report.title)
+            XCTAssertTrue(report.isParityReady, report.title)
+            XCTAssertGreaterThanOrEqual(report.aiPlan.priorities.count, 2, report.title)
+            XCTAssertGreaterThanOrEqual(report.aiPlan.blockedActionExpectations.count, 2, report.title)
+            XCTAssertTrue(
+                report.aiPlan.blockedActionExpectations.contains {
+                    $0.reason.localizedCaseInsensitiveContains("not a Guderian field command")
+                },
+                report.title
+            )
+            XCTAssertTrue(report.debriefProfile.failureText.localizedCaseInsensitiveContains("not a Guderian field command"), report.title)
+        }
+    }
+
+    func testCycle690LateCareerSetCRoutesWithGeneralStaffCaveats() throws {
+        let catalog = LateCareerPlayableSurfaceCatalog.self
+        let setCIDs = LateCareerStaffBattlefieldSetCCatalog.battlefieldIDs
+
+        XCTAssertEqual(catalog.setCPlayableRouteIDs, setCIDs)
+        XCTAssertTrue(setCIDs.allSatisfy { catalog.isRoutedToPlayableSurface($0) })
+        XCTAssertTrue(setCIDs.allSatisfy { catalog.aiPlan(for: $0) != nil })
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle690)
+
+        for id in setCIDs {
+            let entry = try XCTUnwrap(LateCareerGuderianPresentationCatalog.entry(for: id))
+            XCTAssertEqual(entry.scope, .armyGeneralStaffInfluence, id)
+            XCTAssertTrue(entry.visibleCommandCaveatLabel.localizedCaseInsensitiveContains("not a Guderian field command"), id)
+        }
+    }
+
+    func testCycle695LateCareerSetCParityAddsScoringDebriefAndPersistence() {
+        let catalog = LateCareerPlayableSurfaceCatalog.self
+
+        XCTAssertEqual(catalog.setCParityIDs, LateCareerStaffBattlefieldSetCCatalog.battlefieldIDs)
+        XCTAssertEqual(catalog.setCReports.map(\.battlefieldID), catalog.setCParityIDs)
+        XCTAssertEqual(catalog.setCReports.count, 4)
+
+        for report in catalog.setCReports {
+            XCTAssertEqual(report.set, .setC, report.title)
+            XCTAssertTrue(report.isParityReady, report.title)
+            XCTAssertEqual(report.completionRecord.score, report.scoringProfile.maxPlayerScore, report.title)
+            XCTAssertEqual(report.completionRecord.victoryBand, .operational, report.title)
+            XCTAssertTrue(report.debriefProfile.operationalText.localizedCaseInsensitiveContains("outside the 19-battle field-command campaign"), report.title)
+            XCTAssertTrue(report.completionRecord.persistenceKey.contains(report.battlefieldID), report.title)
+        }
+    }
+
+    func testCycle700LateCareerSetDRoutesWithPostDismissalCaveatsVisible() throws {
+        let catalog = LateCareerPlayableSurfaceCatalog.self
+        let setDIDs = LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs
+
+        XCTAssertEqual(catalog.setDPlayableRouteIDs, setDIDs)
+        XCTAssertTrue(setDIDs.allSatisfy { catalog.isRoutedToPlayableSurface($0) })
+        XCTAssertEqual(Array(catalog.routedBattlefieldIDs.suffix(4)), setDIDs)
+
+        let setDEntries = try setDIDs.map { id in
+            try XCTUnwrap(LateCareerGuderianPresentationCatalog.entry(for: id))
+        }
+        XCTAssertEqual(setDEntries.filter { $0.scope == .postDismissalContext }.count, 2)
+        XCTAssertTrue(setDEntries.allSatisfy { $0.visibleCommandCaveatLabel.localizedCaseInsensitiveContains("not a Guderian field command") })
+    }
+
+    func testCycle705LateCareerSetDParityAddsFinalWarDebriefHandling() {
+        let catalog = LateCareerPlayableSurfaceCatalog.self
+
+        XCTAssertEqual(catalog.setDParityIDs, LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs)
+        XCTAssertEqual(catalog.setDReports.map(\.battlefieldID), catalog.setDParityIDs)
+        XCTAssertEqual(catalog.setDReports.count, 4)
+
+        for report in catalog.setDReports {
+            XCTAssertEqual(report.set, .setD, report.title)
+            XCTAssertTrue(report.isParityReady, report.title)
+            XCTAssertTrue(report.debriefProfile.failureText.localizedCaseInsensitiveContains("historical context only"), report.title)
+            XCTAssertGreaterThanOrEqual(report.aiPlan.blockedActionExpectations.count, 3, report.title)
+        }
+
+        XCTAssertEqual(catalog.parityReports.count, 16)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle710)
+    }
+
+    func testCycle710LateCareerAIAndRulesPlaybookConsolidatesAllSixteenBattlefields() {
+        let catalog = LateCareerConsolidatedPlaybookCatalog.self
+        let report = catalog.report
+
+        XCTAssertEqual(catalog.cycleRange, 706...710)
+        XCTAssertTrue(report.isReady)
+        XCTAssertEqual(report.routedBattlefieldCount, 16)
+        XCTAssertEqual(report.parityReadyBattlefieldCount, 16)
+        XCTAssertEqual(report.aiPlanCount, 16)
+        XCTAssertEqual(Set(report.coveredRuleFamilies), Set(LateCareerRuleFamily.allCases))
+        XCTAssertEqual(report.commandCaveatRuleCount, 16)
+        XCTAssertEqual(report.phaseLineRuleCount, 16)
+        XCTAssertGreaterThanOrEqual(report.ruleBindingCount, 96)
+        XCTAssertGreaterThanOrEqual(report.blockedActionExpectationCount, 48)
+
+        for entry in LateCareerGuderianPresentationCatalog.allEntries {
+            XCTAssertEqual(entry.readiness, .playableParity, entry.title)
+            XCTAssertTrue(entry.isParityReady, entry.title)
+            XCTAssertEqual(catalog.ruleBindings(for: entry.id).count, LateCareerRuleFamily.allCases.count, entry.title)
+        }
+    }
+
     func testCampaignCatalogIsChronologicalWithinStableOrder() {
         let scenarios = GuderianCampaignCatalog.all
 

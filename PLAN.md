@@ -86,6 +86,32 @@ Cycle 645 update: cycles 641-645 are complete. Late-career set D now adds Operat
 
 Cycle 650 update: cycles 646-650 are complete. `LateCareerStaffBattlefieldAcceptanceCatalog` now verifies that the current 19-battle campaign remains routed to the DZW-style playable screen, current enriched maps satisfy the acceptance detail categories, all 16 late-career battlefield records match the career ledger, every new battlefield is command-caveated, and the post-dismissal epilogues remain separated from General Staff context.
 
+Cycle 655 update: cycles 651-655 are complete. `LateCareerGuderianPresentationCatalog` now wraps the shared dzw late-career battlefield records for Guderian, keeps the original 19-battle field-command campaign count unchanged, exposes 16 command-caveated context entries, and reports 35 total selectable campaign/context entries for visible app integration.
+
+Cycle 660 update: cycles 656-660 are complete. The Guderian campaign list now includes a separate Late Career Context section with scope filtering for all, Inspector General, General Staff, and epilogue records. Every row shows date, scope, command caveat, readiness, and a stable accessibility identifier without mixing those records into `GuderianCampaignCatalog.all`.
+
+Cycle 665 update: cycles 661-665 are complete. Late-career context rows now open a Guderian briefing workspace that renders the shared dzw late-career maps directly, with a zoomable and scrollable battlefield viewport plus objectives, forces, rules, and source links without duplicating or forking the underlying battlefield data.
+
+Cycle 670 update: cycles 666-670 are complete. The four set-A late-career battlefields, Kursk armored-force pressure, Dnieper withdrawal, Korsun-Cherkassy, and Kamenets-Podolsky, now route to a DZW-style pilot surface with board/sidebar layout, caveated setup metadata, force focus controls, phase advancement, and a visible pilot log. Full scoring/debrief parity remains scheduled for cycles 671-675.
+
+Cycle 675 update: cycles 671-675 are complete. Set A now has late-career playable parity metadata: scoring profiles, operational/tactical/failure debrief text, completion records, persistence keys, AI priorities, blocked-action expectations, and regression coverage for all four set-A battlefields.
+
+Cycle 680 update: cycles 676-680 are complete. Set B, Operation Bagration withdrawal, Lvov-Sandomierz, Narew/Vistula bridgeheads, and Warsaw defensive arcs, now routes into the same late-career DZW-style surface with visible General Staff command caveats.
+
+Cycle 685 update: cycles 681-685 are complete. Set B now has parity metadata alongside its routing: AI pressure priorities, blocked-action expectations, scoring/debrief records, persistence keys, and tests proving each set-B report is parity-ready.
+
+Cycle 690 update: cycles 686-690 are complete. Set C, Vistula-Oder, Poznan corridor, East Prussia/Elbing, and Kustrin/Oder bridgeheads, now routes into the late-career playable surface with General Staff caveats visible.
+
+Cycle 695 update: cycles 691-695 are complete. Set C now has playable parity metadata, including completion records, operational/tactical/failure debrief text, scoring profiles, persistence keys, AI priorities, and regression coverage for the four General Staff bridgehead and collapse-route battlefields.
+
+Cycle 700 update: cycles 696-700 are complete. Set D now routes Operation Solstice, East Pomeranian offensive, Seelow Heights epilogue, and Berlin/Halbe epilogue into the late-career DZW-style playable surface, with the post-dismissal caveats visible for Seelow and Berlin/Halbe.
+
+Cycle 705 update: cycles 701-705 are complete. Set D now has final-war parity metadata with completion records, epilogue-aware debrief handling, persistence keys, AI pressure, blocked-action coverage, and tests proving all four set-D reports are parity-ready.
+
+Cycle 710 update: cycles 706-710 are complete. `LateCareerConsolidatedPlaybookCatalog` now consolidates reusable AI plans, blocked-action expectations, crossing/rail/fortress/withdrawal/phase-line rule bindings, and command-caveat UI events across all 16 late-career records.
+
+Cycle plan 651-730: add the 16 late-career staff/epilogue battlefields to the visible Guderian app experience, first as a separate command-caveated Late Career Context section and then as DZW-style playable battle screens with AI, scoring, debrief, persistence, and GuderianTest parity.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -431,7 +457,58 @@ Status through cycle 640: completed. `LateCareerStaffBattlefieldSetCCatalog` cov
 
 Status through cycle 645: completed. `LateCareerStaffBattlefieldSetDCatalog` covers Operation Solstice, East Pomeranian offensive, Seelow Heights, and Berlin/Halbe, with Seelow and Berlin/Halbe held as post-dismissal epilogues and caveat labels visible in testable data.
 
-Status through cycle 650: completed. `LateCareerStaffBattlefieldAcceptanceCatalog` ties the map-detail and late-career expansion together: the 19 current battles remain playable-screen routed, all late-career records match the 16-candidate ledger, and every staff/epilogue battlefield is ready as command-caveated shared dzw data. The current 60-cycle expansion plan has no documented cycles remaining.
+Status through cycle 650: completed. `LateCareerStaffBattlefieldAcceptanceCatalog` ties the map-detail and late-career expansion together: the 19 current battles remain playable-screen routed, all late-career records match the 16-candidate ledger, and every staff/epilogue battlefield is ready as command-caveated shared dzw data. The current 60-cycle expansion plan is complete; the next plan block is cycles 651-730 for visible late-career integration and playability.
+
+Status through cycle 655: completed. `LateCareerGuderianPresentationCatalog` provides the Guderian-facing app catalog for the 16 late-career records while preserving the 19-battle field-command campaign as its own unchanged catalog.
+
+Status through cycle 660: completed. The campaign view now exposes the separate Late Career Context section, including scope filters and command-caveated row labels for Inspector General, Army General Staff, and post-dismissal epilogue content.
+
+Status through cycle 665: completed. Late-career briefing screens now reuse the shared dzw battlefield maps, objectives, forces, rules, and sources through a zoomable/scrollable Guderian map surface.
+
+Status through cycle 670: completed. Set A late-career records route to the first DZW-style pilot surface with caveated setup metadata, force focus controls, phase controls, and log feedback; parity scoring and debrief work remains in the next cycle block.
+
+Status through cycle 675: completed. `LateCareerPlayableSurfaceCatalog` now reports set-A scoring, debrief, persistence, AI priorities, and blocked-action expectations, and the late-career surface can record a parity debrief for those four battlefields.
+
+Status through cycle 680: completed. Set B late-career records now route to the same DZW-style surface with General Staff caveats visible from the campaign row through the playable panel.
+
+Status through cycle 685: completed. Set B now has parity-ready reports with AI pressure, blocked-action coverage, scoring, debrief, and persistence metadata.
+
+Status through cycle 690: completed. Set C records now route to the late-career playable surface with caveats and AI pressure metadata.
+
+Status through cycle 695: completed. Set C now has parity-ready scoring, debrief, persistence, AI pressure, and completion-report metadata.
+
+Status through cycle 700: completed. Set D now routes to the caveated late-career DZW-style playable surface, including the post-dismissal epilogue records.
+
+Status through cycle 705: completed. Set D now has final-war parity-ready reports with epilogue-aware debriefs, persistence, AI pressure, and blocked-action coverage.
+
+Status through cycle 710: completed. The shared late-career playbook now consolidates AI priorities, blocked actions, command-caveat events, and reusable crossing, rail, fortress, withdrawal, and phase-line rule bindings across all 16 records.
+
+## Cycles 651-730: Visible Late-Career Integration And Playability
+
+The cycle 650 work created detailed late-career staff/epilogue battlefield data, and cycles 651-710 now make those records visible in Guderian as a separate, explicitly caveated Late Career Context section with parity-ready playable reports and consolidated AI/rule bindings. Cycles 711-730 finish separate progress tracking, full automation, UX polish, and acceptance. The original 19-battle field-command campaign must remain intact and visually distinct from staff-influence and post-dismissal epilogue content.
+
+| Cycles | Focus | Output |
+| --- | --- | --- |
+| 651-655 | Late-career app catalog | Add a Guderian-facing late-career presentation catalog that wraps the shared dzw battlefield records, preserves order, exposes command scope, and keeps the 19-battle campaign count unchanged. |
+| 656-660 | Campaign UI section | Add a visible Late Career Context section to the Guderian app with row selection, command-caveat labels, scope filters, and clear separation from direct field-command battles. |
+| 661-665 | Briefing and map surface | Reuse the detailed late-career maps, objectives, forces, source links, and rules in a Guderian briefing workspace with zoomable/scrollable map treatment and no duplicate data fork. |
+| 666-670 | Set A playable pilot | Route Kursk, Dnieper, Korsun-Cherkassy, and Kamenets-Podolsky from the new section into the DZW-style playable surface with caveated setup metadata. |
+| 671-675 | Set A parity | Add playable-screen parity, scoring hooks, debrief text, persistence records, and GuderianTest coverage for the four set-A battlefields. |
+| 676-680 | Set B routing | Route Operation Bagration, Lvov-Sandomierz, Narew/Vistula bridgeheads, and Warsaw-area defensive arcs into the same late-career playable surface. |
+| 681-685 | Set B parity | Add AI priorities, blocked-action expectations, scoring/debrief records, and GuderianTest coverage for the four set-B battlefields. |
+| 686-690 | Set C routing | Route Vistula-Oder, Poznan corridor, East Prussia/Elbing, and Kustrin/Oder bridgeheads into the playable surface with General Staff caveats visible. |
+| 691-695 | Set C parity | Add playable completion paths, AI pressure, scoring, debrief, persistence, and GuderianTest parity for the four set-C battlefields. |
+| 696-700 | Set D routing | Route Operation Solstice, East Pomeranian offensive, Seelow Heights epilogue, and Berlin/Halbe epilogue with post-dismissal caveats visible for the epilogues. |
+| 701-705 | Set D parity | Add playable completion paths, final-war AI pressure, epilogue debrief handling, persistence, and GuderianTest parity for the four set-D battlefields. |
+| 706-710 | Late-career AI and rules | Consolidate reusable late-career AI priorities, crossing/rail/fortress/withdrawal rules, phase-line escalation, and command-caveat UI events across all 16 records. |
+| 711-715 | Progress and debrief model | Extend campaign progress and completion summaries so late-career context completions are tracked separately from the 19-battle field-command campaign. |
+| 716-720 | Automation and regression | Add full GuderianTest automation that opens the late-career section, runs every new battlefield to debrief, and verifies caveats, map detail, AI, scoring, and persistence. |
+| 721-725 | UX polish and docs | Polish filters, accessibility labels, keyboard navigation, source-note display, final-war caveat wording, README guidance, and plan status notes. |
+| 726-730 | Acceptance and builds | Run full SwiftPM and Xcode acceptance, verify the 19-battle campaign remains unchanged, verify all 16 late-career battlefields are visible and playable, and update ship-readiness reporting. |
+
+Status through cycle 710: completed. The shared dzw late-career data is visible in the Guderian app's battle list as a separate Late Career Context section; all 16 records open briefing surfaces and parity-ready playable reports; and the shared playbook consolidates late-career AI, blocked actions, caveat events, and reusable rule bindings.
+
+Status target through cycle 730: planned. Guderian should show 35 total selectable battle/context entries: 19 field-command campaign battles plus 16 visibly caveated late-career context battlefields, all with DZW-style playable-screen coverage and separate completion tracking.
 
 ## Acceptance Criteria
 

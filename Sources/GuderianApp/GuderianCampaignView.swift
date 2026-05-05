@@ -3,11 +3,56 @@ import Foundation
 import Metal
 import SwiftUI
 
+private enum LateCareerScopeFilter: String, CaseIterable, Identifiable {
+    case all
+    case inspectorGeneral
+    case armyGeneralStaff
+    case epilogue
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all:
+            return "All"
+        case .inspectorGeneral:
+            return "Inspector"
+        case .armyGeneralStaff:
+            return "General Staff"
+        case .epilogue:
+            return "Epilogue"
+        }
+    }
+
+    var scope: GuderianCommandScope? {
+        switch self {
+        case .all:
+            return nil
+        case .inspectorGeneral:
+            return .inspectorGeneralInfluence
+        case .armyGeneralStaff:
+            return .armyGeneralStaffInfluence
+        case .epilogue:
+            return .postDismissalContext
+        }
+    }
+
+    func entries(from catalog: [LateCareerGuderianPresentation]) -> [LateCareerGuderianPresentation] {
+        guard let scope else {
+            return catalog
+        }
+
+        return catalog.filter { $0.scope == scope }
+    }
+}
+
 public struct GuderianCampaignView: View {
     private let scenarios = GuderianCampaignCatalog.all.sorted { $0.order < $1.order }
+    private let lateCareerEntries = LateCareerGuderianPresentationCatalog.allEntries
     @State private var selectedID: GuderianBattleID? = .tucholaForest
     @State private var progress = CampaignProgress()
     @State private var playMode: CampaignPlayMode = .chronological
+    @State private var lateCareerScopeFilter: LateCareerScopeFilter = .all
     @State private var hasLoadedSaveState = false
     @AppStorage("guderian.campaignSaveState.v1") private var savedCampaignStateData = Data()
 
@@ -23,6 +68,10 @@ public struct GuderianCampaignView: View {
         FullCampaignShipReportCatalog.report(catalog: scenarios)
     }
 
+    private var visibleLateCareerEntries: [LateCareerGuderianPresentation] {
+        lateCareerScopeFilter.entries(from: lateCareerEntries)
+    }
+
     public init() {}
 
     public var body: some View {
@@ -30,6 +79,7 @@ public struct GuderianCampaignView: View {
             List {
                 campaignStatusSection
                 scenarioListSection
+                lateCareerListSection
             }
             .listStyle(.inset)
             .navigationTitle("Campaign")
@@ -135,10 +185,13 @@ public struct GuderianCampaignView: View {
                 Text(shipReport.isShipReady ? "Full campaign ship-ready" : "\(shipReport.blockers.count) ship blockers")
                     .font(.caption)
                     .foregroundStyle(shipReport.isShipReady ? .green : .orange)
+                Text("\(lateCareerEntries.count) late-career context battlefields | \(LateCareerPlayableSurfaceCatalog.routedEntries.count) routed")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .padding(.vertical, 4)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(completionSummary.progressLabel), \(progress.availableScenarios(in: playMode, catalog: scenarios).count) available, \(shipReport.isShipReady ? "ship ready" : "ship blockers present")")
+            .accessibilityLabel("\(completionSummary.progressLabel), \(progress.availableScenarios(in: playMode, catalog: scenarios).count) available, \(lateCareerEntries.count) late-career context battlefields, \(shipReport.isShipReady ? "ship ready" : "ship blockers present")")
 
             Picker("Play mode", selection: $playMode) {
                 Text(CampaignPlayMode.chronological.rawValue).tag(CampaignPlayMode.chronological)
@@ -162,6 +215,28 @@ public struct GuderianCampaignView: View {
                     }
                 })
                 .accessibilityIdentifier("scenario-row-link-\(scenario.id.rawValue)")
+            }
+        }
+    }
+
+    private var lateCareerListSection: some View {
+        Section(LateCareerGuderianPresentationCatalog.sectionTitle) {
+            Picker("Scope", selection: $lateCareerScopeFilter) {
+                ForEach(LateCareerScopeFilter.allCases) { filter in
+                    Text(filter.title).tag(filter)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel("Late career context scope")
+
+            ForEach(visibleLateCareerEntries) { entry in
+                NavigationLink {
+                    LateCareerContextBriefingView(entry: entry)
+                        .navigationTitle(entry.title)
+                } label: {
+                    LateCareerContextRow(entry: entry)
+                }
+                .accessibilityIdentifier("late-career-row-link-\(entry.id)")
             }
         }
     }
@@ -262,6 +337,624 @@ struct ScenarioRow: View {
             return .accentColor
         }
         return .secondary
+    }
+}
+
+struct LateCareerContextRow: View {
+    let entry: LateCareerGuderianPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
+                Image(systemName: rowIconName)
+                    .foregroundStyle(rowIconColor)
+                    .frame(width: 18)
+                    .accessibilityHidden(true)
+                Text("LC\(entry.order). \(entry.title)")
+                    .font(.headline)
+                Spacer()
+                Text(entry.readinessLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(entry.isSetAPlayablePilot ? .green : .secondary)
+            }
+            Text("\(entry.dateLabel) | \(entry.scopeLabel)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(entry.visibleCommandCaveatLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Late career \(entry.order), \(entry.title), \(entry.dateLabel), \(entry.scopeLabel), \(entry.readinessLabel)")
+        .accessibilityIdentifier("late-career-row-\(entry.id)")
+    }
+
+    private var rowIconName: String {
+        if entry.isParityReady {
+            return "checkmark.seal"
+        }
+        if entry.isRoutedToLateCareerPlayableSurface {
+            return "play.circle"
+        }
+        return "doc.text.magnifyingglass"
+    }
+
+    private var rowIconColor: Color {
+        if entry.isParityReady {
+            return .green
+        }
+        if entry.isRoutedToLateCareerPlayableSurface {
+            return .accentColor
+        }
+        return .secondary
+    }
+}
+
+struct LateCareerContextBriefingView: View {
+    let entry: LateCareerGuderianPresentation
+    @State private var zoom: CGFloat = 1
+    @State private var selectedForceID: String?
+
+    var body: some View {
+        if entry.isRoutedToLateCareerPlayableSurface {
+            LateCareerPlayablePilotView(entry: entry)
+        } else {
+            briefingWorkspace
+        }
+    }
+
+    private var briefingWorkspace: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                LateCareerHeader(entry: entry)
+                LateCareerMetricStrip(entry: entry)
+                LateCareerMapSurface(entry: entry, zoom: $zoom, height: 520)
+                LateCareerTextSection(title: "Player Role", text: entry.playerRole, icon: "person.crop.square")
+                LateCareerTextSection(title: "German Context", text: entry.germanContext, icon: "bolt.horizontal")
+                LateCareerTextSection(title: "Playable Framing", text: entry.playableFraming, icon: "scope")
+                LateCareerObjectiveGrid(entry: entry)
+                LateCareerForceGrid(entry: entry, selectedForceID: $selectedForceID)
+                LateCareerRuleList(entry: entry)
+                LateCareerSourcesList(entry: entry)
+            }
+            .padding(28)
+            .frame(maxWidth: 1240, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityIdentifier("late-career-briefing-\(entry.id)")
+    }
+}
+
+struct LateCareerPlayablePilotView: View {
+    let entry: LateCareerGuderianPresentation
+    @State private var zoom: CGFloat = 1
+    @State private var selectedForceID: String?
+    @State private var phaseIndex = 0
+    @State private var completionRecord: LateCareerCompletionRecord?
+    @State private var actionLog: [String]
+
+    private let phases = ["Briefing", "Player Pressure", "German Response", "Assessment"]
+
+    init(entry: LateCareerGuderianPresentation) {
+        self.entry = entry
+        _actionLog = State(initialValue: [Self.initialLogLine(for: entry)])
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
+                LateCareerHeader(entry: entry)
+                LateCareerMetricStrip(entry: entry)
+                LateCareerMapSurface(entry: entry, zoom: $zoom, height: 560)
+            }
+            .padding(20)
+            .frame(minWidth: 680, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    pilotControls
+                    LateCareerPlayableStatusPanel(entry: entry, report: report, completionRecord: completionRecord)
+                    activeForcePanel
+                    LateCareerObjectiveGrid(entry: entry)
+                    LateCareerRuleList(entry: entry)
+                    LateCareerAIPlanPanel(plan: aiPlan)
+                    LateCareerRuleBindingPanel(entry: entry)
+                    pilotLog
+                    LateCareerSourcesList(entry: entry)
+                }
+                .padding(18)
+            }
+            .frame(width: 390)
+            .background(Color(nsColor: .controlBackgroundColor))
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityIdentifier("late-career-playable-pilot-\(entry.id)")
+    }
+
+    private var report: LateCareerPlayableBattleReport? {
+        entry.playableReport
+    }
+
+    private var aiPlan: LateCareerAIPlan? {
+        LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)
+    }
+
+    private var activeForce: LateCareerStaffBattlefieldForce? {
+        if let selectedForceID,
+           let selected = entry.battlefield.forces.first(where: { $0.id == selectedForceID }) {
+            return selected
+        }
+
+        return entry.battlefield.forces.first
+    }
+
+    private var pilotControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("DZW-Style Surface", systemImage: entry.isParityReady ? "checkmark.seal" : "play.circle")
+                .font(.headline)
+                .foregroundStyle(entry.isParityReady ? .green : .accentColor)
+            Text(entry.visibleCommandCaveatLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Label(phases[phaseIndex], systemImage: "clock.arrow.circlepath")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Button {
+                    advancePhase()
+                } label: {
+                    Label("Phase", systemImage: "forward.end")
+                }
+                .accessibilityIdentifier("late-career-pilot-phase-button-\(entry.id)")
+            }
+
+            Button {
+                focusNextForce()
+            } label: {
+                Label("Next Force", systemImage: "scope")
+            }
+            .accessibilityIdentifier("late-career-pilot-next-force-button-\(entry.id)")
+
+            Button {
+                completeBattle()
+            } label: {
+                Label(completionRecord == nil ? "Debrief" : "Debriefed", systemImage: "rosette")
+            }
+            .disabled(report == nil || completionRecord != nil)
+            .accessibilityIdentifier("late-career-pilot-debrief-button-\(entry.id)")
+        }
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder
+    private var activeForcePanel: some View {
+        if let activeForce {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Selected Force", systemImage: "shield.lefthalf.filled")
+                    .font(.headline)
+                Text(activeForce.name)
+                    .font(.body.weight(.semibold))
+                Text(activeForce.side.rawValue)
+                    .font(.caption)
+                    .foregroundStyle(activeForce.side == .player ? .blue : .red)
+                Text(activeForce.role)
+                    .font(.callout)
+                Text(activeForce.caveat)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .accessibilityIdentifier("late-career-pilot-active-force-\(entry.id)")
+        }
+    }
+
+    private var pilotLog: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Combat Log", systemImage: "list.bullet.rectangle")
+                .font(.headline)
+            ForEach(Array(actionLog.enumerated()), id: \.offset) { _, logEntry in
+                Text(logEntry)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func advancePhase() {
+        phaseIndex = (phaseIndex + 1) % phases.count
+        actionLog.insert("\(phases[phaseIndex]) phase active for \(entry.title).", at: 0)
+        actionLog = Array(actionLog.prefix(6))
+    }
+
+    private func focusNextForce() {
+        let forces = entry.battlefield.forces
+        guard !forces.isEmpty else {
+            return
+        }
+
+        let currentIndex = selectedForceID.flatMap { id in
+            forces.firstIndex { $0.id == id }
+        } ?? -1
+        let nextIndex = (currentIndex + 1) % forces.count
+        selectedForceID = forces[nextIndex].id
+        actionLog.insert("Focused \(forces[nextIndex].name).", at: 0)
+        actionLog = Array(actionLog.prefix(6))
+    }
+
+    private func completeBattle() {
+        guard let report else {
+            actionLog.insert("Scoring and debrief parity are still planned for \(entry.title).", at: 0)
+            actionLog = Array(actionLog.prefix(6))
+            return
+        }
+
+        completionRecord = report.completionRecord
+        actionLog.insert("Debrief recorded: \(report.completionRecord.score) VP, \(report.completionRecord.victoryBand.rawValue), \(report.completionRecord.persistenceKey).", at: 0)
+        actionLog = Array(actionLog.prefix(6))
+    }
+
+    private static func initialLogLine(for entry: LateCareerGuderianPresentation) -> String {
+        if entry.isParityReady {
+            return "\(entry.title) loaded with playable parity, scoring, debrief, AI, and persistence metadata."
+        }
+        return "\(entry.title) routed to the DZW-style late-career surface with caveated setup metadata."
+    }
+}
+
+struct LateCareerPlayableStatusPanel: View {
+    let entry: LateCareerGuderianPresentation
+    let report: LateCareerPlayableBattleReport?
+    let completionRecord: LateCareerCompletionRecord?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(entry.isParityReady ? "Parity Ready" : "Routed", systemImage: entry.isParityReady ? "checkmark.seal" : "arrow.triangle.turn.up.right.circle")
+                .font(.headline)
+                .foregroundStyle(entry.isParityReady ? .green : .accentColor)
+            Text(entry.readinessLabel)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if let report {
+                HStack {
+                    Label("\(report.scoringProfile.maxPlayerScore) VP", systemImage: "sum")
+                    Label("Turns \(report.scoringProfile.targetTurnLowerBound)-\(report.scoringProfile.targetTurnUpperBound)", systemImage: "clock")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Text(completionRecord?.note ?? report.debriefProfile.operationalText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(completionRecord?.persistenceKey ?? report.scoringProfile.persistenceKey)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            } else {
+                Text("Routing is live; scoring, debrief, and persistence parity remain scheduled for a later cycle.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier("late-career-playable-status-\(entry.id)")
+    }
+}
+
+struct LateCareerAIPlanPanel: View {
+    let plan: LateCareerAIPlan?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("AI Pressure", systemImage: "brain.head.profile")
+                .font(.headline)
+
+            if let plan {
+                ForEach(plan.priorities) { priority in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(priority.order). \(priority.targetName)")
+                            .font(.caption.weight(.semibold))
+                        Text(priority.detail)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Label("Blocked Actions", systemImage: "hand.raised")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.top, 4)
+
+                ForEach(plan.blockedActionExpectations) { expectation in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(expectation.action)
+                            .font(.caption.weight(.semibold))
+                        Text(expectation.reason)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Text("AI pressure metadata is not routed yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct LateCareerRuleBindingPanel: View {
+    let entry: LateCareerGuderianPresentation
+
+    private var bindings: [LateCareerRuleBinding] {
+        LateCareerConsolidatedPlaybookCatalog.ruleBindings(for: entry.id)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Rule Bindings", systemImage: "point.3.connected.trianglepath.dotted")
+                .font(.headline)
+
+            ForEach(bindings) { binding in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(binding.family.rawValue)
+                        .font(.caption.weight(.semibold))
+                    Text(binding.trigger)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(binding.effect)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .textBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier("late-career-rule-bindings-\(entry.id)")
+    }
+}
+
+struct LateCareerHeader: View {
+    let entry: LateCareerGuderianPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(entry.title)
+                .font(.system(size: 34, weight: .semibold))
+            Text("\(entry.dateLabel) | \(entry.scopeLabel)")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text(entry.commandCaveat)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityIdentifier("late-career-header-\(entry.id)")
+    }
+}
+
+struct LateCareerMetricStrip: View {
+    let entry: LateCareerGuderianPresentation
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label(entry.readinessLabel, systemImage: readinessIcon)
+                .foregroundStyle(readinessColor)
+            Label("\(entry.mapFeatureCount) map features", systemImage: "map")
+            Label("\(entry.objectiveCount) objectives", systemImage: "target")
+            Label("\(entry.forceCount) forces", systemImage: "person.2")
+            Label("\(entry.ruleCount) rules", systemImage: "checklist")
+            Label("\(entry.sourceCount) sources", systemImage: "link")
+        }
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+
+    private var readinessIcon: String {
+        if entry.isParityReady {
+            return "checkmark.seal"
+        }
+        if entry.isRoutedToLateCareerPlayableSurface {
+            return "play.circle"
+        }
+        return "doc.text"
+    }
+
+    private var readinessColor: Color {
+        if entry.isParityReady {
+            return .green
+        }
+        if entry.isRoutedToLateCareerPlayableSurface {
+            return .accentColor
+        }
+        return .secondary
+    }
+}
+
+struct LateCareerMapSurface: View {
+    let entry: LateCareerGuderianPresentation
+    @Binding var zoom: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Battlefield", systemImage: "map")
+                    .font(.headline)
+                Spacer()
+                Slider(value: $zoom, in: 0.75...1.85, step: 0.05)
+                    .frame(width: 180)
+                    .accessibilityLabel("Late career map zoom")
+                Text("\(Int(zoom * 100))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 42, alignment: .trailing)
+            }
+
+            BattlefieldViewport(
+                zoom: $zoom,
+                boardWidth: CGFloat(entry.battlefield.map.width),
+                boardHeight: CGFloat(entry.battlefield.map.height),
+                pointsPerBoardUnit: 16
+            ) {
+                ScenarioMapView(layout: entry.battlefield.map)
+            }
+            .frame(height: height)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+            }
+            .accessibilityIdentifier("late-career-map-viewport-\(entry.id)")
+        }
+    }
+}
+
+struct LateCareerTextSection: View {
+    let title: String
+    let text: String
+    let icon: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+            Text(text)
+                .font(.callout)
+        }
+    }
+}
+
+struct LateCareerObjectiveGrid: View {
+    let entry: LateCareerGuderianPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Objectives", systemImage: "target")
+                .font(.headline)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: 10)], alignment: .leading, spacing: 10) {
+                ForEach(entry.battlefield.objectives) { objective in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(objective.name)
+                                .font(.body.weight(.medium))
+                            Spacer()
+                            Text("\(objective.victoryPoints) VP")
+                                .font(.caption.weight(.semibold))
+                        }
+                        Text(objective.side.rawValue)
+                            .font(.caption)
+                            .foregroundStyle(objective.side == .player ? .blue : .red)
+                        Text(objective.description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(10)
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+}
+
+struct LateCareerForceGrid: View {
+    let entry: LateCareerGuderianPresentation
+    @Binding var selectedForceID: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Forces", systemImage: "person.2")
+                .font(.headline)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 10)], alignment: .leading, spacing: 10) {
+                ForEach(entry.battlefield.forces) { force in
+                    Button {
+                        selectedForceID = force.id
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(force.name)
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.primary)
+                            Text(force.side.rawValue)
+                                .font(.caption)
+                                .foregroundStyle(force.side == .player ? .blue : .red)
+                            Text(force.role)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(force.caveat)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(force.id == selectedForceID ? Color.accentColor.opacity(0.12) : Color(nsColor: .textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}
+
+struct LateCareerRuleList: View {
+    let entry: LateCareerGuderianPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Rules", systemImage: "checklist")
+                .font(.headline)
+            ForEach(entry.battlefield.rules) { rule in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(rule.name)
+                        .font(.body.weight(.medium))
+                    Text(rule.trigger)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(rule.effect)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .textBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+}
+
+struct LateCareerSourcesList: View {
+    let entry: LateCareerGuderianPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Sources", systemImage: "link")
+                .font(.headline)
+            ForEach(entry.battlefield.sourceLinks, id: \.url) { source in
+                Link(source.title, destination: source.url)
+                    .font(.caption)
+            }
+        }
     }
 }
 

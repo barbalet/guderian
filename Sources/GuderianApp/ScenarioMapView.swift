@@ -1,8 +1,19 @@
 import GuderianCore
 import SwiftUI
 
-struct ScenarioMapView: View {
-    let layout: ScenarioMapLayout
+protocol ScenarioMapRenderable {
+    var title: String { get }
+    var width: Double { get }
+    var height: Double { get }
+    var elements: [ScenarioMapElement] { get }
+    var deploymentZones: [ScenarioDeploymentZone] { get }
+}
+
+extension ScenarioMapLayout: ScenarioMapRenderable {}
+extension LateCareerStaffBattlefieldMap: ScenarioMapRenderable {}
+
+struct ScenarioMapView<Layout: ScenarioMapRenderable>: View {
+    let layout: Layout
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
