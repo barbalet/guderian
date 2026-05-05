@@ -57,9 +57,12 @@ public struct GuderianCampaignView: View {
     @State private var lateCareerScopeFilter: LateCareerScopeFilter = .all
     @State private var hasLoadedSaveState = false
     @State private var hasLoadedLateCareerState = false
+    @State private var hasEvaluatedFirstRunTutorial = false
+    @State private var showsFirstRunTutorial = false
     @AppStorage("guderian.campaignSaveState.v1") private var savedCampaignStateData = Data()
     @AppStorage("guderian.lateCareerProgress.v1") private var savedLateCareerProgressData = Data()
     @AppStorage("guderian.unifiedCampaignSave.v2") private var savedUnifiedCampaignStateData = Data()
+    @AppStorage("guderian.tutorial.firstRunHistory.v1.dismissed") private var firstRunHistoryDismissed = false
 
     private var selectedScenario: GuderianScenario {
         scenarios.first { $0.id == selectedID } ?? scenarios[0]
@@ -213,6 +216,7 @@ public struct GuderianCampaignView: View {
         .onAppear {
             loadSavedCampaignState()
             loadSavedLateCareerState()
+            presentFirstRunTutorialIfNeeded()
         }
         .onChange(of: selectedID) { _, _ in
             persistCampaignState()
@@ -228,6 +232,14 @@ public struct GuderianCampaignView: View {
         }
         .onChange(of: playMode) { _, _ in
             persistCampaignState()
+        }
+        .sheet(isPresented: $showsFirstRunTutorial) {
+            FirstRunTutorialView(flow: GuderianTutorialCatalog.firstRunHistoryFlow) { doNotShowAgain in
+                if doNotShowAgain {
+                    firstRunHistoryDismissed = true
+                }
+                showsFirstRunTutorial = false
+            }
         }
     }
 
@@ -438,6 +450,110 @@ public struct GuderianCampaignView: View {
         }
 
         lateCareerProgress = progress
+    }
+
+    private func presentFirstRunTutorialIfNeeded() {
+        guard !hasEvaluatedFirstRunTutorial else {
+            return
+        }
+        hasEvaluatedFirstRunTutorial = true
+        showsFirstRunTutorial = !firstRunHistoryDismissed
+    }
+
+    private func resetTutorialsForDebug() {
+        firstRunHistoryDismissed = false
+        hasEvaluatedFirstRunTutorial = false
+        presentFirstRunTutorialIfNeeded()
+    }
+}
+
+struct FirstRunTutorialView: View {
+    let flow: TutorialFlow
+    let onFinish: (Bool) -> Void
+    @State private var pageIndex = 0
+    @State private var doNotShowAgain = false
+
+    private var currentPage: TutorialPage {
+        flow.pages[min(max(0, pageIndex), max(0, flow.pages.count - 1))]
+    }
+
+    private var isLastPage: Bool {
+        pageIndex >= flow.pages.count - 1
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(flow.title)
+                        .font(.title2.weight(.bold))
+                    Text("Page \(pageIndex + 1) of \(flow.pages.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("first-run-tutorial-progress")
+                }
+                Spacer()
+                Button {
+                    onFinish(false)
+                } label: {
+                    Label("Skip", systemImage: "xmark")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("first-run-tutorial-skip-button")
+            }
+
+            ProgressView(value: Double(pageIndex + 1), total: Double(max(1, flow.pages.count)))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(currentPage.title)
+                    .font(.title3.weight(.semibold))
+                    .accessibilityIdentifier("first-run-tutorial-page-title")
+                Text(currentPage.body)
+                    .font(.body)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier(currentPage.accessibilityIdentifier)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 8)
+
+            if isLastPage {
+                Toggle(flow.doNotShowAgainLabel, isOn: $doNotShowAgain)
+                    .toggleStyle(.checkbox)
+                    .accessibilityIdentifier("first-run-tutorial-do-not-show-again")
+            }
+
+            HStack {
+                Button {
+                    pageIndex = max(0, pageIndex - 1)
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                }
+                .disabled(pageIndex == 0)
+                .accessibilityIdentifier("first-run-tutorial-back-button")
+
+                Spacer()
+
+                Button {
+                    if isLastPage {
+                        onFinish(doNotShowAgain)
+                    } else {
+                        pageIndex = min(flow.pages.count - 1, pageIndex + 1)
+                    }
+                } label: {
+                    Label(isLastPage ? "Finish" : "Next", systemImage: isLastPage ? "checkmark" : "chevron.right")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(isLastPage ? "first-run-tutorial-finish-button" : "first-run-tutorial-next-button")
+            }
+        }
+        .padding(26)
+        .frame(width: 620)
+        .frame(minHeight: 460)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityIdentifier("first-run-history-tutorial")
     }
 }
 

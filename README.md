@@ -87,6 +87,8 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 - Cycles 591-650: 400% map-detail improvement and late-career command-context expansion, with post-1941 scenarios labeled as staff-influence or epilogue context rather than direct field command.
 - Cycles 651-730: visible late-career integration, adding a separate Guderian Late Career Context section, shared dzw briefing maps, parity-ready reports for all 16 late-career records, separate late-career progress, GuderianTest automation, UX audit coverage, and final acceptance while preserving the 19-battle field-command campaign.
 - Cycles 731-830: unified 35-battle playable campaign, removing the UI/playability split so all 35 rows use one Battles list, one DZW-style playable surface, one progress/save model, one harness, README chronology coverage, and final acceptance with command caveats retained as historical labels only.
+- Cycles 831-890: corrected real DZW UI parity, routing battles 20-35 through the same live playable board, controls, AI turn flow, debrief, and persistence path as battles 1-19.
+- Cycles 891-930: tutorial onboarding and reusable guidance, adding a four-screen first-run historical tutorial plus first-battle contextual hints with versioned `Do not show again` persistence.
 
 Cycle 451 correction: after running `derZweiteWeltkrieg`, the accepted playability bar is the actual DZW battle screen: terrain board, objectives, opposing units, direct unit selection, draggable movement, phase/action controls, pending-choice handling, and a visible combat log. Earlier cycle 400/450 reports proved native data, diagnostics, and automation stability, but they overstated product playability because the Guderian app still surfaced a simplified board instead of the full DZW-style playable screen.
 
@@ -218,6 +220,10 @@ Cycle 830 update: cycles 826-830 are complete. `UnifiedCampaignAcceptanceCatalog
 
 Cycle 890 correction/update: cycles 831-890 repair the product-level UI parity gap behind the cycle 830 metadata claim. Battles 20-35 now launch through the generalized `DZWPlayableBattleView` path with the same live native board snapshot, board renderer, unit selection, movement, phase, combat, German AI, debrief, and persistence surface as battles 1-19; `LateCareerUnifiedPlayableBoardView` and `LateCareerMapSurface` are no longer accepted playable destinations.
 
+Cycle 910 update: cycles 891-910 add reusable tutorial models, versioned dismissal/storage keys, a four-screen first-run historical tutorial, and the launch gate that presents it once unless `Do not show again` is selected.
+
+Cycle 930 update: cycles 911-930 add first-battle contextual guidance for Tuchola Forest. The first-battle tutorial now responds to battle opening, board visibility, unit selection, objective inspection, movement, phase changes, shooting, assault, blocked actions, German AI turn flow, and debrief, with a final `Do not show again` checkbox and acceptance coverage proving normal battle completion is unaffected.
+
 ## Run
 
 Build and test from the repository root:
@@ -247,9 +253,9 @@ Then upload `dist/Guderian-1.0.0.zip` to the GitHub release at `https://github.c
 
 ## Ship Status
 
-The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19.
+The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19. Cycle 930 completes the tutorial onboarding block with first-run historical context and first-battle contextual hints.
 
-Remaining playable-screen estimate: battles 1-35 are complete through cycle 890. There are no cycles remaining in the current unified 35-battle playable-campaign plan.
+Remaining playable-screen estimate: battles 1-35 are complete through cycle 890, and tutorial onboarding is complete through cycle 930. There are no cycles remaining in the current unified 35-battle playable-campaign or tutorial-onboarding plans.
 
 ## App Identity
 

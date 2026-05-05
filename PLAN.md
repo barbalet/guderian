@@ -162,11 +162,17 @@ Cycle 830 correction: the cycle 830 acceptance language overclaims actual produc
 
 Cycle 890 update: cycles 831-890 are complete. Battles 20-35 now route through the generalized `DZWPlayableBattleView` path, `DZWPlayableBattleViewModel` accepts either field-command scenarios or late-career entries, `LateCareerNativeBoardSession` exposes a live `NativeBoardSnapshot` plus the same selection/move/phase/combat/pending-choice action surface, and `UnifiedRealDZWPlayableParityCatalog` verifies all 16 late-career battles use the real DZW host contract while explicitly forbidding `LateCareerUnifiedPlayableBoardView` / `LateCareerMapSurface` as playable destinations.
 
+Cycle 910 update: cycles 891-910 are complete. `TutorialFlow`, `TutorialPage`, `TutorialHint`, `TutorialTrigger`, `TutorialProgress`, storage keys, and `TutorialProgressCodec` now define reusable tutorial infrastructure. `GuderianTutorialCatalog` adds the four-screen first-run historical tutorial with versioned dismissal, and `GuderianCampaignView` presents the new paged tutorial sheet on first launch with a final `Do not show again` checkbox.
+
+Cycle 930 update: cycles 911-930 are complete. `GuderianTutorialCatalog.firstBattleGuidanceFlow` now contains ordered first-battle hints for opening the battle, reading the board, selecting units, inspecting objectives, dragging movement, advancing phases, shooting, assaulting, understanding blocked actions, running the German AI turn, and reading the debrief. `DZWPlayableBattleView` records those live gameplay triggers for Tuchola Forest only and presents a non-blocking hint card with final `Do not show again` persistence. `GuderianTutorialAcceptanceCatalog` closes the reusable tutorial acceptance gate with zero remaining cycles.
+
 Cycle plan 651-730: add the 16 late-career staff/epilogue battlefields to the visible Guderian app experience, first as a separate command-caveated Late Career Context section and then as DZW-style playable battle screens with AI, scoring, debrief, persistence, and GuderianTest parity.
 
 Cycle plan 731-830: remove the remaining UI/playability distinction between the 19 field-command battles and the 16 late-career staff/epilogue battlefields. All 35 selectable battles should route through the same DZW-style battle screen, command controls, AI turn flow, blocked-action feedback, debrief, persistence, and automation harness. Historical command-scope caveats remain visible as briefing/source labels only, not as a separate or lighter gameplay surface.
 
 Cycle plan 831-890: repair the cycle 830 overclaim by routing battles 20-35 through the real DZW-style playable battle implementation, not a lookalike late-career map surface. The plan also covers the known technical debt: duplicated late-career UI, scenario-only `DZWPlayableBattleViewModel` assumptions, metadata-only parity tests, weak screenshot/interaction verification, stale acceptance wording, and app/test paths that do not currently prove the real view is shared.
+
+Cycle plan 891-930: add two tutorial interfaces and the reusable tutorial architecture they need. The first is a four-screen first-run historical tutorial about Heinz Guderian, the purpose of the battles, and why sober memorialization matters. The second is a first-battle contextual tutorial for the opening game, with movement, phase, objective, combat, AI-turn, and debrief hints. Both tutorials need versioned "Do not show again" persistence and should be structured so the tutorial model, trigger system, and storage contract can be reused by future `gzw` games.
 
 ## Planning Rules
 
@@ -607,7 +613,7 @@ Status through cycle 820: completed. The README Battle Chronology lists all 35 s
 
 Status through cycle 825: completed. `UnifiedBuildRegressionHardeningCatalog` captures the SwiftPM, GuderianTest, Xcode, 35-battle harness, save/load migration, UI parity, documentation, and balance/pacing regression gates.
 
-Status through cycle 830: completed for data/catalog/documentation scaffolding, but corrected as incomplete for actual product UI parity. Battles 20-35 still use a separate late-career map/play surface rather than the same `DZWPlayableBattleView` path as battles 1-19. There are 60 newly planned cycles remaining to make the UI and playability claim true.
+Status through cycle 930: complete. The corrected real DZW UI parity work is done, and both tutorial interfaces are implemented: first-run historical onboarding plus first-battle contextual guidance with versioned dismissal and reusable tutorial acceptance.
 
 ## Cycles 831-890: Real DZW UI Parity And Debt Retirement
 
@@ -639,6 +645,36 @@ Known technical debt covered by this block:
 
 Status through cycle 890: complete. This block covers the known technical debt behind the 20-35 UI/playability mismatch: the scenario-only view model, the late-career-only playable surface, regenerated report helpers in place of a live UI session, metadata-only parity checks, stale acceptance wording, and the missing regression gate for the real shared DZW board path. No additional UI/playability debt is currently known from this pass; future cycles should only be needed for newly discovered engine limitations or visual polish beyond the shared DZW board contract.
 
+## Cycles 891-930: Tutorial Onboarding And Reusable Guidance System
+
+This block adds two player-facing tutorials while building the reusable tutorial layer that future `gzw` games can carry forward. The system should separate data from presentation: tutorial IDs, pages, hint triggers, dismissal state, copy, and analytics/test events live in a small shared model, while Guderian-specific history text and first-battle hints live in catalog data. The first-run tutorial appears the first time the app is launched unless its versioned dismissal flag is set. The first-battle tutorial appears only in the first battle flow and gives contextual help as the player reaches teachable moments. Both tutorials end with a checkbox labeled exactly `Do not show again`.
+
+Technical requirements:
+
+- Add a reusable tutorial domain model, likely in `GuderianCore`, with `TutorialFlow`, `TutorialPage`, `TutorialHint`, `TutorialTrigger`, `TutorialDismissalPolicy`, `TutorialProgress`, and `TutorialStorageKey` concepts.
+- Keep UI reusable in `GuderianApp`: a paged modal/sheet for historical tutorials and a non-blocking battle hint surface for contextual gameplay tips.
+- Version dismissal state so future tutorial rewrites can opt into showing again only when intentionally bumped.
+- Store tutorial preferences separately from campaign completion so a player can reset campaign progress without unexpectedly resetting tutorial choices, while still exposing debug/test reset hooks.
+- Use `@AppStorage` or the existing save-envelope settings layer only behind an abstraction so future games can swap storage without changing tutorial UI.
+- First-run historical tutorial must contain four screens, about 100 words each, covering Guderian's historical role, the player's opposing-force perspective, the reason these battles are modeled, and why memorialization should be sober rather than celebratory.
+- First-battle tutorial should target the first chronological battle and trigger hints for orientation, selecting units, reading objectives, dragging movement, advancing phases, shooting/assault timing, resolving blocked actions, letting the German AI act, and debrief/persistence.
+- Do not change `dzw` engine rules for tutorials. Tutorials are presentation/control guidance only.
+- Tutorial UI must not obscure critical board controls on small windows; hints need dismissal/next behavior, keyboard accessibility, and stable identifiers for tests.
+- GuderianTest and Swift tests must prove first-run gating, "Do not show again" persistence, first-battle trigger ordering, reset/debug behavior, and that tutorials do not affect battle completion.
+
+| Cycles | Focus | Output |
+| --- | --- | --- |
+| 891-895 | Reusable tutorial model | Introduce the tutorial data model, versioned IDs, dismissal policies, trigger vocabulary, progress state, and storage abstraction. Define reusable keys for `firstRunHistory` and `firstBattleGuidance` without hard-coding UI state into campaign progress. |
+| 896-900 | Historical tutorial content | Draft and catalog four first-run pages of about 100 words each. Cover Guderian's career, the opposing-force player role, why the battles are modeled, and the importance of historical memorialization with sober language. Add copy-length and required-topic tests. |
+| 901-905 | First-run tutorial UI | Build the paged first-run tutorial interface with title, page progress, back/next/finish controls, readable layout, accessibility identifiers, and a final-page `Do not show again` checkbox. Ensure it opens on first launch only when not dismissed. |
+| 906-910 | First-run persistence and reset | Wire the first-run tutorial to the storage abstraction, versioned dismissal flag, app launch gate, debug reset hook, and tests for first launch, dismissed launch, and version-bump behavior. |
+| 911-915 | First-battle hint catalog | Define the first-battle tutorial triggers and hint copy for orientation, unit selection, objectives, movement, phase flow, blocked actions, shooting, assault, German AI turn, and debrief. Make hints data-driven so future games can replace content without rewriting the UI. |
+| 916-920 | Battle tutorial integration | Integrate the hint coordinator into `DZWPlayableBattleView` for the first chronological battle only. Track live board events without altering legal actions, AI behavior, completion scoring, or the shared 35-battle UI parity path. |
+| 921-925 | Battle tutorial UI and dismissal | Build the contextual hint surface with next/dismiss controls, placement that avoids board/control occlusion, keyboard accessibility, stable test identifiers, and a final `Do not show again` checkbox that suppresses future first-battle tutorial runs. |
+| 926-930 | Reuse hardening and acceptance | Add reusable tutorial acceptance catalogs, GuderianTest coverage, save/settings regression checks, README/PLAN updates, and final gates proving both tutorials work, persist, reset, and leave normal battle play unaffected. |
+
+Status through cycle 930: complete. The reusable tutorial model, first-run history copy, first-run tutorial sheet, first-battle hint catalog, live first-battle trigger integration, contextual hint UI, final `Do not show again` dismissal, README/PLAN updates, and acceptance tests are in place. No cycles remain for this tutorial block. No engine technical debt is expected from this pass because tutorials remain presentation/control guidance and do not alter `dzw` rules, AI behavior, scoring, debriefs, or campaign persistence.
+
 ## Acceptance Criteria
 
 - `dzw` remains cleanly updatable because Guderian-specific engine hooks are guarded or externalized.
@@ -651,5 +687,8 @@ Status through cycle 890: complete. This block covers the known technical debt b
 - All 35 selectable Guderian battles use the same visual and interactive playable-battle UI implementation; command-scope caveats may appear as historical labels, but they must not create a separate or reduced playability mode.
 - For battles 20-35, acceptance requires the real `DZWPlayableBattleView` path or a shared generalized successor with the same board renderer, view model, controls, gestures, session state, and interaction behavior as battles 1-19. `LateCareerMapSurface`, matching accessibility identifiers, catalog flags, and metadata-only harnesses do not satisfy playable UI parity.
 - Visual parity tests must prove battles 20-35 show the proper board/sidebar/control structure, not a briefing map or late-career-only surface.
+- The first-run historical tutorial appears on initial launch, contains four approximately 100-word screens, ends with `Do not show again`, and stays dismissed on later launches when that checkbox is selected.
+- The first-battle tutorial provides contextual movement, strategy, phase, combat, AI-turn, blocked-action, and debrief hints during the first game, ends with `Do not show again`, and stays dismissed for future first-battle runs when selected.
+- Tutorial models, trigger definitions, dismissal policies, and storage contracts are reusable enough for future `gzw` games to adopt without carrying Guderian-specific copy.
 - The app clearly frames the player as opposing Guderian and treats the historical subject with sober context.
 - "Playable" means a DZW-style hand-playable Guderian battle screen with scenario-specific units, terrain, objectives, legal actions, scoring, AI pressure, blocked-action reporting, logs, and debriefs; proxy-loadable metadata or automation-only completion no longer satisfies the playable milestone.

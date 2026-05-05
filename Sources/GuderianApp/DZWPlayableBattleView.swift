@@ -154,6 +154,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     @Published private(set) var debriefError: String?
     @Published private(set) var aiTurnEvents: [String]
     @Published private(set) var playableTestGameResult: PlayableTestGameBattleResult?
+    @Published private(set) var latestTutorialTrigger: TutorialTrigger?
+    @Published private(set) var tutorialEventCount = 0
 
     let source: DZWPlayableBattleSource
     private var session: DZWPlayableBoardSession?
@@ -196,6 +198,15 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         completion != nil
     }
 
+    var isFirstBattleTutorialEligible: Bool {
+        switch source {
+        case .fieldCommand(let scenario):
+            return scenario.id == .tucholaForest
+        case .lateCareer:
+            return false
+        }
+    }
+
     var title: String {
         source.boardTitle
     }
@@ -228,6 +239,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             session?.selectTarget(unit.id)
         }
         refresh()
+        recordTutorialTrigger(.unitSelection)
     }
 
     func cycleActiveUnit(forward: Bool) {
@@ -241,6 +253,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             session?.selectUnit(candidates[0].id)
             session?.selectNearestEnemyToSelectedUnit()
             refresh()
+            recordTutorialTrigger(.unitSelection)
             return
         }
 
@@ -249,6 +262,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         session?.selectUnit(candidates[nextIndex].id)
         session?.selectNearestEnemyToSelectedUnit()
         refresh()
+        recordTutorialTrigger(.unitSelection)
     }
 
     func clearSelection() {
@@ -260,6 +274,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             session?.selectNearestEnemyToSelectedUnit()
         }
         refresh()
+        recordTutorialTrigger(.unitSelection)
     }
 
     func selectNearestEnemy() {
@@ -282,8 +297,9 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             x: min(max(Double(point.x), 1), Double(Self.boardWidth - 1)),
             y: min(max(Double(point.y), 1), Double(Self.boardHeight - 1))
         )
-        session?.moveUnit(id, to: coordinate)
+        let moved = session?.moveUnit(id, to: coordinate) ?? false
         refresh()
+        recordTutorialTrigger(moved ? .movementDrag : .blockedAction)
     }
 
     func rotateSelected(by degrees: Double) {
@@ -312,18 +328,22 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     func shootSelected() {
         guard let selectedUnit, let selectedTarget else {
+            recordTutorialTrigger(.blockedAction)
             return
         }
-        session?.shootUnit(selectedUnit.id, targetID: selectedTarget.id)
+        let fired = session?.shootUnit(selectedUnit.id, targetID: selectedTarget.id) ?? false
         refresh()
+        recordTutorialTrigger(fired ? .shooting : .blockedAction)
     }
 
     func assaultSelected(advance: Bool) {
         guard let selectedUnit, let selectedTarget else {
+            recordTutorialTrigger(.blockedAction)
             return
         }
-        session?.assaultUnit(selectedUnit.id, targetID: selectedTarget.id, advance: advance)
+        let assaulted = session?.assaultUnit(selectedUnit.id, targetID: selectedTarget.id, advance: advance) ?? false
         refresh()
+        recordTutorialTrigger(assaulted ? .assault : .blockedAction)
     }
 
     func resolvePendingChoice() {
@@ -334,6 +354,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     func advancePhase() {
         session?.advancePhase()
         refresh()
+        recordTutorialTrigger(.phaseAdvance)
+        if snapshot?.activePlayer == .guderianAI {
+            recordTutorialTrigger(.germanAITurn)
+        }
     }
 
     func runAutomatedActiveStep() {
@@ -366,6 +390,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             return
         }
 
+        recordTutorialTrigger(.germanAITurn)
         recordAIEvent("German turn runner started.")
         var safety = 0
         while snapshot?.activePlayer != .guderianAI && isBattleOver == false && safety < 4 {
@@ -398,6 +423,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         refresh()
     }
 
+    func recordTutorialTrigger(_ trigger: TutorialTrigger) {
+        latestTutorialTrigger = trigger
+        tutorialEventCount += 1
+    }
+
     func playBattleToEnd() -> DZWPlayableCompletionRecord? {
         guard let session else {
             debriefError = "Board session unavailable."
@@ -417,6 +447,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 completion = display
                 debriefError = nil
                 refresh()
+                recordTutorialTrigger(.debrief)
                 recordAIEvent("Playable test game completed: \(result.antiGuderianStepCount) Anti-Guderian AI steps, \(result.germanStepCount) German AI steps.")
                 return display.record
             } catch {
@@ -429,7 +460,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         case .lateCareer:
             playableTestGameResult = nil
             runSharedAutoplayToDebrief()
-            return completeBattle()
+            let record = completeBattle()
+            if record != nil {
+                recordTutorialTrigger(.debrief)
+            }
+            return record
         }
     }
 
@@ -452,6 +487,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 playableTestGameResult = nil
                 debriefError = nil
                 refresh()
+                recordTutorialTrigger(.debrief)
                 recordAIEvent("Debrief recorded: \(display.score) VP, \(display.victoryBandLabel).")
                 return display.record
             } catch {
@@ -473,6 +509,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             playableTestGameResult = nil
             debriefError = nil
             refresh()
+            recordTutorialTrigger(.debrief)
             recordAIEvent("Debrief recorded: \(display.score) VP, \(display.victoryBandLabel).")
             return display.record
         }
@@ -997,6 +1034,9 @@ private struct DZWPlayableBattlePanelWindow: View {
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.45)))
             }
         }
+        .onAppear {
+            model.recordTutorialTrigger(.objectiveInspection)
+        }
     }
 
     private func armiesSection(_ snapshot: NativeBoardSnapshot) -> some View {
@@ -1051,12 +1091,87 @@ private struct DZWPlayableBattlePanelWindow: View {
     }
 }
 
+private struct FirstBattleTutorialHintView: View {
+    let hint: TutorialHint
+    let flow: TutorialFlow
+    let isFinalHint: Bool
+    @Binding var doNotShowAgain: Bool
+    let onNext: () -> Void
+    let onSkip: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(hint.title)
+                        .font(.headline.weight(.bold))
+                        .accessibilityIdentifier("first-battle-tutorial-title")
+                    Text("Hint \(hint.order) of \(flow.hints.count)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("first-battle-tutorial-progress")
+                }
+                Spacer()
+                Button {
+                    onSkip()
+                } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Hide tutorial hint")
+                .accessibilityIdentifier("first-battle-tutorial-skip-button")
+            }
+
+            Text(hint.body)
+                .font(.callout)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(hint.accessibilityIdentifier)
+
+            if isFinalHint {
+                Toggle(flow.doNotShowAgainLabel, isOn: $doNotShowAgain)
+                    .toggleStyle(.checkbox)
+                    .accessibilityIdentifier("first-battle-tutorial-do-not-show-again")
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    onNext()
+                } label: {
+                    Label(isFinalHint ? "Finish" : "Next", systemImage: isFinalHint ? "checkmark" : "chevron.right")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(isFinalHint ? "first-battle-tutorial-finish-button" : "first-battle-tutorial-next-button")
+            }
+        }
+        .padding(14)
+        .frame(width: 360)
+        .foregroundStyle(Color(red: 0.15, green: 0.12, blue: 0.08))
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(red: 0.98, green: 0.96, blue: 0.88))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.black.opacity(0.16), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.22), radius: 14, x: 0, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("first-battle-tutorial-hint")
+    }
+}
+
 struct DZWPlayableBattleView: View {
     @StateObject private var model: DZWPlayableBattleViewModel
     @StateObject private var panelWindows = DZWPlayableBattleWindowCoordinator()
     @State private var dragPreview: [Int: CGPoint] = [:]
     @State private var assaultAdvance = true
     @State private var battlefieldZoom: CGFloat = 1
+    @State private var firstBattleTutorial = TutorialHintCoordinator()
+    @State private var firstBattleTutorialDoNotShowAgain = false
+    @AppStorage("guderian.tutorial.firstBattleGuidance.v1.dismissed") private var firstBattleGuidanceDismissed = false
     private let onCompletion: (DZWPlayableCompletionRecord) -> Void
 
     init(scenario: GuderianScenario, onCompletion: @escaping (CampaignCompletionRecord) -> Void = { _ in }) {
@@ -1094,6 +1209,26 @@ struct DZWPlayableBattleView: View {
                 }
                 .padding(18)
                 .zIndex(10)
+
+                if let hint = activeFirstBattleHint {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            FirstBattleTutorialHintView(
+                                hint: hint,
+                                flow: firstBattleTutorialFlow,
+                                isFinalHint: firstBattleTutorialFlow.isLastHint(hint),
+                                doNotShowAgain: $firstBattleTutorialDoNotShowAgain,
+                                onNext: advanceFirstBattleTutorial,
+                                onSkip: skipFirstBattleTutorialHint
+                            )
+                        }
+                    }
+                    .padding(20)
+                    .transition(.opacity)
+                    .zIndex(20)
+                }
             }
             .background(Color(red: 0.10, green: 0.14, blue: 0.10))
             .accessibilityElement(children: .contain)
@@ -1104,6 +1239,13 @@ struct DZWPlayableBattleView: View {
                     assaultAdvance: $assaultAdvance,
                     onCompletion: onCompletion
                 )
+                recordFirstBattleTutorialTrigger(.battleOpened)
+                recordFirstBattleTutorialTrigger(.boardVisible)
+            }
+            .onChange(of: model.tutorialEventCount) { _, _ in
+                if let trigger = model.latestTutorialTrigger {
+                    recordFirstBattleTutorialTrigger(trigger)
+                }
             }
             .onDisappear {
                 panelWindows.closeAll()
@@ -1115,6 +1257,44 @@ struct DZWPlayableBattleView: View {
                 description: Text(model.lastError)
             )
         }
+    }
+
+    private var firstBattleTutorialFlow: TutorialFlow {
+        GuderianTutorialCatalog.firstBattleGuidanceFlow
+    }
+
+    private var activeFirstBattleHint: TutorialHint? {
+        guard model.isFirstBattleTutorialEligible,
+              !firstBattleGuidanceDismissed else {
+            return nil
+        }
+        return firstBattleTutorial.activeHint(in: firstBattleTutorialFlow)
+    }
+
+    private func recordFirstBattleTutorialTrigger(_ trigger: TutorialTrigger) {
+        guard model.isFirstBattleTutorialEligible,
+              !firstBattleGuidanceDismissed else {
+            return
+        }
+        firstBattleTutorial.record(trigger, in: firstBattleTutorialFlow)
+    }
+
+    private func advanceFirstBattleTutorial() {
+        guard let hint = activeFirstBattleHint else {
+            return
+        }
+        let isFinal = firstBattleTutorialFlow.isLastHint(hint)
+        firstBattleTutorial.completeActiveHint(in: firstBattleTutorialFlow)
+        if isFinal {
+            if firstBattleTutorialDoNotShowAgain {
+                firstBattleGuidanceDismissed = true
+            }
+            firstBattleTutorial.dismiss(firstBattleTutorialFlow)
+        }
+    }
+
+    private func skipFirstBattleTutorialHint() {
+        firstBattleTutorial.completeActiveHint(in: firstBattleTutorialFlow)
     }
 
     private var battlefieldToolbar: some View {
@@ -1502,6 +1682,9 @@ struct DZWPlayableBattleView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.45)))
             }
+        }
+        .onAppear {
+            model.recordTutorialTrigger(.objectiveInspection)
         }
     }
 

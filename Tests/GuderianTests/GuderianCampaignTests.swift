@@ -1131,6 +1131,120 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(kursk.completionPersistenceKey.contains("kursk-armored-force-pressure"))
     }
 
+    func testCycle910FirstRunTutorialModelContentAndPersistenceAreReady() throws {
+        let catalog = GuderianTutorialCatalog.self
+        let flow = catalog.firstRunHistoryFlow
+
+        XCTAssertEqual(catalog.cycleRange, 891...930)
+        XCTAssertEqual(catalog.firstRunCycleRange, 891...910)
+        XCTAssertEqual(catalog.firstBattleCycleRange, 911...930)
+        XCTAssertTrue(catalog.acceptanceReadyThroughCycle910)
+        XCTAssertEqual(flow.id, .firstRunHistory)
+        XCTAssertEqual(flow.version, 1)
+        XCTAssertEqual(flow.presentationKind, .pagedOnboarding)
+        XCTAssertEqual(flow.openingTrigger, .appFirstLaunch)
+        XCTAssertEqual(flow.pages.count, 4)
+        XCTAssertEqual(flow.doNotShowAgainLabel, "Do not show again")
+        XCTAssertEqual(flow.storageKey, catalog.firstRunHistoryStorageKey)
+        XCTAssertEqual(catalog.firstBattleGuidanceFlowStub.storageKey, catalog.firstBattleGuidanceStorageKey)
+        XCTAssertTrue(flow.usesReusableStorageContract)
+        XCTAssertTrue(catalog.firstBattleGuidanceFlowStub.usesReusableStorageContract)
+        XCTAssertTrue(flow.pages.allSatisfy { (80...125).contains($0.wordCount) })
+        XCTAssertTrue(flow.pages.allSatisfy(\.containsRequiredTopics))
+        XCTAssertTrue(flow.pages.allSatisfy { $0.accessibilityIdentifier.hasPrefix("first-run-history-page-") })
+
+        var progress = TutorialProgress()
+        XCTAssertTrue(progress.shouldPresent(flow))
+        progress.dismiss(flow)
+        XCTAssertFalse(progress.shouldPresent(flow))
+
+        let encoded = try TutorialProgressCodec.encode(progress)
+        let decoded = try TutorialProgressCodec.decode(encoded)
+        XCTAssertEqual(decoded, progress)
+        XCTAssertFalse(TutorialProgressCodec.decodeIfPresent(encoded).shouldPresent(flow))
+
+        let revisedFlow = TutorialFlow(
+            id: flow.id,
+            version: flow.version + 1,
+            title: flow.title,
+            presentationKind: flow.presentationKind,
+            storageKey: TutorialStorageKey("guderian.tutorial.firstRunHistory.v2.dismissed"),
+            openingTrigger: flow.openingTrigger,
+            pages: flow.pages
+        )
+        XCTAssertTrue(progress.shouldPresent(revisedFlow))
+
+        progress.reset(.firstRunHistory)
+        XCTAssertTrue(progress.shouldPresent(flow))
+    }
+
+    func testCycle930FirstBattleTutorialHintsPersistenceAndAcceptanceAreReady() throws {
+        let flow = GuderianTutorialCatalog.firstBattleGuidanceFlow
+        let report = GuderianTutorialAcceptanceCatalog.report
+
+        XCTAssertEqual(GuderianTutorialAcceptanceCatalog.cycleRange, 911...930)
+        XCTAssertTrue(GuderianTutorialCatalog.acceptanceReadyThroughCycle930)
+        XCTAssertTrue(GuderianTutorialAcceptanceCatalog.acceptanceReadyThroughCycle930, report.blockers.joined(separator: "\n"))
+        XCTAssertTrue(report.isReady, report.blockers.joined(separator: "\n"))
+        XCTAssertEqual(report.remainingCycles, 0)
+        XCTAssertEqual(report.firstBattleHintCount, GuderianTutorialCatalog.requiredFirstBattleTriggers.count)
+
+        XCTAssertEqual(flow.id, .firstBattleGuidance)
+        XCTAssertEqual(flow.version, 1)
+        XCTAssertEqual(flow.presentationKind, .contextualBattleHints)
+        XCTAssertEqual(flow.openingTrigger, .battleOpened)
+        XCTAssertEqual(flow.doNotShowAgainLabel, "Do not show again")
+        XCTAssertEqual(flow.storageKey, GuderianTutorialCatalog.firstBattleGuidanceStorageKey)
+        XCTAssertTrue(flow.usesReusableStorageContract)
+        XCTAssertTrue(flow.pages.isEmpty)
+        XCTAssertEqual(flow.hints.count, 11)
+        XCTAssertEqual(flow.orderedHints.map(\.order), Array(1...11))
+        XCTAssertEqual(Set(flow.hints.map(\.trigger)), Set(GuderianTutorialCatalog.requiredFirstBattleTriggers))
+        XCTAssertTrue(flow.hints.allSatisfy { $0.accessibilityIdentifier.hasPrefix("first-battle-tutorial-hint-") })
+        XCTAssertTrue(flow.hints.allSatisfy { (28...55).contains($0.wordCount) })
+        XCTAssertTrue(flow.hints.allSatisfy(\.containsRequiredTopics))
+        XCTAssertTrue(flow.hasHint(for: .movementDrag))
+        XCTAssertTrue(flow.hasHint(for: .blockedAction))
+        XCTAssertTrue(flow.hasHint(for: .germanAITurn))
+        XCTAssertTrue(flow.hasHint(for: .debrief))
+
+        var coordinator = TutorialHintCoordinator()
+        XCTAssertNil(coordinator.activeHint(in: flow))
+        coordinator.record(.battleOpened, in: flow)
+        XCTAssertEqual(coordinator.activeHint(in: flow)?.trigger, .battleOpened)
+        coordinator.completeActiveHint(in: flow)
+
+        for trigger in GuderianTutorialCatalog.requiredFirstBattleTriggers.dropFirst() {
+            coordinator.record(trigger, in: flow)
+        }
+        XCTAssertEqual(coordinator.events.map(\.trigger), GuderianTutorialCatalog.requiredFirstBattleTriggers)
+        XCTAssertEqual(coordinator.triggeredHintIDs.count, flow.hints.count)
+        XCTAssertEqual(coordinator.activeHint(in: flow)?.trigger, .boardVisible)
+
+        var completed = 1
+        while coordinator.activeHint(in: flow) != nil {
+            coordinator.completeActiveHint(in: flow)
+            completed += 1
+        }
+        XCTAssertEqual(completed, flow.hints.count)
+        XCTAssertTrue(coordinator.progress.isComplete(flow))
+        XCTAssertEqual(coordinator.progress.completedHintCount(in: flow), flow.hints.count)
+
+        coordinator.dismiss(flow)
+        XCTAssertFalse(coordinator.progress.shouldPresent(flow))
+        XCTAssertNil(coordinator.activeHint(in: flow))
+
+        coordinator.reset(.firstBattleGuidance)
+        XCTAssertTrue(coordinator.progress.shouldPresent(flow))
+        XCTAssertTrue(coordinator.triggeredHintIDs.isEmpty)
+        XCTAssertTrue(coordinator.events.isEmpty)
+
+        let harness = try DZWPlayableScreenHarness.runTucholaFlow(seed: 930_001)
+        XCTAssertTrue(harness.completedAllStages, harness.blockers.joined(separator: "\n"))
+        XCTAssertEqual(harness.completion.completionRecord.scenarioID, .tucholaForest)
+        XCTAssertNotNil(harness.persistedProgress.completionRecord(for: .tucholaForest))
+    }
+
     private func readmeText() throws -> String {
         let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("README.md")
