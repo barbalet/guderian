@@ -1,5 +1,27 @@
 # Guderian Development Plan
 
+## Current Ship Status
+
+The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19. Cycle 930 completes the tutorial onboarding block with first-run historical context and first-battle contextual hints. Cycle 1080 closes the local `REVIEW.md` hardening pass.
+
+Remaining playable-screen estimate: battles 1-35 are complete through cycle 890, tutorial onboarding is complete through cycle 930, and the local review hardening plan is complete through cycle 1080. There are no cycles remaining in the current unified 35-battle playable-campaign, tutorial-onboarding, or `REVIEW.md` local-hardening plans.
+
+## Cycle Range Summary
+
+- Cycles 1-100: playable demo, centered on a fortified-delay tutorial plus two famous command-scope scenarios: Sedan/Meuse and Moscow/Tula.
+- Cycles 101-250: complete campaign, expanding to every battle in the README chronology and shipping all scenarios as playable, tested, historically annotated missions.
+- Cycles 251-300: native playable demo, replacing proxy forces/maps with real Guderian battle instances for Wizna, Sedan, and Moscow/Tula/Kashira.
+- Cycles 301-400: native full campaign, converting all 19 battles to scenario-specific units, terrain, actions, AI pressure, scoring, and debriefs.
+- Cycles 401-450: post-ship hardening, adding after-action analysis and deterministic campaign soak probes across every native battle.
+- Cycles 451-500: `derZweiteWeltkrieg` playable-screen rebase, beginning with Tuchola Forest as the accepted DZW-style board/sidebar/unit-control pilot and then carrying that screen parity through the campaign.
+- Cycles 591-650: 400% map-detail improvement and late-career command-context expansion, with post-1941 scenarios labeled as staff-influence or epilogue context rather than direct field command.
+- Cycles 651-730: visible late-career integration, adding a separate Guderian Late Career Context section, shared dzw briefing maps, parity-ready reports for all 16 late-career records, separate late-career progress, GuderianTest automation, UX audit coverage, and final acceptance while preserving the 19-battle field-command campaign.
+- Cycles 731-830: unified 35-battle playable campaign, removing the UI/playability split so all 35 rows use one Battles list, one DZW-style playable surface, one progress/save model, one harness, README chronology coverage, and final acceptance with command caveats retained as historical labels only.
+- Cycles 831-890: corrected real DZW UI parity, routing battles 20-35 through the same live playable board, controls, AI turn flow, debrief, and persistence path as battles 1-19.
+- Cycles 891-930: tutorial onboarding and reusable guidance, adding a four-screen first-run historical tutorial plus first-battle contextual hints with versioned `Do not show again` persistence.
+- Cycles 931-960: `GuderianTest` first-battle autoplay replacement, making the test app visibly play Tuchola Forest through the same DZW-style battle surface as the main app.
+- Cycles 961-1080: `REVIEW.md` local hardening, implementing the review cleanup inside this checkout and embedded `dzw` without changing the sibling `derZweiteWeltkrieg` checkout.
+
 Cycle 0 update: README and this plan were created from a review of the root project, the included `dzw` engine directory, and Wikipedia research on Guderian's World War II field-command battles.
 
 Cycle 30 update: cycles 1-30 are complete. The repository now has a root Swift package, a `GuderianCore` campaign/scenario data model, all 19 command-scope scenarios represented as metadata, demo IDs locked to Wizna/Sedan/Moscow-Tula-Kashira, a no-submodule-edit `dzw` proxy loader, a SwiftUI app shell with Metal device detection, and regression tests for catalog and loader behavior.
