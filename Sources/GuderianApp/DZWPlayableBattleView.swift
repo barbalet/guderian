@@ -175,22 +175,33 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     let source: DZWPlayableBattleSource
     private var session: DZWPlayableBoardSession?
+    private let guderianTestController: GuderianTestFirstBattleRunController?
     private let aiTargetPriorities: [String]
     private var restartCount = 0
 
-    init(scenario: GuderianScenario) {
+    init(
+        scenario: GuderianScenario,
+        guderianTestController: GuderianTestFirstBattleRunController? = nil
+    ) {
         self.source = .fieldCommand(scenario)
+        self.guderianTestController = guderianTestController
         aiTargetPriorities = source.aiTargetPriorities
         aiTurnEvents = [
             "German AI ready: \(source.aiPostureName) will pressure \(Self.prioritySummary(aiTargetPriorities))."
         ]
-        session = source.makeSession(restartCount: restartCount)
-        refresh()
-        dzwPlayableLog.info("Battle model initialized source=fieldCommand battle=\(scenario.id.rawValue, privacy: .public) title=\(scenario.title, privacy: .public) session=\(self.session == nil ? "missing" : "ready", privacy: .public)")
+        if let guderianTestController {
+            session = guderianTestController.session
+            syncFromGuderianTestController(context: "initial")
+        } else {
+            session = source.makeSession(restartCount: restartCount)
+            refresh()
+        }
+        dzwPlayableLog.info("Battle model initialized source=fieldCommand battle=\(scenario.id.rawValue, privacy: .public) title=\(scenario.title, privacy: .public) session=\(self.session == nil ? "missing" : "ready", privacy: .public) externalGuderianTestController=\(guderianTestController != nil, privacy: .public)")
     }
 
     init(lateCareerEntry: LateCareerGuderianPresentation) {
         self.source = .lateCareer(lateCareerEntry)
+        guderianTestController = nil
         aiTargetPriorities = source.aiTargetPriorities
         aiTurnEvents = [
             "German AI ready: \(source.aiPostureName) will pressure \(Self.prioritySummary(aiTargetPriorities))."
@@ -376,6 +387,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func advancePhase() {
+        if runGuderianTestControllerStep(context: "visible-next-phase") {
+            return
+        }
+
         session?.advancePhase()
         refresh()
         dzwPlayableLog.info("Phase advanced activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public) turn=\(self.snapshot?.turnNumber ?? -1, privacy: .public)")
@@ -386,6 +401,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func runAutomatedActiveStep() {
+        if runGuderianTestControllerStep(context: "visible-auto-step") {
+            return
+        }
+
         guard let snapshot, !isBattleOver else {
             dzwPlayableLog.info("Automated active step ignored battleOver=\(self.isBattleOver, privacy: .public) hasSnapshot=\(self.snapshot != nil, privacy: .public)")
             return
@@ -413,6 +432,18 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func runGermanTurn() {
+        if let guderianTestController {
+            do {
+                _ = try guderianTestController.runUntilPauseOrDebrief(maxSteps: 6)
+                syncFromGuderianTestController(context: "visible-german-turn")
+                dzwPlayableLog.info("Visible German Turn routed through external GuderianTest controller.")
+            } catch {
+                debriefError = "\(error)"
+                dzwPlayableLog.error("Visible German Turn failed through external GuderianTest controller error=\(String(describing: error), privacy: .public)")
+            }
+            return
+        }
+
         guard !isBattleOver else {
             dzwPlayableLog.info("German turn ignored because battle is over.")
             return
@@ -443,6 +474,18 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func restartBattle() {
+        if let guderianTestController {
+            do {
+                try guderianTestController.restart()
+                syncFromGuderianTestController(context: "restart")
+                dzwPlayableLog.info("External GuderianTest battle restarted through visible board controls.")
+            } catch {
+                debriefError = "\(error)"
+                dzwPlayableLog.error("External GuderianTest battle restart failed error=\(String(describing: error), privacy: .public)")
+            }
+            return
+        }
+
         restartCount += 1
         session = source.makeSession(restartCount: restartCount)
         completion = nil
@@ -462,6 +505,20 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func playBattleToEnd() -> DZWPlayableCompletionRecord? {
+        if let guderianTestController {
+            do {
+                let report = try guderianTestController.runToDebrief()
+                syncFromGuderianTestController(context: "visible-play-to-end")
+                dzwPlayableLog.info("Visible play-to-end routed through external GuderianTest controller.")
+                return .fieldCommand(report.result.completion.completionRecord)
+            } catch {
+                debriefError = "\(error)"
+                syncFromGuderianTestController(context: "visible-play-to-end-error")
+                dzwPlayableLog.error("Visible play-to-end failed through external GuderianTest controller error=\(String(describing: error), privacy: .public)")
+                return nil
+            }
+        }
+
         guard let session else {
             debriefError = "Board session unavailable."
             dzwPlayableLog.error("Play-to-end failed because board session is unavailable.")
@@ -508,6 +565,14 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func completeBattle() -> DZWPlayableCompletionRecord? {
+        if let guderianTestController {
+            if let report = guderianTestController.lastReport {
+                syncFromGuderianTestController(context: "visible-debrief-existing")
+                return .fieldCommand(report.result.completion.completionRecord)
+            }
+            return playBattleToEnd()
+        }
+
         guard let session else {
             debriefError = "Board session unavailable."
             dzwPlayableLog.error("Complete battle failed because board session is unavailable.")
@@ -564,6 +629,61 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     private func refresh() {
         snapshot = session?.playableBoardSnapshot()
         lastError = snapshot?.lastAction.detail ?? "Board session unavailable."
+    }
+
+    @discardableResult
+    private func runGuderianTestControllerStep(context: String) -> Bool {
+        guard let guderianTestController else {
+            return false
+        }
+
+        do {
+            _ = try guderianTestController.stepOnce()
+            syncFromGuderianTestController(context: context)
+            dzwPlayableLog.info("Visible board action routed through external GuderianTest controller context=\(context, privacy: .public)")
+        } catch {
+            debriefError = "\(error)"
+            dzwPlayableLog.error("Visible board action failed through external GuderianTest controller context=\(context, privacy: .public) error=\(String(describing: error), privacy: .public)")
+        }
+        return true
+    }
+
+    func syncFromGuderianTestController(context: String) {
+        guard let guderianTestController else {
+            return
+        }
+
+        session = guderianTestController.session
+        snapshot = guderianTestController.latestSnapshot
+        lastError = guderianTestController.latestSnapshot.lastAction.detail
+        if let report = guderianTestController.lastReport {
+            completion = DZWPlayableBattleCompletionDisplay(fieldCommand: report.result.completion)
+            playableTestGameResult = report.result
+            debriefError = nil
+        } else {
+            completion = nil
+            playableTestGameResult = nil
+            if guderianTestController.runState != .failed {
+                debriefError = nil
+            }
+        }
+
+        aiTurnEvents = Self.guderianTestEvents(from: guderianTestController)
+        dzwPlayableLog.info("Visible board synced from GuderianTest controller context=\(context, privacy: .public) state=\(guderianTestController.runState.rawValue, privacy: .public) steps=\(guderianTestController.steps.count, privacy: .public) phaseAdvances=\(guderianTestController.phaseAdvances, privacy: .public) turn=\(guderianTestController.latestSnapshot.turnNumber, privacy: .public) phase=\(guderianTestController.latestSnapshot.phase.rawValue, privacy: .public) action=\(guderianTestController.latestSnapshot.lastAction.detail, privacy: .public)")
+    }
+
+    private static func guderianTestEvents(from controller: GuderianTestFirstBattleRunController) -> [String] {
+        let recent = controller.steps.suffix(8).map { step in
+            "\(step.turnNumber) \(step.activePlayer.rawValue) \(step.phase.rawValue): \(step.detail)"
+        }
+
+        if recent.isEmpty {
+            return [
+                "GuderianTest live controller ready: visible board shares the autoplay session."
+            ]
+        }
+
+        return Array(recent)
     }
 
     private func runSharedAutoplayToDebrief() {
@@ -1244,16 +1364,23 @@ public struct DZWPlayableBattleView: View {
     private let onCompletion: (DZWPlayableCompletionRecord) -> Void
     private let showsDefaultPanels: Bool
     private let showsTutorials: Bool
+    private let guderianTestSyncToken: Int
 
     public init(
         scenario: GuderianScenario,
         showsDefaultPanels: Bool = true,
         showsTutorials: Bool = true,
+        guderianTestController: GuderianTestFirstBattleRunController? = nil,
+        guderianTestSyncToken: Int = 0,
         onCompletion: @escaping (CampaignCompletionRecord) -> Void = { _ in }
     ) {
-        _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(scenario: scenario))
+        _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(
+            scenario: scenario,
+            guderianTestController: guderianTestController
+        ))
         self.showsDefaultPanels = showsDefaultPanels
         self.showsTutorials = showsTutorials
+        self.guderianTestSyncToken = guderianTestSyncToken
         self.onCompletion = { record in
             if case .fieldCommand(let completionRecord) = record {
                 onCompletion(completionRecord)
@@ -1270,6 +1397,7 @@ public struct DZWPlayableBattleView: View {
         _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(lateCareerEntry: lateCareerEntry))
         self.showsDefaultPanels = showsDefaultPanels
         self.showsTutorials = showsTutorials
+        guderianTestSyncToken = 0
         self.onCompletion = { record in
             if case .lateCareer(let completionRecord) = record {
                 onCompletion(completionRecord)
@@ -1319,6 +1447,7 @@ public struct DZWPlayableBattleView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("battle-screen")
             .onAppear {
+                model.syncFromGuderianTestController(context: "on-appear")
                 dzwPlayableLog.info("Battle view appeared title=\(model.title, privacy: .public) tutorialEligible=\(model.isFirstBattleTutorialEligible, privacy: .public) firstBattleDismissed=\(firstBattleGuidanceDismissed, privacy: .public) showsDefaultPanels=\(showsDefaultPanels, privacy: .public) showsTutorials=\(showsTutorials, privacy: .public)")
                 logDZWWindowSnapshot("dzw-battle-on-appear-before-panels")
                 if showsDefaultPanels {
@@ -1340,6 +1469,9 @@ public struct DZWPlayableBattleView: View {
                     dzwPlayableLog.info("Battle view observed tutorial trigger event trigger=\(trigger.rawValue, privacy: .public) count=\(model.tutorialEventCount, privacy: .public)")
                     recordFirstBattleTutorialTrigger(trigger)
                 }
+            }
+            .onChange(of: guderianTestSyncToken) { _, syncToken in
+                model.syncFromGuderianTestController(context: "guderian-test-sync-\(syncToken)")
             }
             .onDisappear {
                 dzwPlayableLog.info("Battle view disappeared title=\(model.title, privacy: .public) visiblePanels=\(panelWindows.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")

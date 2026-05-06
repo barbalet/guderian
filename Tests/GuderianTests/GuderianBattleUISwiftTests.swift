@@ -154,6 +154,35 @@ struct GuderianBattleUISwiftTests {
         #expect(controller.latestSnapshot.phase != opening.phase || controller.latestSnapshot.turnNumber != opening.turnNumber)
     }
 
+    @Test("Cycles 941-950 GuderianTest live movement changes displayed unit positions")
+    func guderianTestFirstBattleAutoplayControllerMovesUnitsInLiveSession() throws {
+        let controller = try GuderianTestFirstBattleRunController()
+        var beforeMovement = controller.latestSnapshot
+        var movementStep: PlayableTestGameStep?
+
+        for _ in 0..<6 {
+            beforeMovement = controller.latestSnapshot
+            let step = try controller.stepOnce()
+            if step?.phase == .movement {
+                movementStep = step
+                break
+            }
+        }
+
+        let afterMovement = controller.latestSnapshot
+        let movedUnits = afterMovement.units.filter { unit in
+            guard let before = beforeMovement.units.first(where: { $0.id == unit.id }) else {
+                return false
+            }
+            return abs(before.x - unit.x) > 0.01 || abs(before.y - unit.y) > 0.01
+        }
+
+        #expect(movementStep?.status == .succeeded)
+        #expect(movementStep?.detail.contains("active units moved") == true)
+        #expect(!movedUnits.isEmpty)
+        #expect(afterMovement.lastAction.detail != beforeMovement.lastAction.detail)
+    }
+
     @Test("Cycles 941-950 GuderianTest automated human player hands turns to German AI")
     func guderianTestFirstBattleAutoplayControllerRunsBothSidesByLegalSteps() throws {
         let controller = try GuderianTestFirstBattleRunController()

@@ -79,6 +79,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var speed: GuderianTestFirstBattleAutoplaySpeed = .standard
     @Published private(set) var errorMessage: String?
+    @Published private(set) var boardSyncToken = 0
 
     private var controller: GuderianTestFirstBattleRunController?
     private var runTask: Task<Void, Never>?
@@ -106,6 +107,10 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
 
     var hasReport: Bool {
         report != nil
+    }
+
+    var liveController: GuderianTestFirstBattleRunController? {
+        controller
     }
 
     var canRun: Bool {
@@ -294,6 +299,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
         phaseAdvances = controller.phaseAdvances
         blockers = controller.blockers
         isRunning = controller.runState == .running
+        boardSyncToken += 1
         logStateIfNeeded("controller-sync")
     }
 
@@ -326,7 +332,9 @@ struct GuderianTestFirstBattleAutoplayView: View {
             DZWPlayableBattleView(
                 scenario: viewModel.scenario,
                 showsDefaultPanels: !isUITesting,
-                showsTutorials: !isUITesting
+                showsTutorials: !isUITesting,
+                guderianTestController: viewModel.liveController,
+                guderianTestSyncToken: viewModel.boardSyncToken
             )
                 .frame(minWidth: 860, minHeight: 760)
                 .accessibilityIdentifier("guderian-test-primary-battle-surface")
