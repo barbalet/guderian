@@ -27,9 +27,11 @@ File bugs, requests, and trackable feedback in [GitHub Issues](https://github.co
 
 ## Screenshots
 
-![Battle 1 scenario map: Tuchola Forest Corridor](docs/images/guderian-battle-01-tuchola-forest-map.png)
+Initial battle maps show the starting board state with unit counters visible and without tactical overlay lines.
 
-![Battle 13 scenario map: Bialystok-Minsk Pocket](docs/images/guderian-battle-13-bialystok-minsk-map.png)
+![Battle 1 initial battle map with starting units: Tuchola Forest](docs/images/guderian-battle-01-tuchola-forest-map.png)
+
+![Battle 13 initial battle map with starting units: Bialystok-Minsk](docs/images/guderian-battle-13-bialystok-minsk-map.png)
 
 ## Included Engine Review
 
