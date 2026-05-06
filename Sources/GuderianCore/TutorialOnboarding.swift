@@ -39,6 +39,33 @@ public enum FirstBattleGuidanceHintID: String, Codable, CaseIterable, Hashable, 
     case debrief = "firstBattleGuidance-debrief"
 }
 
+public enum FirstBattleButtonCoachID: String, Codable, CaseIterable, Hashable, Sendable {
+    case autoStep = "firstBattleButtonCoach-autoStep"
+    case germanTurn = "firstBattleButtonCoach-germanTurn"
+    case playToEnd = "firstBattleButtonCoach-playToEnd"
+    case nextPhase = "firstBattleButtonCoach-nextPhase"
+    case debrief = "firstBattleButtonCoach-debrief"
+    case restart = "firstBattleButtonCoach-restart"
+    case previousReady = "firstBattleButtonCoach-previousReady"
+    case nextReady = "firstBattleButtonCoach-nextReady"
+    case nearestEnemy = "firstBattleButtonCoach-nearestEnemy"
+    case clearSelection = "firstBattleButtonCoach-clearSelection"
+    case rotateLeft = "firstBattleButtonCoach-rotateLeft"
+    case rotateRight = "firstBattleButtonCoach-rotateRight"
+    case manualCover = "firstBattleButtonCoach-manualCover"
+    case hullDown = "firstBattleButtonCoach-hullDown"
+    case shootTarget = "firstBattleButtonCoach-shootTarget"
+    case assaultFollowUp = "firstBattleButtonCoach-assaultFollowUp"
+    case assaultTarget = "firstBattleButtonCoach-assaultTarget"
+    case resolvePending = "firstBattleButtonCoach-resolvePending"
+    case zoomOut = "firstBattleButtonCoach-zoomOut"
+    case resetZoom = "firstBattleButtonCoach-resetZoom"
+    case commandPanel = "firstBattleButtonCoach-commandPanel"
+    case inspectorPanel = "firstBattleButtonCoach-inspectorPanel"
+    case forcesPanel = "firstBattleButtonCoach-forcesPanel"
+    case logPanel = "firstBattleButtonCoach-logPanel"
+}
+
 public struct TutorialStorageKey: Codable, Hashable, Sendable {
     public let rawValue: String
 
@@ -109,6 +136,28 @@ public struct TutorialHint: Identifiable, Codable, Hashable, Sendable, TutorialC
         self.id = id
         self.trigger = trigger
         self.order = order
+        self.title = title
+        self.body = body
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.requiredTopics = requiredTopics
+    }
+}
+
+public struct FirstBattleButtonCoachTip: Identifiable, Codable, Hashable, Sendable, TutorialContent {
+    public let id: FirstBattleButtonCoachID
+    public let title: String
+    public let body: String
+    public let accessibilityIdentifier: String
+    public let requiredTopics: [String]
+
+    public init(
+        id: FirstBattleButtonCoachID,
+        title: String,
+        body: String,
+        accessibilityIdentifier: String,
+        requiredTopics: [String] = []
+    ) {
+        self.id = id
         self.title = title
         self.body = body
         self.accessibilityIdentifier = accessibilityIdentifier
@@ -227,6 +276,35 @@ public struct TutorialProgress: Codable, Hashable, Sendable {
         flow.orderedHints.first { hint in
             triggeredHintIDs.contains(hint.id) && !completedHintIDs.contains(hint.id)
         }
+    }
+}
+
+public struct FirstBattleButtonCoachProgress: Codable, Hashable, Sendable {
+    public private(set) var usedButtonIDs: Set<FirstBattleButtonCoachID>
+    public private(set) var completedFirstGame: Bool
+
+    public init(
+        usedButtonIDs: Set<FirstBattleButtonCoachID> = [],
+        completedFirstGame: Bool = false
+    ) {
+        self.usedButtonIDs = usedButtonIDs
+        self.completedFirstGame = completedFirstGame
+    }
+
+    public func shouldPresent(_ id: FirstBattleButtonCoachID) -> Bool {
+        !completedFirstGame && !usedButtonIDs.contains(id)
+    }
+
+    public mutating func recordUse(_ id: FirstBattleButtonCoachID) {
+        usedButtonIDs.insert(id)
+    }
+
+    public mutating func completeFirstGame() {
+        completedFirstGame = true
+    }
+
+    public mutating func resetSessionUse() {
+        usedButtonIDs.removeAll()
     }
 }
 
@@ -365,6 +443,7 @@ public enum GuderianTutorialCatalog {
 
     public static let firstRunHistoryStorageKey = TutorialStorageKey("guderian.tutorial.firstRunHistory.v1.dismissed")
     public static let firstBattleGuidanceStorageKey = TutorialStorageKey("guderian.tutorial.firstBattleGuidance.v1.dismissed")
+    public static let firstBattleButtonCoachStorageKey = TutorialStorageKey("guderian.tutorial.firstBattleButtonCoach.v1.completed")
 
     public static var firstRunHistoryFlow: TutorialFlow {
         TutorialFlow(
@@ -389,6 +468,183 @@ public enum GuderianTutorialCatalog {
             pages: [],
             hints: firstBattleGuidanceHints
         )
+    }
+
+    public static var firstBattleButtonCoachTips: [FirstBattleButtonCoachTip] {
+        [
+            FirstBattleButtonCoachTip(
+                id: .autoStep,
+                title: "Auto Step",
+                body: "Runs one legal action for the active side and then advances the board. Use it when you want the engine to handle a single phase step.",
+                accessibilityIdentifier: "first-battle-button-coach-auto-step",
+                requiredTopics: ["legal action", "phase"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .germanTurn,
+                title: "German Turn",
+                body: "Lets the German AI act until control returns to you or the safety cap is reached. Watch where it applies pressure before setting your next defense.",
+                accessibilityIdentifier: "first-battle-button-coach-german-turn",
+                requiredTopics: ["German AI", "pressure"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .playToEnd,
+                title: "Play To End",
+                body: "Autoplays the remaining battle and creates the debrief result. This is useful for checking the scenario outcome without issuing every order yourself.",
+                accessibilityIdentifier: "first-battle-button-coach-play-to-end",
+                requiredTopics: ["Autoplays", "debrief"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .nextPhase,
+                title: "Next Phase",
+                body: "Moves the battle to the next movement, shooting, or assault phase. Check your selected unit first because some actions are only legal in one phase.",
+                accessibilityIdentifier: "first-battle-button-coach-next-phase",
+                requiredTopics: ["phase", "legal"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .debrief,
+                title: "Debrief",
+                body: "Ends the current battle state and records score, victory band, and campaign progress. Use it when you are ready to accept the result.",
+                accessibilityIdentifier: "first-battle-button-coach-debrief",
+                requiredTopics: ["score", "campaign progress"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .restart,
+                title: "Restart",
+                body: "Resets the battle to a fresh board while keeping the same scenario selected. Use it when you want to try a different opening plan.",
+                accessibilityIdentifier: "first-battle-button-coach-restart",
+                requiredTopics: ["Resets", "scenario"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .previousReady,
+                title: "Prev Ready",
+                body: "Selects the previous active unit that can still participate. It helps you review the force without hunting across the map.",
+                accessibilityIdentifier: "first-battle-button-coach-prev-ready",
+                requiredTopics: ["active unit", "map"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .nextReady,
+                title: "Next Ready",
+                body: "Selects the next active unit that can still participate. Use it to step through your available units before ending a phase.",
+                accessibilityIdentifier: "first-battle-button-coach-next-ready",
+                requiredTopics: ["active unit", "phase"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .nearestEnemy,
+                title: "Nearest Enemy",
+                body: "Targets the closest enemy to the selected unit. This is a quick way to set up shooting or assault orders.",
+                accessibilityIdentifier: "first-battle-button-coach-nearest-enemy",
+                requiredTopics: ["enemy", "orders"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .clearSelection,
+                title: "Clear",
+                body: "Returns selection to the first active friendly unit. It gives you a reliable reset when the current selection is confusing.",
+                accessibilityIdentifier: "first-battle-button-coach-clear-selection",
+                requiredTopics: ["selection", "friendly unit"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .rotateLeft,
+                title: "Rotate Left",
+                body: "Turns the selected unit forty-five degrees left. Facing matters for vehicles and line-of-fire decisions.",
+                accessibilityIdentifier: "first-battle-button-coach-rotate-left",
+                requiredTopics: ["selected unit", "Facing"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .rotateRight,
+                title: "Rotate Right",
+                body: "Turns the selected unit forty-five degrees right. Use it to orient armor or guns toward the threat you expect next.",
+                accessibilityIdentifier: "first-battle-button-coach-rotate-right",
+                requiredTopics: ["selected unit", "threat"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .manualCover,
+                title: "Manual Cover",
+                body: "Marks whether the selected unit is using cover. Cover can change how survivable a position is under fire.",
+                accessibilityIdentifier: "first-battle-button-coach-manual-cover",
+                requiredTopics: ["selected unit", "Cover"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .hullDown,
+                title: "Hull Down",
+                body: "Marks whether the selected vehicle is protected by a hull-down position. It is mainly for armor using terrain to reduce exposure.",
+                accessibilityIdentifier: "first-battle-button-coach-hull-down",
+                requiredTopics: ["vehicle", "terrain"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .shootTarget,
+                title: "Shoot Target",
+                body: "Fires with the selected unit at the current target during the shooting phase. If the button is disabled, check phase, target, and whether the unit can still fire.",
+                accessibilityIdentifier: "first-battle-button-coach-shoot-target",
+                requiredTopics: ["shooting phase", "target"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .assaultFollowUp,
+                title: "Assault Follow-Up",
+                body: "Chooses whether a victorious assaulting unit advances after combat. Leave it off when holding position matters more than taking ground.",
+                accessibilityIdentifier: "first-battle-button-coach-assault-follow-up",
+                requiredTopics: ["assault", "position"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .assaultTarget,
+                title: "Assault Target",
+                body: "Orders close combat against the selected target during the assault phase. Use it only when the board position is worth the risk.",
+                accessibilityIdentifier: "first-battle-button-coach-assault-target",
+                requiredTopics: ["assault phase", "target"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .resolvePending,
+                title: "Resolve Pending",
+                body: "Accepts the first pending rules choice so play can continue. Use it when combat or weapon handling is waiting for a resolution.",
+                accessibilityIdentifier: "first-battle-button-coach-resolve-pending",
+                requiredTopics: ["rules choice", "continue"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .zoomOut,
+                title: "Zoom Out",
+                body: "Reduces the battlefield zoom level. Use it when you need more of the map in view before giving orders.",
+                accessibilityIdentifier: "first-battle-button-coach-zoom-out",
+                requiredTopics: ["zoom", "map"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .resetZoom,
+                title: "Reset Zoom",
+                body: "Returns the battlefield to the normal zoom level. Use it when panning or scaling has made the board hard to read.",
+                accessibilityIdentifier: "first-battle-button-coach-reset-zoom",
+                requiredTopics: ["zoom", "board"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .commandPanel,
+                title: "Command Panel",
+                body: "Shows or hides the command panel with phase and action controls. Keep it open when you are issuing orders frequently.",
+                accessibilityIdentifier: "first-battle-button-coach-command-panel",
+                requiredTopics: ["command panel", "orders"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .inspectorPanel,
+                title: "Inspector Panel",
+                body: "Shows or hides unit details and objectives. Use it to understand the selected unit and the scenario goals.",
+                accessibilityIdentifier: "first-battle-button-coach-inspector-panel",
+                requiredTopics: ["unit details", "objectives"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .forcesPanel,
+                title: "Forces Panel",
+                body: "Shows or hides the force matchup and recent German AI events. It helps you compare remaining units and pressure.",
+                accessibilityIdentifier: "first-battle-button-coach-forces-panel",
+                requiredTopics: ["force matchup", "pressure"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .logPanel,
+                title: "Log Panel",
+                body: "Shows or hides the recent battle log. Open it when you need to review what the engine just resolved.",
+                accessibilityIdentifier: "first-battle-button-coach-log-panel",
+                requiredTopics: ["battle log", "engine"]
+            ),
+        ]
+    }
+
+    public static func firstBattleButtonCoachTip(for id: FirstBattleButtonCoachID) -> FirstBattleButtonCoachTip? {
+        firstBattleButtonCoachTips.first { $0.id == id }
     }
 
     public static var firstRunHistoryPages: [TutorialPage] {

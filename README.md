@@ -17,6 +17,20 @@ The local engine boundary currently includes the Guderian scenario board bridge:
 
 Keep new engine changes outside `dzw` when possible. When a C rules change is unavoidable for Guderian, guard it with `HEINZ_GUDERIAN_GAME`, document the symbol here, and treat it as local to this checkout unless a later upstreaming pass explicitly promotes it.
 
+## Contact And Feedback
+
+Contact `barbalet at gmail dot com` if you have questions, feedback, or would like to collaborate.
+
+Join the [Guderian Discord server](https://discord.gg/FzyszZFS2c) for discussion and coordination.
+
+File bugs, requests, and trackable feedback in [GitHub Issues](https://github.com/barbalet/guderian/issues). GitHub issue tracking requires signing in with a GitHub account or a Google account so you can receive progress updates on the issues you file.
+
+## Screenshots
+
+![Battle 1 scenario map: Tuchola Forest Corridor](docs/images/guderian-battle-01-tuchola-forest-map.png)
+
+![Battle 13 scenario map: Bialystok-Minsk Pocket](docs/images/guderian-battle-13-bialystok-minsk-map.png)
+
 ## Included Engine Review
 
 The `dzw` directory is a complete playable World War II skirmish engine and app:
@@ -105,7 +119,3 @@ Or open `Guderian.xcodeproj` in Xcode and run the shared `Guderian` macOS scheme
 ## App Identity
 
 The app icon uses a face-focused crop of the public-domain Wikimedia Commons portrait documented in `Resources/AppIconSource/README.md`. The crop is intentionally limited to historical subject identification.
-
-## Contact
-
-Contact `barbalet at gmail dot com` if you have questions, feedback, or would like to collaborate.

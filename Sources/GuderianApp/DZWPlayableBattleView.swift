@@ -773,11 +773,22 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
     func showDefaults(
         model: DZWPlayableBattleViewModel,
         assaultAdvance: Binding<Bool>,
+        firstBattleButtonCoachProgress: Binding<FirstBattleButtonCoachProgress>,
+        firstBattleButtonCoachCompleted: Binding<Bool>,
+        showsFirstBattleButtonCoach: Bool,
         onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
         dzwPlayableLog.info("Showing default battle panels currentVisible=\(self.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
         for panel in [DZWPlayableBattlePanel.command, .inspector] {
-            show(panel, model: model, assaultAdvance: assaultAdvance, onCompletion: onCompletion)
+            show(
+                panel,
+                model: model,
+                assaultAdvance: assaultAdvance,
+                firstBattleButtonCoachProgress: firstBattleButtonCoachProgress,
+                firstBattleButtonCoachCompleted: firstBattleButtonCoachCompleted,
+                showsFirstBattleButtonCoach: showsFirstBattleButtonCoach,
+                onCompletion: onCompletion
+            )
         }
         dzwPlayableLog.info("Default battle panels shown visible=\(self.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
         logDZWWindowSnapshot("dzw-panel-defaults")
@@ -787,13 +798,24 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         _ panel: DZWPlayableBattlePanel,
         model: DZWPlayableBattleViewModel,
         assaultAdvance: Binding<Bool>,
+        firstBattleButtonCoachProgress: Binding<FirstBattleButtonCoachProgress>,
+        firstBattleButtonCoachCompleted: Binding<Bool>,
+        showsFirstBattleButtonCoach: Bool,
         onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
         dzwPlayableLog.info("Panel toggle requested panel=\(panel.rawValue, privacy: .public) wasVisible=\(self.visiblePanels.contains(panel), privacy: .public)")
         if visiblePanels.contains(panel) {
             hide(panel)
         } else {
-            show(panel, model: model, assaultAdvance: assaultAdvance, onCompletion: onCompletion)
+            show(
+                panel,
+                model: model,
+                assaultAdvance: assaultAdvance,
+                firstBattleButtonCoachProgress: firstBattleButtonCoachProgress,
+                firstBattleButtonCoachCompleted: firstBattleButtonCoachCompleted,
+                showsFirstBattleButtonCoach: showsFirstBattleButtonCoach,
+                onCompletion: onCompletion
+            )
         }
     }
 
@@ -801,6 +823,9 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         _ panel: DZWPlayableBattlePanel,
         model: DZWPlayableBattleViewModel,
         assaultAdvance: Binding<Bool>,
+        firstBattleButtonCoachProgress: Binding<FirstBattleButtonCoachProgress>,
+        firstBattleButtonCoachCompleted: Binding<Bool>,
+        showsFirstBattleButtonCoach: Bool,
         onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
         let reusedWindow = windows[panel] != nil
@@ -810,6 +835,9 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
                 panel: panel,
                 model: model,
                 assaultAdvance: assaultAdvance,
+                firstBattleButtonCoachProgress: firstBattleButtonCoachProgress,
+                firstBattleButtonCoachCompleted: firstBattleButtonCoachCompleted,
+                showsFirstBattleButtonCoach: showsFirstBattleButtonCoach,
                 onCompletion: onCompletion
             )
         )
@@ -925,13 +953,215 @@ private extension DZWPlayableBattlePanel {
             return "battle-log-scroll"
         }
     }
+
+    var buttonCoachID: FirstBattleButtonCoachID {
+        switch self {
+        case .command:
+            return .commandPanel
+        case .inspector:
+            return .inspectorPanel
+        case .forces:
+            return .forcesPanel
+        case .log:
+            return .logPanel
+        }
+    }
+}
+
+private enum FirstBattleButtonCoachPopoverPlacement {
+    case aboveRight
+    case belowLeft
+
+    var anchor: PopoverAttachmentAnchor {
+        switch self {
+        case .aboveRight:
+            return .point(.topTrailing)
+        case .belowLeft:
+            return .point(.bottomLeading)
+        }
+    }
+
+    var arrowEdge: Edge {
+        switch self {
+        case .aboveRight:
+            return .bottom
+        case .belowLeft:
+            return .top
+        }
+    }
+}
+
+private struct FirstBattleButtonCoachFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if !next.isEmpty {
+            value = next
+        }
+    }
+}
+
+private struct FirstBattleButtonCoachWindowReader: NSViewRepresentable {
+    @Binding var windowSize: CGSize
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        updateWindowSize(from: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        updateWindowSize(from: nsView)
+    }
+
+    private func updateWindowSize(from view: NSView) {
+        let sizeBinding = $windowSize
+        DispatchQueue.main.async {
+            guard let window = view.window else {
+                return
+            }
+            let size = window.contentView?.bounds.size ?? window.frame.size
+            if sizeBinding.wrappedValue != size {
+                sizeBinding.wrappedValue = size
+            }
+        }
+    }
+}
+
+private struct FirstBattleButtonCoachDialog: View {
+    let tip: FirstBattleButtonCoachTip
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(tip.title)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+            Text(tip.body)
+                .font(.system(size: 12, weight: .medium))
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(width: 270, alignment: .leading)
+        .foregroundStyle(Color(red: 0.14, green: 0.10, blue: 0.07))
+        .background(Color(red: 0.98, green: 0.96, blue: 0.88))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(tip.accessibilityIdentifier)
+    }
+}
+
+private struct FirstBattleButtonCoachModifier: ViewModifier {
+    let id: FirstBattleButtonCoachID
+    let showsCoach: Bool
+    let progress: FirstBattleButtonCoachProgress
+    let completedFirstGame: Bool
+
+    @State private var isHovering = false
+    @State private var buttonFrame: CGRect = .zero
+    @State private var windowSize: CGSize = .zero
+
+    private let dialogWidth: CGFloat = 270
+    private let dialogHeightEstimate: CGFloat = 120
+    private let edgePadding: CGFloat = 20
+
+    private var tip: FirstBattleButtonCoachTip? {
+        GuderianTutorialCatalog.firstBattleButtonCoachTip(for: id)
+    }
+
+    private var canPresent: Bool {
+        showsCoach &&
+            completedFirstGame == false &&
+            progress.shouldPresent(id) &&
+            tip != nil
+    }
+
+    private var placement: FirstBattleButtonCoachPopoverPlacement {
+        let size = windowSize == .zero
+            ? (NSScreen.main?.visibleFrame.size ?? CGSize(width: 1440, height: 900))
+            : windowSize
+        let closeToRightEdge = buttonFrame.maxX + dialogWidth + edgePadding > size.width
+        let closeToTopEdge = buttonFrame.minY - dialogHeightEstimate - edgePadding < 0
+        let invertedCloseToTopEdge = size.height - buttonFrame.maxY - dialogHeightEstimate - edgePadding < 0
+
+        if closeToRightEdge || closeToTopEdge || invertedCloseToTopEdge {
+            return .belowLeft
+        }
+        return .aboveRight
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                ZStack {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(
+                                key: FirstBattleButtonCoachFrameKey.self,
+                                value: proxy.frame(in: .global)
+                            )
+                    }
+                    FirstBattleButtonCoachWindowReader(windowSize: $windowSize)
+                        .frame(width: 0, height: 0)
+                }
+            )
+            .onPreferenceChange(FirstBattleButtonCoachFrameKey.self) { frame in
+                buttonFrame = frame
+            }
+            .onHover { hovering in
+                guard canPresent else {
+                    isHovering = false
+                    return
+                }
+                isHovering = hovering
+            }
+            .onChange(of: canPresent) { _, canPresent in
+                if !canPresent {
+                    isHovering = false
+                }
+            }
+            .popover(
+                isPresented: Binding(
+                    get: { isHovering && canPresent },
+                    set: { isHovering = $0 }
+                ),
+                attachmentAnchor: placement.anchor,
+                arrowEdge: placement.arrowEdge
+            ) {
+                if let tip {
+                    FirstBattleButtonCoachDialog(tip: tip)
+                }
+            }
+    }
+}
+
+private extension View {
+    func firstBattleButtonCoach(
+        _ id: FirstBattleButtonCoachID,
+        showsCoach: Bool,
+        progress: FirstBattleButtonCoachProgress,
+        completedFirstGame: Bool
+    ) -> some View {
+        modifier(FirstBattleButtonCoachModifier(
+            id: id,
+            showsCoach: showsCoach,
+            progress: progress,
+            completedFirstGame: completedFirstGame
+        ))
+    }
 }
 
 private struct DZWPlayableBattlePanelWindow: View {
     let panel: DZWPlayableBattlePanel
     @ObservedObject var model: DZWPlayableBattleViewModel
     @Binding var assaultAdvance: Bool
+    @Binding var firstBattleButtonCoachProgress: FirstBattleButtonCoachProgress
+    @Binding var firstBattleButtonCoachCompleted: Bool
+    let showsFirstBattleButtonCoach: Bool
     let onCompletion: (DZWPlayableCompletionRecord) -> Void
+
+    private var buttonCoachShows: Bool {
+        showsFirstBattleButtonCoach && !firstBattleButtonCoachCompleted
+    }
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: true) {
@@ -954,6 +1184,23 @@ private struct DZWPlayableBattlePanelWindow: View {
         .accessibilityIdentifier(panel.scrollIdentifier)
         .frame(minWidth: panel.minimumSize.width, minHeight: panel.minimumSize.height)
         .background(Color(red: 0.96, green: 0.93, blue: 0.84))
+    }
+
+    private func markButtonCoachUsed(_ id: FirstBattleButtonCoachID) {
+        firstBattleButtonCoachProgress.recordUse(id)
+    }
+
+    private func completeFirstBattleButtonCoach() {
+        guard showsFirstBattleButtonCoach else {
+            return
+        }
+        firstBattleButtonCoachProgress.completeFirstGame()
+        firstBattleButtonCoachCompleted = true
+    }
+
+    private func recordCompletion(_ record: DZWPlayableCompletionRecord) {
+        completeFirstBattleButtonCoach()
+        onCompletion(record)
     }
 
     @ViewBuilder
@@ -996,54 +1243,96 @@ private struct DZWPlayableBattlePanelWindow: View {
 
             HStack(spacing: 10) {
                 Button {
+                    markButtonCoachUsed(.autoStep)
                     model.runAutomatedActiveStep()
                 } label: {
                     Label("Auto Step", systemImage: "play.fill")
                 }
                 .disabled(model.isBattleOver)
+                .firstBattleButtonCoach(
+                    .autoStep,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.germanTurn)
                     model.runGermanTurn()
                 } label: {
                     Label("German Turn", systemImage: "forward.frame.fill")
                 }
                 .disabled(model.isBattleOver)
                 .accessibilityIdentifier("german-turn-button")
+                .firstBattleButtonCoach(
+                    .germanTurn,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.playToEnd)
                     if let record = model.playBattleToEnd() {
-                        onCompletion(record)
+                        recordCompletion(record)
                     }
                 } label: {
                     Label("Play To End", systemImage: "forward.end.alt.fill")
                 }
                 .disabled(model.hasCompletion)
                 .accessibilityIdentifier("play-to-end-button")
+                .firstBattleButtonCoach(
+                    .playToEnd,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.nextPhase)
                     model.advancePhase()
                 } label: {
                     Label("Next Phase", systemImage: "forward.end.fill")
                 }
                 .disabled(model.isBattleOver)
                 .accessibilityIdentifier("next-phase-button")
+                .firstBattleButtonCoach(
+                    .nextPhase,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.debrief)
                     if let record = model.completeBattle() {
-                        onCompletion(record)
+                        recordCompletion(record)
                     }
                 } label: {
                     Label("Debrief", systemImage: "flag.checkered")
                 }
                 .disabled(model.hasCompletion)
                 .accessibilityIdentifier("battle-debrief-button")
+                .firstBattleButtonCoach(
+                    .debrief,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.restart)
                     model.restartBattle()
                 } label: {
                     Label("Restart", systemImage: "arrow.counterclockwise")
                 }
                 .accessibilityIdentifier("battle-restart-button")
+                .firstBattleButtonCoach(
+                    .restart,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
             .buttonStyle(.borderedProminent)
         }
@@ -1072,23 +1361,51 @@ private struct DZWPlayableBattlePanelWindow: View {
 
             HStack {
                 Button("Prev Ready") {
+                    markButtonCoachUsed(.previousReady)
                     model.cycleActiveUnit(forward: false)
                 }
                 .accessibilityIdentifier("prev-ready-button")
+                .firstBattleButtonCoach(
+                    .previousReady,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
                 Button("Next Ready") {
+                    markButtonCoachUsed(.nextReady)
                     model.cycleActiveUnit(forward: true)
                 }
                 .accessibilityIdentifier("next-ready-button")
+                .firstBattleButtonCoach(
+                    .nextReady,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
             HStack {
                 Button("Nearest Enemy") {
+                    markButtonCoachUsed(.nearestEnemy)
                     model.selectNearestEnemy()
                 }
                 .accessibilityIdentifier("nearest-enemy-button")
+                .firstBattleButtonCoach(
+                    .nearestEnemy,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
                 Button("Clear") {
+                    markButtonCoachUsed(.clearSelection)
                     model.clearSelection()
                 }
                 .accessibilityIdentifier("clear-selection-button")
+                .firstBattleButtonCoach(
+                    .clearSelection,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
         }
         .buttonStyle(.bordered)
@@ -1101,55 +1418,123 @@ private struct DZWPlayableBattlePanelWindow: View {
 
             HStack {
                 Button {
+                    markButtonCoachUsed(.rotateLeft)
                     model.rotateSelected(by: -45)
                 } label: {
                     Label("Rotate -45", systemImage: "rotate.left")
                 }
+                .accessibilityIdentifier("rotate-left-button")
+                .firstBattleButtonCoach(
+                    .rotateLeft,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
                 Button {
+                    markButtonCoachUsed(.rotateRight)
                     model.rotateSelected(by: 45)
                 } label: {
                     Label("Rotate +45", systemImage: "rotate.right")
                 }
+                .accessibilityIdentifier("rotate-right-button")
+                .firstBattleButtonCoach(
+                    .rotateRight,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
             .disabled(snapshot.selectedUnit == nil || model.isBattleOver)
 
             HStack {
                 Toggle("Manual Cover", isOn: Binding(
                     get: { snapshot.selectedUnit?.inCover ?? false },
-                    set: { model.toggleCover($0) }
+                    set: {
+                        markButtonCoachUsed(.manualCover)
+                        model.toggleCover($0)
+                    }
                 ))
+                .firstBattleButtonCoach(
+                    .manualCover,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
                 Toggle("Hull Down", isOn: Binding(
                     get: { snapshot.selectedUnit?.hullDown ?? false },
-                    set: { model.toggleHullDown($0) }
+                    set: {
+                        markButtonCoachUsed(.hullDown)
+                        model.toggleHullDown($0)
+                    }
                 ))
+                .firstBattleButtonCoach(
+                    .hullDown,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
             .font(.caption.weight(.semibold))
             .disabled(snapshot.selectedUnit == nil || model.isBattleOver)
 
             Button {
+                markButtonCoachUsed(.shootTarget)
                 model.shootSelected()
             } label: {
                 Label("Shoot Target", systemImage: "scope")
             }
             .disabled(snapshot.phase != .shooting || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("shoot-target-button")
+            .firstBattleButtonCoach(
+                .shootTarget,
+                showsCoach: buttonCoachShows,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
 
-            Toggle("Assault follow-up advances", isOn: $assaultAdvance)
+            Toggle("Assault follow-up advances", isOn: Binding(
+                get: { assaultAdvance },
+                set: {
+                    markButtonCoachUsed(.assaultFollowUp)
+                    assaultAdvance = $0
+                }
+            ))
                 .font(.caption.weight(.semibold))
+                .firstBattleButtonCoach(
+                    .assaultFollowUp,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
             Button {
+                markButtonCoachUsed(.assaultTarget)
                 model.assaultSelected(advance: assaultAdvance)
             } label: {
                 Label("Assault Target", systemImage: "figure.run")
             }
             .disabled(snapshot.phase != .assault || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("assault-target-button")
+            .firstBattleButtonCoach(
+                .assaultTarget,
+                showsCoach: buttonCoachShows,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
 
             Button {
+                markButtonCoachUsed(.resolvePending)
                 model.resolvePendingChoice()
             } label: {
                 Label("Resolve Pending", systemImage: "checkmark.circle")
             }
+            .accessibilityIdentifier("resolve-pending-button")
+            .firstBattleButtonCoach(
+                .resolvePending,
+                showsCoach: buttonCoachShows,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
 
             Label(snapshot.lastAction.detail, systemImage: snapshot.lastAction.status == .blocked ? "exclamationmark.triangle" : "checkmark.circle")
                 .font(.caption)
@@ -1372,10 +1757,13 @@ public struct DZWPlayableBattleView: View {
     @State private var battlefieldZoom: CGFloat = 1
     @State private var firstBattleTutorial = TutorialHintCoordinator()
     @State private var firstBattleTutorialDoNotShowAgain = false
+    @State private var firstBattleButtonCoachProgress = FirstBattleButtonCoachProgress()
     @AppStorage("guderian.tutorial.firstBattleGuidance.v1.dismissed") private var firstBattleGuidanceDismissed = false
+    @AppStorage("guderian.tutorial.firstBattleButtonCoach.v1.completed") private var firstBattleButtonCoachCompleted = false
     private let onCompletion: (DZWPlayableCompletionRecord) -> Void
     private let showsDefaultPanels: Bool
     private let showsTutorials: Bool
+    private let isGuderianTestBacked: Bool
     private let guderianTestSyncToken: Int
 
     public init(
@@ -1392,6 +1780,7 @@ public struct DZWPlayableBattleView: View {
         ))
         self.showsDefaultPanels = showsDefaultPanels
         self.showsTutorials = showsTutorials
+        isGuderianTestBacked = guderianTestController != nil
         self.guderianTestSyncToken = guderianTestSyncToken
         self.onCompletion = { record in
             if case .fieldCommand(let completionRecord) = record {
@@ -1409,6 +1798,7 @@ public struct DZWPlayableBattleView: View {
         _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(lateCareerEntry: lateCareerEntry))
         self.showsDefaultPanels = showsDefaultPanels
         self.showsTutorials = showsTutorials
+        isGuderianTestBacked = false
         guderianTestSyncToken = 0
         self.onCompletion = { record in
             if case .lateCareer(let completionRecord) = record {
@@ -1466,6 +1856,9 @@ public struct DZWPlayableBattleView: View {
                     panelWindows.showDefaults(
                         model: model,
                         assaultAdvance: $assaultAdvance,
+                        firstBattleButtonCoachProgress: $firstBattleButtonCoachProgress,
+                        firstBattleButtonCoachCompleted: $firstBattleButtonCoachCompleted,
+                        showsFirstBattleButtonCoach: showsFirstBattleButtonCoach,
                         onCompletion: onCompletion
                     )
                     dzwPlayableLog.info("Battle view default panels requested visible=\(panelWindows.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
@@ -1480,6 +1873,11 @@ public struct DZWPlayableBattleView: View {
                 if let trigger = model.latestTutorialTrigger {
                     dzwPlayableLog.info("Battle view observed tutorial trigger event trigger=\(trigger.rawValue, privacy: .public) count=\(model.tutorialEventCount, privacy: .public)")
                     recordFirstBattleTutorialTrigger(trigger)
+                }
+            }
+            .onChange(of: model.hasCompletion) { _, hasCompletion in
+                if hasCompletion {
+                    completeFirstBattleButtonCoach()
                 }
             }
             .onChange(of: guderianTestSyncToken) { _, syncToken in
@@ -1502,6 +1900,13 @@ public struct DZWPlayableBattleView: View {
 
     private var firstBattleTutorialFlow: TutorialFlow {
         GuderianTutorialCatalog.firstBattleGuidanceFlow
+    }
+
+    private var showsFirstBattleButtonCoach: Bool {
+        showsTutorials &&
+            !isGuderianTestBacked &&
+            !firstBattleButtonCoachCompleted &&
+            !Self.isRunningUnderTests
     }
 
     private var activeFirstBattleHint: TutorialHint? {
@@ -1562,18 +1967,53 @@ public struct DZWPlayableBattleView: View {
         dzwPlayableLog.info("First-battle tutorial skipped activeHint=\(activeHint, privacy: .public) completedHints=\(firstBattleTutorial.progress.completedHintCount(in: firstBattleTutorialFlow), privacy: .public)")
     }
 
+    private func markButtonCoachUsed(_ id: FirstBattleButtonCoachID) {
+        firstBattleButtonCoachProgress.recordUse(id)
+    }
+
+    private func completeFirstBattleButtonCoach() {
+        guard showsFirstBattleButtonCoach else {
+            return
+        }
+        guard !firstBattleButtonCoachCompleted else {
+            return
+        }
+        firstBattleButtonCoachProgress.completeFirstGame()
+        firstBattleButtonCoachCompleted = true
+        dzwPlayableLog.info("First-battle button coach completed for future launches.")
+    }
+
+    private func recordCompletion(_ record: DZWPlayableCompletionRecord) {
+        completeFirstBattleButtonCoach()
+        onCompletion(record)
+    }
+
+    private static var isRunningUnderTests: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil ||
+            environment["GUDERIAN_TEST_MODE"] != nil ||
+            environment["GUDERIAN_UI_TESTING"] != nil
+    }
+
     private var battlefieldToolbar: some View {
         HStack(spacing: 10) {
             Label("Battlefield", systemImage: "map")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
 
             Button {
+                markButtonCoachUsed(.zoomOut)
                 adjustZoom(by: -0.15)
             } label: {
                 Image(systemName: "minus.magnifyingglass")
                     .frame(width: 24, height: 24)
             }
             .accessibilityLabel("Zoom out")
+            .firstBattleButtonCoach(
+                .zoomOut,
+                showsCoach: showsFirstBattleButtonCoach,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
 
             Slider(value: zoomBinding, in: 0.6...2.2)
                 .frame(width: 160)
@@ -1584,24 +2024,38 @@ public struct DZWPlayableBattleView: View {
                 .frame(width: 44, alignment: .trailing)
 
             Button {
+                markButtonCoachUsed(.resetZoom)
                 battlefieldZoom = 1
             } label: {
                 Image(systemName: "arrow.counterclockwise")
                     .frame(width: 24, height: 24)
             }
             .accessibilityLabel("Reset zoom")
+            .firstBattleButtonCoach(
+                .resetZoom,
+                showsCoach: showsFirstBattleButtonCoach,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
 
             Divider()
                 .frame(height: 24)
 
             ForEach(DZWPlayableBattlePanel.allCases) { panel in
                 Button {
+                    markButtonCoachUsed(panel.buttonCoachID)
                     toggle(panel)
                 } label: {
                     Label(panel.title, systemImage: panel.systemImage)
                 }
                 .tint(panelWindows.visiblePanels.contains(panel) ? Color(red: 0.13, green: 0.32, blue: 0.67) : Color.black.opacity(0.32))
                 .accessibilityIdentifier("toggle-\(panel.rawValue)-window")
+                .firstBattleButtonCoach(
+                    panel.buttonCoachID,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
         }
         .buttonStyle(.borderedProminent)
@@ -1630,6 +2084,9 @@ public struct DZWPlayableBattleView: View {
             panel,
             model: model,
             assaultAdvance: $assaultAdvance,
+            firstBattleButtonCoachProgress: $firstBattleButtonCoachProgress,
+            firstBattleButtonCoachCompleted: $firstBattleButtonCoachCompleted,
+            showsFirstBattleButtonCoach: showsFirstBattleButtonCoach,
             onCompletion: onCompletion
         )
     }
@@ -1668,54 +2125,96 @@ public struct DZWPlayableBattleView: View {
 
             HStack(spacing: 10) {
                 Button {
+                    markButtonCoachUsed(.autoStep)
                     model.runAutomatedActiveStep()
                 } label: {
                     Label("Auto Step", systemImage: "play.fill")
                 }
                 .disabled(model.isBattleOver)
+                .firstBattleButtonCoach(
+                    .autoStep,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.germanTurn)
                     model.runGermanTurn()
                 } label: {
                     Label("German Turn", systemImage: "forward.frame.fill")
                 }
                 .disabled(model.isBattleOver)
                 .accessibilityIdentifier("german-turn-button")
+                .firstBattleButtonCoach(
+                    .germanTurn,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.playToEnd)
                     if let record = model.playBattleToEnd() {
-                        onCompletion(record)
+                        recordCompletion(record)
                     }
                 } label: {
                     Label("Play To End", systemImage: "forward.end.alt.fill")
                 }
                 .disabled(model.hasCompletion)
                 .accessibilityIdentifier("play-to-end-button")
+                .firstBattleButtonCoach(
+                    .playToEnd,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.nextPhase)
                     model.advancePhase()
                 } label: {
                     Label("Next Phase", systemImage: "forward.end.fill")
                 }
                 .disabled(model.isBattleOver)
                 .accessibilityIdentifier("next-phase-button")
+                .firstBattleButtonCoach(
+                    .nextPhase,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.debrief)
                     if let record = model.completeBattle() {
-                        onCompletion(record)
+                        recordCompletion(record)
                     }
                 } label: {
                     Label("Debrief", systemImage: "flag.checkered")
                 }
                 .disabled(model.hasCompletion)
                 .accessibilityIdentifier("battle-debrief-button")
+                .firstBattleButtonCoach(
+                    .debrief,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
                 Button {
+                    markButtonCoachUsed(.restart)
                     model.restartBattle()
                 } label: {
                     Label("Restart", systemImage: "arrow.counterclockwise")
                 }
                 .accessibilityIdentifier("battle-restart-button")
+                .firstBattleButtonCoach(
+                    .restart,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
             .buttonStyle(.borderedProminent)
         }
@@ -1793,23 +2292,51 @@ public struct DZWPlayableBattleView: View {
 
             HStack {
                 Button("Prev Ready") {
+                    markButtonCoachUsed(.previousReady)
                     model.cycleActiveUnit(forward: false)
                 }
                 .accessibilityIdentifier("prev-ready-button")
+                .firstBattleButtonCoach(
+                    .previousReady,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
                 Button("Next Ready") {
+                    markButtonCoachUsed(.nextReady)
                     model.cycleActiveUnit(forward: true)
                 }
                 .accessibilityIdentifier("next-ready-button")
+                .firstBattleButtonCoach(
+                    .nextReady,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
             HStack {
                 Button("Nearest Enemy") {
+                    markButtonCoachUsed(.nearestEnemy)
                     model.selectNearestEnemy()
                 }
                 .accessibilityIdentifier("nearest-enemy-button")
+                .firstBattleButtonCoach(
+                    .nearestEnemy,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
                 Button("Clear") {
+                    markButtonCoachUsed(.clearSelection)
                     model.clearSelection()
                 }
                 .accessibilityIdentifier("clear-selection-button")
+                .firstBattleButtonCoach(
+                    .clearSelection,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
         }
         .buttonStyle(.bordered)
@@ -1822,55 +2349,123 @@ public struct DZWPlayableBattleView: View {
 
             HStack {
                 Button {
+                    markButtonCoachUsed(.rotateLeft)
                     model.rotateSelected(by: -45)
                 } label: {
                     Label("Rotate -45", systemImage: "rotate.left")
                 }
+                .accessibilityIdentifier("rotate-left-button")
+                .firstBattleButtonCoach(
+                    .rotateLeft,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
                 Button {
+                    markButtonCoachUsed(.rotateRight)
                     model.rotateSelected(by: 45)
                 } label: {
                     Label("Rotate +45", systemImage: "rotate.right")
                 }
+                .accessibilityIdentifier("rotate-right-button")
+                .firstBattleButtonCoach(
+                    .rotateRight,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
             .disabled(snapshot.selectedUnit == nil || model.isBattleOver)
 
             HStack {
                 Toggle("Manual Cover", isOn: Binding(
                     get: { snapshot.selectedUnit?.inCover ?? false },
-                    set: { model.toggleCover($0) }
+                    set: {
+                        markButtonCoachUsed(.manualCover)
+                        model.toggleCover($0)
+                    }
                 ))
+                .firstBattleButtonCoach(
+                    .manualCover,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
                 Toggle("Hull Down", isOn: Binding(
                     get: { snapshot.selectedUnit?.hullDown ?? false },
-                    set: { model.toggleHullDown($0) }
+                    set: {
+                        markButtonCoachUsed(.hullDown)
+                        model.toggleHullDown($0)
+                    }
                 ))
+                .firstBattleButtonCoach(
+                    .hullDown,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             }
             .font(.caption.weight(.semibold))
             .disabled(snapshot.selectedUnit == nil || model.isBattleOver)
 
             Button {
+                markButtonCoachUsed(.shootTarget)
                 model.shootSelected()
             } label: {
                 Label("Shoot Target", systemImage: "scope")
             }
             .disabled(snapshot.phase != .shooting || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("shoot-target-button")
+            .firstBattleButtonCoach(
+                .shootTarget,
+                showsCoach: showsFirstBattleButtonCoach,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
 
-            Toggle("Assault follow-up advances", isOn: $assaultAdvance)
+            Toggle("Assault follow-up advances", isOn: Binding(
+                get: { assaultAdvance },
+                set: {
+                    markButtonCoachUsed(.assaultFollowUp)
+                    assaultAdvance = $0
+                }
+            ))
                 .font(.caption.weight(.semibold))
+                .firstBattleButtonCoach(
+                    .assaultFollowUp,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
 
             Button {
+                markButtonCoachUsed(.assaultTarget)
                 model.assaultSelected(advance: assaultAdvance)
             } label: {
                 Label("Assault Target", systemImage: "figure.run")
             }
             .disabled(snapshot.phase != .assault || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("assault-target-button")
+            .firstBattleButtonCoach(
+                .assaultTarget,
+                showsCoach: showsFirstBattleButtonCoach,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
 
             Button {
+                markButtonCoachUsed(.resolvePending)
                 model.resolvePendingChoice()
             } label: {
                 Label("Resolve Pending", systemImage: "checkmark.circle")
             }
+            .accessibilityIdentifier("resolve-pending-button")
+            .firstBattleButtonCoach(
+                .resolvePending,
+                showsCoach: showsFirstBattleButtonCoach,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
 
             Label(snapshot.lastAction.detail, systemImage: snapshot.lastAction.status == .blocked ? "exclamationmark.triangle" : "checkmark.circle")
                 .font(.caption)

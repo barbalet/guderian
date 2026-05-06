@@ -299,6 +299,38 @@ final class ReviewLocalHardeningTests: XCTestCase {
         XCTAssertEqual(FirstBattleGuidanceHintID.germanAI.rawValue, "firstBattleGuidance-germanAI")
     }
 
+    func testFirstBattleButtonCoachTracksUsedButtonsAndCompletion() throws {
+        let tips = GuderianTutorialCatalog.firstBattleButtonCoachTips
+
+        XCTAssertEqual(tips.map(\.id), FirstBattleButtonCoachID.allCases)
+        XCTAssertEqual(
+            GuderianTutorialCatalog.firstBattleButtonCoachStorageKey.rawValue,
+            "guderian.tutorial.firstBattleButtonCoach.v1.completed"
+        )
+        XCTAssertTrue(tips.allSatisfy { $0.accessibilityIdentifier.hasPrefix("first-battle-button-coach-") })
+        XCTAssertTrue(tips.allSatisfy(\.containsRequiredTopics))
+        XCTAssertTrue(tips.allSatisfy { tip in
+            tip.body.filter { ".!?".contains($0) }.count <= 2
+        })
+
+        var progress = FirstBattleButtonCoachProgress()
+        XCTAssertTrue(progress.shouldPresent(.autoStep))
+        XCTAssertTrue(progress.shouldPresent(.germanTurn))
+
+        progress.recordUse(.autoStep)
+        XCTAssertFalse(progress.shouldPresent(.autoStep))
+        XCTAssertTrue(progress.shouldPresent(.germanTurn))
+
+        progress.completeFirstGame()
+        XCTAssertFalse(FirstBattleButtonCoachID.allCases.contains { progress.shouldPresent($0) })
+
+        let decoded = try JSONDecoder().decode(
+            FirstBattleButtonCoachProgress.self,
+            from: JSONEncoder().encode(progress)
+        )
+        XCTAssertEqual(decoded, progress)
+    }
+
     func testCycle991TargetedAcceptanceGatesLiveInTestTarget() {
         XCTAssertTrue(UnifiedGuderianBattleCatalog.acceptanceReadyThroughCycle740)
         XCTAssertTrue(GuderianTutorialCatalog.acceptanceReadyThroughCycle910)
