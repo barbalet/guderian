@@ -8,763 +8,448 @@ import SwiftUI
 struct GuderianTestApp: App {
     var body: some Scene {
         WindowGroup("GuderianTest") {
-            GuderianCampaignView()
-                .frame(minWidth: 1120, minHeight: 760)
-        }
-        .windowResizability(.contentMinSize)
-
-        WindowGroup("GuderianTest Playability") {
-            GuderianTestDashboard()
-                .frame(minWidth: 1180, minHeight: 760)
+            GuderianTestFirstBattleAutoplayView()
+                .frame(minWidth: 1280, minHeight: 820)
         }
         .windowResizability(.contentMinSize)
     }
 }
 
 @MainActor
-final class GuderianTestViewModel: ObservableObject {
-    @Published private(set) var reports: [CampaignAutomationBattleReport] = []
-    @Published private(set) var lateCareerReport = LateCareerAutomationCatalog.runAll
+final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
+    @Published private(set) var scenario: GuderianScenario
+    @Published private(set) var snapshot: NativeBoardSnapshot?
+    @Published private(set) var report: GuderianTestFirstBattleAutoplayReport?
+    @Published private(set) var runState: GuderianTestFirstBattleRunState = .ready
+    @Published private(set) var steps: [PlayableTestGameStep] = []
+    @Published private(set) var phaseAdvances = 0
+    @Published private(set) var blockers: [String] = []
     @Published private(set) var isRunning = false
-    @Published private(set) var focusedID: GuderianBattleID? = GuderianCampaignCatalog.all.first?.id
+    @Published private(set) var speed: GuderianTestFirstBattleAutoplaySpeed = .standard
+    @Published private(set) var errorMessage: String?
 
+    private var controller: GuderianTestFirstBattleRunController?
     private var runTask: Task<Void, Never>?
 
-    var summary: CampaignAutomationRunReport {
-        CampaignAutomationRunReport(
-            reports: reports,
-            completionSummary: completionProgress.completionSummary(catalog: GuderianCampaignCatalog.all)
-        )
-    }
-
-    private var completionProgress: CampaignProgress {
-        var progress = CampaignProgress()
-        for report in reports where report.status == .passed || report.status == .warning {
-            if let record = report.completionRecord {
-                progress.recordCompletion(record)
-                continue
-            }
-            guard let scenario = GuderianCampaignCatalog.scenario(id: report.id) else {
-                continue
-            }
-            let balance = ScenarioBalanceCatalog.profile(for: scenario)
-            progress.recordCompletion(
-                CampaignCompletionRecord(
-                    scenarioID: report.id,
-                    score: balance.maxPlayerScore,
-                    victoryBand: report.status == .passed ? .operational : .tactical,
-                    completedTurn: report.finalTurn,
-                    note: "Recorded by GuderianTest dashboard."
-                )
-            )
+    init() {
+        do {
+            let controller = try GuderianTestFirstBattleRunController()
+            self.controller = controller
+            scenario = controller.scenario
+            syncFromController()
+        } catch {
+            scenario = (try? GuderianTestFirstBattleAutoplayContract.primaryScenario()) ?? GuderianCampaignCatalog.all.sorted { $0.order < $1.order }[0]
+            runState = .failed
+            errorMessage = "\(error)"
         }
-        return progress
     }
 
-    func report(for id: GuderianBattleID) -> CampaignAutomationBattleReport? {
-        reports.first { $0.id == id }
+    deinit {
+        runTask?.cancel()
     }
 
-    func start() {
-        guard !isRunning else {
+    var hasReport: Bool {
+        report != nil
+    }
+
+    var canRun: Bool {
+        controller?.canRun == true && !isRunning
+    }
+
+    var canStep: Bool {
+        controller?.canStep == true && !isRunning
+    }
+
+    var canPause: Bool {
+        isRunning
+    }
+
+    var antiGuderianStepCount: Int {
+        steps.filter { $0.controller == .antiGuderian }.count
+    }
+
+    var germanStepCount: Int {
+        steps.filter { $0.controller == .guderian }.count
+    }
+
+    var recentSteps: [PlayableTestGameStep] {
+        Array(steps.suffix(8).reversed())
+    }
+
+    var speedModes: [GuderianTestFirstBattleAutoplaySpeed] {
+        GuderianTestFirstBattleAutoplaySpeed.allCases
+    }
+
+    var maxPhaseAdvances: Int {
+        controller?.maxPhaseAdvances ?? 0
+    }
+
+    var phaseBudgetRemaining: Int {
+        controller?.phaseBudgetRemaining ?? 0
+    }
+
+    var phaseProgressFraction: Double {
+        controller?.phaseProgressFraction ?? 0
+    }
+
+    func setSpeed(_ speed: GuderianTestFirstBattleAutoplaySpeed) {
+        self.speed = speed
+    }
+
+    func runToDebrief() {
+        guard !isRunning, let controller else {
+            if controller == nil {
+                errorMessage = "GuderianTest first-battle controller is unavailable."
+            }
             return
         }
 
-        reports = []
-        lateCareerReport = LateCareerAutomationCatalog.runAll
-        isRunning = true
-        runTask = Task {
-            var progress = CampaignProgress()
-            for scenario in GuderianCampaignCatalog.all.sorted(by: { $0.order < $1.order }) {
-                guard !Task.isCancelled else {
-                    break
-                }
-                if focusedID == nil {
-                    focusedID = scenario.id
+        guard controller.canRun else {
+            return
+        }
+
+        runTask?.cancel()
+        errorMessage = nil
+        controller.resume()
+        syncFromController()
+
+        runTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+
+            while let controller = self.controller,
+                  controller.runState == .running,
+                  !Task.isCancelled {
+                do {
+                    _ = try controller.runUntilPauseOrDebrief(maxSteps: 1)
+                    self.syncFromController()
+                } catch {
+                    self.report = nil
+                    self.errorMessage = "\(error)"
+                    self.syncFromController()
+                    return
                 }
 
-                let report = CampaignAutomationRunner.runBattle(
-                    scenario,
-                    progress: &progress,
-                    options: .appDefault
-                )
-                reports.append(report)
-                focusedID = report.id
-                try? await Task.sleep(nanoseconds: 70_000_000)
+                if controller.runState == .running {
+                    try? await Task.sleep(nanoseconds: self.speed.stepDelayNanoseconds)
+                }
             }
-            isRunning = false
+
+            self.runTask = nil
+            self.syncFromController()
         }
     }
 
-    func stop() {
+    func stepOnce() {
+        guard let controller else {
+            errorMessage = "GuderianTest first-battle controller is unavailable."
+            return
+        }
+
+        guard controller.canStep, !isRunning else {
+            return
+        }
+
+        do {
+            _ = try controller.stepOnce()
+            errorMessage = nil
+        } catch {
+            errorMessage = "\(error)"
+        }
+        syncFromController()
+    }
+
+    func pause() {
         runTask?.cancel()
         runTask = nil
-        isRunning = false
+        controller?.pause()
+        syncFromController()
     }
 
-    func reset() {
-        stop()
-        reports = []
-        lateCareerReport = LateCareerAutomationCatalog.runAll
-        focusedID = GuderianCampaignCatalog.all.first?.id
+    func resume() {
+        runToDebrief()
+    }
+
+    func runSynchronouslyForTests() {
+        guard let controller else {
+            errorMessage = "GuderianTest first-battle controller is unavailable."
+            return
+        }
+
+        do {
+            _ = try controller.runToDebrief()
+            errorMessage = nil
+        } catch {
+            errorMessage = "\(error)"
+        }
+        syncFromController()
+    }
+
+    func restart() {
+        guard let controller else {
+            errorMessage = "GuderianTest first-battle controller is unavailable."
+            return
+        }
+
+        runTask?.cancel()
+        runTask = nil
+        do {
+            try controller.restart()
+            errorMessage = nil
+        } catch {
+            errorMessage = "\(error)"
+        }
+        syncFromController()
+    }
+
+    private func syncFromController() {
+        guard let controller else {
+            isRunning = false
+            return
+        }
+
+        scenario = controller.scenario
+        snapshot = controller.latestSnapshot
+        report = controller.lastReport
+        runState = controller.runState
+        steps = controller.steps
+        phaseAdvances = controller.phaseAdvances
+        blockers = controller.blockers
+        isRunning = controller.runState == .running
     }
 }
 
-struct GuderianTestDashboard: View {
-    @StateObject private var viewModel = GuderianTestViewModel()
+struct GuderianTestFirstBattleAutoplayView: View {
+    @StateObject private var viewModel = GuderianTestFirstBattleAutoplayViewModel()
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                runHeader
-                Divider()
-                battleList
-            }
-            .navigationTitle("Battles")
-            .navigationDestination(for: GuderianBattleID.self) { id in
-                if let scenario = GuderianCampaignCatalog.scenario(id: id) {
-                    GuderianTestBattleScreen(
-                        scenario: scenario,
-                        report: viewModel.report(for: id),
-                        isFocused: viewModel.focusedID == id,
-                        isRunning: viewModel.isRunning
-                    )
-                }
-            }
+        HSplitView {
+            DZWPlayableBattleView(scenario: viewModel.scenario)
+                .frame(minWidth: 860, minHeight: 760)
+                .accessibilityIdentifier("guderian-test-primary-battle-surface")
+
+            GuderianTestAutoplayControlPanel(viewModel: viewModel)
+                .frame(minWidth: 360, idealWidth: 400, maxWidth: 460)
         }
-        .toolbar {
-            ToolbarItemGroup {
-                Button {
-                    viewModel.start()
-                } label: {
-                    Label(viewModel.isRunning ? "Running" : "Run", systemImage: viewModel.isRunning ? "play.circle.fill" : "play.fill")
-                }
-                .disabled(viewModel.isRunning)
-                .accessibilityIdentifier("guderian-test-run-button")
-
-                Button {
-                    viewModel.stop()
-                } label: {
-                    Label("Stop", systemImage: "stop.fill")
-                }
-                .disabled(!viewModel.isRunning)
-                .accessibilityIdentifier("guderian-test-stop-button")
-
-                Button {
-                    viewModel.reset()
-                } label: {
-                    Label("Reset", systemImage: "arrow.counterclockwise")
-                }
-                .accessibilityIdentifier("guderian-test-reset-button")
-            }
-        }
-        .onAppear {
-            if viewModel.reports.isEmpty {
-                viewModel.start()
-            }
-        }
-    }
-
-    private var runHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("GuderianTest")
-                        .font(.title2.weight(.semibold))
-                    Text(viewModel.summary.completionSummary.progressLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(viewModel.lateCareerReport.completionSummary.progressLabel)
-                        .font(.caption)
-                        .foregroundStyle(viewModel.lateCareerReport.allPassed ? .green : .secondary)
-                    Text(viewModel.isRunning ? "Automation is running through the campaign." : "Open a battle row to inspect the full automation playback.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if viewModel.isRunning {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], alignment: .leading, spacing: 8) {
-                SummaryBadge(title: "Passed", value: viewModel.summary.passedCount, systemImage: "checkmark.circle.fill", color: .green)
-                SummaryBadge(title: "Warnings", value: viewModel.summary.warningCount, systemImage: "exclamationmark.triangle.fill", color: .orange)
-                SummaryBadge(title: "Failed", value: viewModel.summary.failedCount, systemImage: "xmark.octagon.fill", color: .red)
-                SummaryBadge(title: "Blocked", value: viewModel.summary.blockedCount, systemImage: "hand.raised.fill", color: .purple)
-                SummaryBadge(title: "Issues", value: viewModel.summary.issueCount, systemImage: "list.bullet.clipboard", color: .blue)
-                SummaryBadge(title: "Late", value: viewModel.lateCareerReport.passedCount, systemImage: "checkmark.seal.fill", color: .green)
-            }
-        }
-        .padding(16)
-    }
-
-    private var battleList: some View {
-        List {
-            Section("Field Command Campaign") {
-                ForEach(GuderianCampaignCatalog.all.sorted(by: { $0.order < $1.order })) { scenario in
-                    let report = viewModel.reports.first { $0.id == scenario.id }
-                    NavigationLink(value: scenario.id) {
-                        GuderianTestBattleRow(
-                            scenario: scenario,
-                            report: report,
-                            isFocused: viewModel.focusedID == scenario.id
-                        )
-                    }
-                    .accessibilityIdentifier("guderian-test-row-link-\(scenario.id.rawValue)")
-                }
-            }
-
-            Section("Late Career Context") {
-                ForEach(viewModel.lateCareerReport.reports) { report in
-                    LateCareerTestContextRow(report: report)
-                }
-            }
-        }
-        .listStyle(.inset)
-        .accessibilityIdentifier("guderian-test-battle-list")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("guderian-test-first-battle-autoplay")
     }
 }
 
-struct LateCareerTestContextRow: View {
-    let report: LateCareerAutomationBattleReport
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: iconName)
-                .foregroundStyle(color)
-                .frame(width: 24)
-                .accessibilityLabel(report.status.rawValue)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(report.title)
-                    .font(.headline)
-                    .lineLimit(1)
-                Text(report.completionRecord.note)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 8)], alignment: .leading, spacing: 4) {
-                    Text(report.caveatVisible ? "caveat ok" : "caveat blocked")
-                    Text(report.mapDetailReady ? "map ok" : "map blocked")
-                    Text(report.aiPressureReady ? "AI ok" : "AI blocked")
-                    Text(report.scoringReady ? "\(report.completionRecord.score) VP" : "score blocked")
-                    Text(report.persistenceReady ? "save ok" : "save blocked")
-                    Text(report.ruleBindingReady ? "rules ok" : "rules blocked")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if report.passed {
-                Label("Debriefed", systemImage: "rosette")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
-            } else {
-                Label("\(report.issues.count) issues", systemImage: "exclamationmark.triangle")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
-            }
-        }
-        .padding(.vertical, 8)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("guderian-test-late-career-row-\(report.id)")
-    }
-
-    private var iconName: String {
-        switch report.status {
-        case .passed:
-            return "checkmark.circle.fill"
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .failed:
-            return "xmark.octagon.fill"
-        case .blocked:
-            return "hand.raised.fill"
-        case .running:
-            return "play.circle.fill"
-        case .queued:
-            return "circle"
-        }
-    }
-
-    private var color: Color {
-        switch report.status {
-        case .passed:
-            return .green
-        case .warning:
-            return .orange
-        case .failed:
-            return .red
-        case .blocked:
-            return .purple
-        case .running:
-            return .blue
-        case .queued:
-            return .secondary
-        }
-    }
-}
-
-struct SummaryBadge: View {
-    let title: String
-    let value: Int
-    let systemImage: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .foregroundStyle(color)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(value)")
-                    .font(.headline)
-                Text(title)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 10)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-struct GuderianTestBattleRow: View {
-    let scenario: GuderianScenario
-    let report: CampaignAutomationBattleReport?
-    let isFocused: Bool
-
-    var body: some View {
-        HStack(spacing: 14) {
-            statusIcon
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(scenario.order). \(scenario.title)")
-                    .font(.headline)
-                    .lineLimit(1)
-                Text("\(scenario.dateLabel) | \(scenario.theater.rawValue)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8)], alignment: .leading, spacing: 4) {
-                    Text(report.map { "\($0.actionsSucceeded)/\($0.actionsAttempted) actions" } ?? "queued")
-                    Text(report?.nativeBoardDiagnosticsPassed == true ? "board ok" : "board pending")
-                    Text(playableScreenLabel(report))
-                    Text(playableTestGameLabel(report))
-                    Text(report?.completionRecord.map { "\($0.score) VP" } ?? "score pending")
-                    Text(report.map { $0.issues.isEmpty ? "no issues" : "\($0.issues.count) issues" } ?? "not run")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if isFocused {
-                Label("Running", systemImage: "play.circle.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.blue)
-            }
-        }
-        .padding(.vertical, 8)
-        .accessibilityIdentifier("guderian-test-row-\(scenario.id.rawValue)")
-    }
-
-    @ViewBuilder
-    private var statusIcon: some View {
-        if let report {
-            Image(systemName: iconName(for: report.status))
-                .foregroundStyle(color(for: report.status))
-                .accessibilityLabel(report.status.rawValue)
-        } else {
-            Image(systemName: "circle")
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Queued")
-        }
-    }
-
-    private func iconName(for status: CampaignAutomationStatus) -> String {
-        switch status {
-        case .passed:
-            return "checkmark.circle.fill"
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .failed:
-            return "xmark.octagon.fill"
-        case .blocked:
-            return "hand.raised.fill"
-        case .running:
-            return "play.circle.fill"
-        case .queued:
-            return "circle"
-        }
-    }
-
-    private func color(for status: CampaignAutomationStatus) -> Color {
-        switch status {
-        case .passed:
-            return .green
-        case .warning:
-            return .orange
-        case .failed:
-            return .red
-        case .blocked:
-            return .purple
-        case .running:
-            return .blue
-        case .queued:
-            return .secondary
-        }
-    }
-
-    private func playableScreenLabel(_ report: CampaignAutomationBattleReport?) -> String {
-        guard PlayableBattleSurfaceCatalog.isRoutedToPlayableScreen(scenario.id) else {
-            return "screen queued"
-        }
-        guard let report else {
-            return "screen pending"
-        }
-        return report.playableScreenParityCompleted ? "screen ok" : "screen blocked"
-    }
-
-    private func playableTestGameLabel(_ report: CampaignAutomationBattleReport?) -> String {
-        guard let report else {
-            return "test game pending"
-        }
-        return report.playableTestGameCompleted ? "test game ok" : "test game blocked"
-    }
-}
-
-struct GuderianTestBattleScreen: View {
-    let scenario: GuderianScenario
-    let report: CampaignAutomationBattleReport?
-    let isFocused: Bool
-    let isRunning: Bool
-
-    var body: some View {
-        Group {
-            if let report {
-                GuderianTestReportDetail(report: report)
-            } else {
-                pendingScreen
-            }
-        }
-        .navigationTitle(scenario.title)
-        .accessibilityIdentifier("guderian-test-battle-screen-\(scenario.id.rawValue)")
-    }
-
-    private var pendingScreen: some View {
-        VStack(spacing: 16) {
-            Image(systemName: isFocused && isRunning ? "play.circle.fill" : "clock")
-                .font(.system(size: 54))
-                .foregroundStyle(isFocused && isRunning ? .blue : .secondary)
-            Text(scenario.title)
-                .font(.title2.weight(.semibold))
-            Text(isFocused && isRunning ? "Automation is running this battle now." : "Automation has not produced a battle report yet.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 8) {
-                Label(scenario.playerForceSummary, systemImage: "shield.lefthalf.filled")
-                Label(scenario.guderianCommand, systemImage: "bolt.horizontal")
-                Label("\(scenario.objectives.count) objectives queued", systemImage: "scope")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-}
-
-struct GuderianTestReportDetail: View {
-    let report: CampaignAutomationBattleReport
+struct GuderianTestAutoplayControlPanel: View {
+    @ObservedObject var viewModel: GuderianTestFirstBattleAutoplayViewModel
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
-                if !report.issues.isEmpty {
-                    issueSection
-                }
-                timelineSection
-                engineLogSection
+                runControls
+                liveSnapshotSection
+                eventLogSection
+                resultSection
             }
-            .padding(24)
-            .frame(maxWidth: 1260, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .accessibilityIdentifier("guderian-test-report-detail")
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Label(report.status.rawValue, systemImage: iconName(for: report.status))
-                    .font(.headline)
-                    .foregroundStyle(color(for: report.status))
-                Spacer()
-                Text("\(report.actionsSucceeded)/\(report.actionsAttempted) actions")
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(report.title)
-                .font(.system(size: 30, weight: .semibold))
-            Text("\(report.theater.rawValue) | \(report.playerArmy) vs \(report.opponentArmy)")
+        VStack(alignment: .leading, spacing: 8) {
+            Label("GuderianTest", systemImage: "play.rectangle.on.rectangle")
+                .font(.title2.weight(.semibold))
+            Text("First-battle autoplay replacement")
                 .font(.headline)
+            Text(viewModel.scenario.title)
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(.secondary)
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], alignment: .leading, spacing: 10) {
-                DetailMetric(title: "Final Turn", value: "\(report.finalTurn)")
-                DetailMetric(title: "Final Phase", value: report.finalPhase)
-                DetailMetric(title: "Winner", value: report.engineWinner)
-                DetailMetric(title: "Score", value: report.completionRecord.map { "\($0.score) VP" } ?? "Pending")
-                DetailMetric(title: "Debrief", value: report.completionRecord?.victoryBand.rawValue ?? "Pending")
-                DetailMetric(title: "Board", value: report.nativeBoardDiagnosticsPassed ? "Passed" : "Check")
-                DetailMetric(title: "Units", value: "\(report.engineUnitCount)")
-                DetailMetric(title: "Objectives", value: "\(report.engineObjectiveCount)")
-            }
-
-            if !report.debriefSummary.isEmpty {
-                Label(
-                    report.debriefSummary,
-                    systemImage: report.nativeDemoBoardCompleted ? "flag.checkered" : "flag"
-                )
-                .font(.callout)
-                .foregroundStyle(report.nativeDemoBoardCompleted ? .green : .secondary)
-            }
-
-            if let diagnostic = report.boardDiagnostic {
-                Label(
-                    "\(diagnostic.legalActionsSucceeded)/\(diagnostic.legalActionsAttempted) legal board actions, \(diagnostic.phaseAdvances) phase advances, \(diagnostic.findings.count) findings",
-                    systemImage: diagnostic.passedRealBoardDiagnostics ? "checkerboard.rectangle" : "exclamationmark.triangle"
-                )
-                .font(.callout)
-                .foregroundStyle(diagnostic.passedRealBoardDiagnostics ? .green : .orange)
-            }
-
-            if !report.nativePolandPackSummary.isEmpty {
-                Label(report.nativePolandPackSummary, systemImage: "map")
-                    .font(.callout)
-                    .foregroundStyle(report.nativePolandPackCompleted ? .green : .secondary)
-            }
-
-            if !report.nativeFrancePackSummary.isEmpty {
-                Label(report.nativeFrancePackSummary, systemImage: "flag.checkered")
-                    .font(.callout)
-                    .foregroundStyle(report.nativeFrancePackCompleted ? .green : .secondary)
-            }
-
-            if !report.easternFrontFoundationSummary.isEmpty {
-                Label(report.easternFrontFoundationSummary, systemImage: "scope")
-                    .font(.callout)
-                    .foregroundStyle(report.easternFrontFoundationReady ? .green : .secondary)
-            }
-
-            if !report.nativeEasternFrontPackSummary.isEmpty {
-                Label(report.nativeEasternFrontPackSummary, systemImage: "snowflake")
-                    .font(.callout)
-                    .foregroundStyle(report.nativeEasternFrontPackCompleted ? .green : .secondary)
-            }
-
-            if !report.nativeAIEventPassSummary.isEmpty {
-                Label(report.nativeAIEventPassSummary, systemImage: "point.3.connected.trianglepath.dotted")
-                    .font(.callout)
-                    .foregroundStyle(report.nativeAIEventPassReady ? .green : .secondary)
-            }
-
-            if !report.nativeAIEventExecutionSummary.isEmpty {
-                Label(report.nativeAIEventExecutionSummary, systemImage: "arrow.triangle.branch")
-                    .font(.callout)
-                    .foregroundStyle(report.nativeAIEventExecutionReady ? .green : .secondary)
-            }
-
-            if !report.nativeBalanceUXSummary.isEmpty {
-                Label(report.nativeBalanceUXSummary, systemImage: "slider.horizontal.3")
-                    .font(.callout)
-                    .foregroundStyle(report.nativeBalanceUXReady ? .green : .secondary)
-            }
-
-            if !report.nativePostShipAnalysisSummary.isEmpty {
-                Label(report.nativePostShipAnalysisSummary, systemImage: "doc.text.magnifyingglass")
-                    .font(.callout)
-                    .foregroundStyle(report.nativePostShipAnalysisReady ? .green : .secondary)
-            }
-
-            if !report.nativeSoakSummary.isEmpty {
-                Label(report.nativeSoakSummary, systemImage: "repeat.circle")
-                    .font(.callout)
-                    .foregroundStyle(report.nativeSoakReady ? .green : .secondary)
-            }
-
-            if !report.playableScreenParitySummary.isEmpty {
-                Label(report.playableScreenParitySummary, systemImage: "checkerboard.rectangle")
-                    .font(.callout)
-                    .foregroundStyle(report.playableScreenParityCompleted ? .green : .orange)
-            }
-
-            if !report.playableTestGameSummary.isEmpty {
-                Label(report.playableTestGameSummary, systemImage: "person.2.wave.2")
-                    .font(.callout)
-                    .foregroundStyle(report.playableTestGameCompleted ? .green : .orange)
-            }
+            Text("Primary surface: \(GuderianTestFirstBattleAutoplayContract.embeddedBattleSurfaceName)")
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
         }
     }
 
-    private var issueSection: some View {
+    private var runControls: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Failures And Blockers", systemImage: "exclamationmark.bubble")
-                .font(.headline)
-            ForEach(report.issues) { issue in
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: iconName(for: issue.kind))
-                        .foregroundStyle(color(for: issue.kind))
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("\(issue.kind.rawValue) | \(issue.stage)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Text(issue.title)
-                            .font(.callout.weight(.medium))
-                        Text(issue.detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+            HStack(spacing: 10) {
+                Button {
+                    viewModel.runToDebrief()
+                } label: {
+                    Label(runButtonTitle, systemImage: "forward.end.alt.fill")
                 }
-                .padding(10)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
+                .disabled(!viewModel.canRun)
+                .accessibilityIdentifier("guderian-test-run-to-debrief-button")
 
-    private var timelineSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Automation Timeline", systemImage: "point.3.connected.trianglepath.dotted")
-                .font(.headline)
-            ForEach(report.steps) { step in
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: iconName(for: step.status))
-                        .foregroundStyle(color(for: step.status))
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(step.stage)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        Text(step.title)
-                            .font(.callout.weight(.medium))
-                        Text(step.detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                Button {
+                    viewModel.stepOnce()
+                } label: {
+                    Label("Step", systemImage: "forward.frame.fill")
                 }
-                .padding(.vertical, 4)
+                .disabled(!viewModel.canStep)
+                .accessibilityIdentifier("guderian-test-step-button")
             }
+
+            HStack(spacing: 10) {
+                Button {
+                    viewModel.pause()
+                } label: {
+                    Label("Pause", systemImage: "pause.fill")
+                }
+                .disabled(!viewModel.canPause)
+                .accessibilityIdentifier("guderian-test-pause-button")
+
+                Button {
+                    viewModel.restart()
+                } label: {
+                    Label("Restart", systemImage: "arrow.counterclockwise")
+                }
+                .disabled(viewModel.isRunning)
+                .accessibilityIdentifier("guderian-test-restart-button")
+            }
+
+            Picker(
+                "Speed",
+                selection: Binding(
+                    get: { viewModel.speed },
+                    set: { viewModel.setSpeed($0) }
+                )
+            ) {
+                ForEach(viewModel.speedModes) { speed in
+                    Text(speed.rawValue).tag(speed)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(viewModel.hasReport)
+            .accessibilityIdentifier("guderian-test-speed-picker")
         }
+        .buttonStyle(.borderedProminent)
     }
 
-    private var engineLogSection: some View {
+    private var runButtonTitle: String {
+        if viewModel.isRunning {
+            return "Running"
+        }
+        return viewModel.runState == .paused ? "Resume" : "Run"
+    }
+
+    private var liveSnapshotSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Engine Trace", systemImage: "terminal")
+            Text("Live Session")
                 .font(.headline)
-            if report.engineLogTail.isEmpty {
-                Text("No engine log lines were emitted.")
+
+            metric("State", viewModel.runState.rawValue)
+            metric("Speed", viewModel.speed.rawValue)
+            metric("Phase advances", "\(viewModel.phaseAdvances)")
+            metric("Safety cap", "\(viewModel.phaseBudgetRemaining) of \(viewModel.maxPhaseAdvances) left")
+            metric("Steps", "\(viewModel.steps.count)")
+            ProgressView(value: viewModel.phaseProgressFraction)
+                .accessibilityIdentifier("guderian-test-safety-cap")
+
+            if let snapshot = viewModel.snapshot {
+                metric("Turn", "\(snapshot.turnNumber)")
+                metric("Active", snapshot.activePlayer.rawValue)
+                metric("Phase", snapshot.phase.rawValue)
+                metric("Winner", snapshot.mission.winner.rawValue)
+                metric("Score", "\(snapshot.mission.playerScore)-\(snapshot.mission.opponentScore)")
+                Text(snapshot.lastAction.detail)
+                    .font(.caption)
+                    .foregroundStyle(snapshot.lastAction.status == .blocked ? .orange : .secondary)
+            } else {
+                Text("No native board snapshot is available.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var eventLogSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Autoplay Log")
+                .font(.headline)
+
+            if viewModel.recentSteps.isEmpty {
+                Text("No automated phase has run yet.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(Array(report.engineLogTail.enumerated()), id: \.offset) { _, line in
-                    Text(line)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                ForEach(viewModel.recentSteps) { step in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("\(step.turnNumber) \(step.activePlayer.rawValue) \(step.phase.rawValue)")
+                            .font(.caption.weight(.semibold))
+                        Text(step.title)
+                            .font(.caption)
+                        Text(step.detail)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    }
+                    .padding(.vertical, 3)
                 }
             }
         }
         .padding(12)
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func iconName(for status: CampaignAutomationStatus) -> String {
-        switch status {
-        case .passed:
-            return "checkmark.circle.fill"
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .failed:
-            return "xmark.octagon.fill"
-        case .blocked:
-            return "hand.raised.fill"
-        case .running:
-            return "play.circle.fill"
-        case .queued:
-            return "circle"
-        }
-    }
-
-    private func iconName(for kind: CampaignAutomationIssueKind) -> String {
-        switch kind {
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .failure:
-            return "xmark.octagon.fill"
-        case .blocker:
-            return "hand.raised.fill"
-        }
-    }
-
-    private func color(for status: CampaignAutomationStatus) -> Color {
-        switch status {
-        case .passed:
-            return .green
-        case .warning:
-            return .orange
-        case .failed:
-            return .red
-        case .blocked:
-            return .purple
-        case .running:
-            return .blue
-        case .queued:
-            return .secondary
-        }
-    }
-
-    private func color(for kind: CampaignAutomationIssueKind) -> Color {
-        switch kind {
-        case .warning:
-            return .orange
-        case .failure:
-            return .red
-        case .blocker:
-            return .purple
-        }
-    }
-}
-
-struct DetailMetric: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(value)
-                .font(.callout.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 10)
-        .frame(minWidth: 86, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier("guderian-test-event-log")
+    }
+
+    private var resultSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Result")
+                .font(.headline)
+
+            if let report = viewModel.report {
+                Label(report.outcomeLabel, systemImage: report.outcomeLabel == "Loss" ? "xmark.octagon" : "rosette")
+                    .font(.headline)
+                    .foregroundStyle(report.outcomeLabel == "Loss" ? .red : .green)
+                Text(report.finalResultSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("guderian-test-result-summary")
+                metric("Score", report.scoreLabel)
+                metric("Turn", "\(report.result.completion.completionRecord.completedTurn)")
+                metric("Anti-Guderian steps", "\(report.result.antiGuderianStepCount)")
+                metric("German steps", "\(report.result.germanStepCount)")
+                metric("Phase advances", "\(report.result.phaseAdvances)")
+                metric("Persisted", report.completedToDebrief ? "Yes" : "No")
+                Text(report.result.completion.debriefSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if !viewModel.blockers.isEmpty {
+                ForEach(viewModel.blockers, id: \.self) { blocker in
+                    Label(blocker, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } else if let errorMessage = viewModel.errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else {
+                Text("Run, resume, or step the first-battle autoplay check to produce a real debrief record.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier("guderian-test-result-panel")
+    }
+
+    private func metric(_ title: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.caption.monospacedDigit())
+                .multilineTextAlignment(.trailing)
+        }
     }
 }

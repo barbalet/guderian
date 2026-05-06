@@ -1163,7 +1163,7 @@ private struct FirstBattleTutorialHintView: View {
     }
 }
 
-struct DZWPlayableBattleView: View {
+public struct DZWPlayableBattleView: View {
     @StateObject private var model: DZWPlayableBattleViewModel
     @StateObject private var panelWindows = DZWPlayableBattleWindowCoordinator()
     @State private var dragPreview: [Int: CGPoint] = [:]
@@ -1174,7 +1174,7 @@ struct DZWPlayableBattleView: View {
     @AppStorage("guderian.tutorial.firstBattleGuidance.v1.dismissed") private var firstBattleGuidanceDismissed = false
     private let onCompletion: (DZWPlayableCompletionRecord) -> Void
 
-    init(scenario: GuderianScenario, onCompletion: @escaping (CampaignCompletionRecord) -> Void = { _ in }) {
+    public init(scenario: GuderianScenario, onCompletion: @escaping (CampaignCompletionRecord) -> Void = { _ in }) {
         _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(scenario: scenario))
         self.onCompletion = { record in
             if case .fieldCommand(let completionRecord) = record {
@@ -1183,7 +1183,7 @@ struct DZWPlayableBattleView: View {
         }
     }
 
-    init(lateCareerEntry: LateCareerGuderianPresentation, onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }) {
+    public init(lateCareerEntry: LateCareerGuderianPresentation, onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }) {
         _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(lateCareerEntry: lateCareerEntry))
         self.onCompletion = { record in
             if case .lateCareer(let completionRecord) = record {
@@ -1192,7 +1192,7 @@ struct DZWPlayableBattleView: View {
         }
     }
 
-    var body: some View {
+    public var body: some View {
         if let snapshot = model.snapshot {
             ZStack(alignment: .topLeading) {
                 BattlefieldViewport(
