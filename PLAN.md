@@ -174,6 +174,8 @@ Cycle plan 831-890: repair the cycle 830 overclaim by routing battles 20-35 thro
 
 Cycle plan 891-930: add two tutorial interfaces and the reusable tutorial architecture they need. The first is a four-screen first-run historical tutorial about Heinz Guderian, the purpose of the battles, and why sober memorialization matters. The second is a first-battle contextual tutorial for the opening game, with movement, phase, objective, combat, AI-turn, and debrief hints. Both tutorials need versioned "Do not show again" persistence and should be structured so the tutorial model, trigger system, and storage contract can be reused by future `gzw` games.
 
+Cycle plan 931-960: completely replace `GuderianTest` with a first-battle autoplay app based on the real `Guderian` battle implementation. The new test target should launch directly into Tuchola Forest, use the same `DZWPlayableBattleView`/native board session path as the player-facing app, drive the normally human side with an automated anti-Guderian player, hand turns to the existing German AI automation, and run to a real debriefable victory or loss.
+
 ## Planning Rules
 
 - Treat `dzw` as read-only unless a change is explicitly guarded with `HEINZ_GUDERIAN_GAME`.
@@ -674,6 +676,34 @@ Technical requirements:
 | 926-930 | Reuse hardening and acceptance | Add reusable tutorial acceptance catalogs, GuderianTest coverage, save/settings regression checks, README/PLAN updates, and final gates proving both tutorials work, persist, reset, and leave normal battle play unaffected. |
 
 Status through cycle 930: complete. The reusable tutorial model, first-run history copy, first-run tutorial sheet, first-battle hint catalog, live first-battle trigger integration, contextual hint UI, final `Do not show again` dismissal, README/PLAN updates, and acceptance tests are in place. No cycles remain for this tutorial block. No engine technical debt is expected from this pass because tutorials remain presentation/control guidance and do not alter `dzw` rules, AI behavior, scoring, debriefs, or campaign persistence.
+
+## Cycles 931-960: GuderianTest First-Battle Autoplay Replacement
+
+This block replaces the current `GuderianTest` campaign diagnostics dashboard with a real first-battle autoplay application. The new target should be based on the same Guderian code path that a player uses: Tuchola Forest opens through the real DZW-style battle surface, the native board session remains live, the battle advances through movement, shooting, assault, pending-choice resolution, German AI phases, debrief, and campaign completion handling, and the final screen clearly reports either a player victory band or a loss to Guderian's AI.
+
+The replacement should not keep the old two-window dashboard as the primary test experience. Campaign-wide automation can survive only as lower-level regression helpers if still useful; the product-facing `GuderianTest` app should become a focused visual autoplay harness for the first chronological battle.
+
+Technical requirements:
+
+- `GuderianTest` launches a single window centered on Tuchola Forest, not the full campaign list plus a separate diagnostics report dashboard.
+- The test app reuses the same `DZWPlayableBattleView`, `NativeBoardSession`, board renderer, controls, completion resolver, and persistence path used by `Guderian`.
+- Any currently private battle-running state that `GuderianTest` needs should be extracted into reusable app/core types instead of copied into the test target.
+- The automated human player controls the anti-Guderian side, chooses legal active units, prioritizes Tuchola delay and withdrawal objectives, moves defensively or toward score targets, shoots nearest meaningful threats, resolves assaults/pending choices, and records blocked actions.
+- The German side continues to use the existing German AI turn behavior and scenario priority targets.
+- The battle must continue until the native mission winner, a debriefable completion state, or a documented safety failure. A normal run should produce a completion record that represents either victory or loss, not a synthetic pass marker.
+- The UI should make the run observable: current turn/phase, active side, last action, step count, player/German action counts, score, winner, victory band, debrief text, and a concise event log.
+- Tests must prove both sides received active phases, the real battle screen is used, a debrief/persistence record is produced, and the old dashboard is no longer the primary `GuderianTest` surface.
+
+| Cycles | Focus | Output |
+| --- | --- | --- |
+| 931-935 | Replacement acceptance and app shell | Define the new `GuderianTest` contract, remove the old two-window campaign dashboard from the primary app flow, and create a single-window first-battle test shell that loads Tuchola Forest by default. Add failing acceptance tests that assert the old dashboard is not the launch surface. |
+| 936-940 | Shared battle-run controller extraction | Extract the reusable session/action/debrief pieces currently embedded in `DZWPlayableBattleViewModel` into shared app/core types that both `Guderian` and `GuderianTest` can consume. Preserve the existing player-facing battle behavior while making the live run state observable to the test target. |
+| 941-945 | First-battle run model | Build the `GuderianTest` run model around a live Tuchola `NativeBoardSession`, with published snapshot, run state, step log, counters, errors, score, winner, and completion display. Support start, pause, step, resume, restart, and deterministic seed control without bypassing legal board actions. |
+| 946-950 | Automated human player | Implement the anti-Guderian automated human controller for movement, shooting, assault, and pending-choice phases. Its priorities should reflect Tuchola Forest: delay Brda crossings, contest Chojnice/Tuchola road hubs, protect withdrawal routes, preserve units when possible, and fall back to nearest legal objective when a priority move is blocked. |
+| 951-955 | Full autoplay loop and result UI | Wire the automated human player and German AI into a continuous visible autoplay loop with speed controls, safety caps, live phase updates, recent-action log, and final result panel. The loop should stop on a real winner/debriefable state and show victory/loss, score, victory band, completed turn, and debrief summary. |
+| 956-960 | Cleanup, tests, and acceptance | Remove or demote obsolete dashboard-only UI, update GuderianTest tests to exercise the real first-battle autoplay surface, verify debrief persistence and both-side participation, keep campaign-wide helpers only where regression tests still need them, update README/PLAN notes, and run SwiftPM/Xcode build and test gates. |
+
+Acceptance for cycle 960: `GuderianTest` is no longer a campaign diagnostics dashboard. It is a first-battle autoplay app that uses the same playable battle implementation as `Guderian`, visibly plays Tuchola Forest through legal board phases with an automated human opponent and German AI, and ends with a real debriefable victory or loss record.
 
 ## Acceptance Criteria
 
