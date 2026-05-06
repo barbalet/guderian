@@ -12,7 +12,7 @@ That define is enabled only for the Guderian workspace/package path so upstream 
 
 The local engine boundary currently includes the Guderian scenario board bridge:
 
-- Guarded by `HEINZ_GUDERIAN_GAME`: `TE_GUDERIAN_LABEL_LENGTH`, the Guderian label buffers stored on `game_t`, and `game_apply_guderian_scenario_board`, which replaces the generic skirmish board with scenario-authored mission text, terrain zones, objectives, and target score.
+- Guarded by `HEINZ_GUDERIAN_GAME`: `DZW_GUDERIAN_LABEL_LENGTH`, the Guderian label buffers stored on `game_t`, and `game_apply_guderian_scenario_board`, which replaces the generic skirmish board with scenario-authored mission text, terrain zones, objectives, and target score.
 - The public board-size boundary functions `game_board_width()` and `game_board_height()`, which let Swift UI code read the engine dimensions without duplicating the C constants.
 
 Keep new engine changes outside `dzw` when possible. When a C rules change is unavoidable for Guderian, guard it with `HEINZ_GUDERIAN_GAME`, document the symbol here, and treat it as local to this checkout unless a later upstreaming pass explicitly promotes it.

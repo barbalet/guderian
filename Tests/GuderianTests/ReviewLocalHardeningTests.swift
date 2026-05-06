@@ -686,7 +686,40 @@ final class ReviewLocalHardeningTests: XCTestCase {
         XCTAssertTrue(items.allSatisfy { $0.targetCycles.upperBound <= 1080 })
         XCTAssertTrue(plan.contains("Status through cycle 1080: completed"))
         XCTAssertTrue(plan.contains("Acceptance for cycle 1080"))
-        XCTAssertTrue(readme.contains("Cycle 1080 update"))
-        XCTAssertTrue(readme.contains("`REVIEW.md` local hardening block is complete"))
+        XCTAssertTrue(plan.contains("Cycle 1080 closes") || plan.contains("Cycle 1080 update"))
+        XCTAssertTrue(plan.contains("`REVIEW.md` local hardening block is complete"))
+        XCTAssertTrue(readme.contains("current ship status"))
+        XCTAssertTrue(readme.contains("[PLAN.md](PLAN.md)"))
+    }
+
+    func testDZWPrefixMigrationRemovesLegacyTEPrefixes() throws {
+        var urls = [
+            Self.packageRoot.appendingPathComponent("README.md"),
+            Self.packageRoot.appendingPathComponent("PLAN.md"),
+            Self.packageRoot.appendingPathComponent("RELEASE.md"),
+        ]
+
+        for root in ["Sources", "Tests", "dzw/Sources", "dzw/Tests", "dzw/docs"] {
+            urls.append(contentsOf: try repositoryFiles(
+                under: root,
+                extensions: ["swift", "c", "h", "md"]
+            ))
+        }
+
+        let legacyPrefixPattern = "\\b(?:" + "T" + "E_|" + "t" + "e_)"
+
+        for url in urls {
+            guard FileManager.default.fileExists(atPath: url.path) else { continue }
+
+            let text = try String(contentsOf: url, encoding: .utf8)
+            XCTAssertNil(
+                text.range(of: legacyPrefixPattern, options: .regularExpression),
+                url.path
+            )
+        }
+
+        let header = try repositoryFile("dzw/Sources/DerZweiteWeltkriegCore/include/der_Zweite_Weltkrieg.h")
+        XCTAssertTrue(header.contains("DZW_PLAYER_ONE"))
+        XCTAssertTrue(header.contains("typedef struct dzw_game game_t;"))
     }
 }

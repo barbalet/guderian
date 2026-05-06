@@ -1024,8 +1024,8 @@ public struct LateCareerNativeScenarioLoadout {
     }
 
     private func deployBlueprintUnits(in game: OpaquePointer) -> NativeScenarioDeploymentReport {
-        let playerIDs = engineUnitIDs(in: game, owner: TE_PLAYER_ONE)
-        let opponentIDs = engineUnitIDs(in: game, owner: TE_PLAYER_TWO)
+        let playerIDs = engineUnitIDs(in: game, owner: DZW_PLAYER_ONE)
+        let opponentIDs = engineUnitIDs(in: game, owner: DZW_PLAYER_TWO)
         let playerResult = deploy(blueprint.units.filter { $0.side == .player }, onto: playerIDs, in: game)
         let opponentResult = deploy(blueprint.units.filter { $0.side == .guderianAI }, onto: opponentIDs, in: game)
         let attempted = playerResult.attempted + opponentResult.attempted
@@ -1104,15 +1104,15 @@ public enum LateCareerNativeScenarioLoader {
     public static func load(_ battlefield: LateCareerStaffBattlefield, seed: UInt32 = 1945) -> LateCareerNativeScenarioLoadout {
         let instance = LateCareerNativeBattleInstanceCatalog.instance(for: battlefield)
         let blueprint = instance.engineBlueprint(seed: seed)
-        let playerEntries = armyListSelections(for: instance.units.filter { $0.side == .player }, army: TE_ARMY_SOVIET)
-        let opponentEntries = armyListSelections(for: instance.units.filter { $0.side == .guderianAI }, army: TE_ARMY_GERMAN)
+        let playerEntries = armyListSelections(for: instance.units.filter { $0.side == .player }, army: DZW_ARMY_SOVIET)
+        let opponentEntries = armyListSelections(for: instance.units.filter { $0.side == .guderianAI }, army: DZW_ARMY_GERMAN)
         return LateCareerNativeScenarioLoadout(
             battlefield: battlefield,
             seed: seed,
             instance: instance,
             blueprint: blueprint,
-            playerArmy: TE_ARMY_SOVIET,
-            opponentArmy: TE_ARMY_GERMAN,
+            playerArmy: DZW_ARMY_SOVIET,
+            opponentArmy: DZW_ARMY_GERMAN,
             playerEntries: playerEntries,
             opponentEntries: opponentEntries,
             warnings: warnings(battlefield: battlefield, blueprint: blueprint, playerEntries: playerEntries, opponentEntries: opponentEntries),
@@ -1168,12 +1168,12 @@ public enum LateCareerNativeScenarioLoader {
     private static func score(_ option: UnifiedCatalogOption, for unit: NativeBattleUnit) -> Int {
         let text = "\(option.name) \(option.primaryWeaponName)".lowercased()
         let unitText = "\(unit.name) \(unit.role) \(unit.historicalNote)".lowercased()
-        var score = option.kind == TE_UNIT_INFANTRY ? 4 : 1
-        if unit.mobility == .armor, option.kind == TE_UNIT_VEHICLE || option.kind == TE_UNIT_ASSAULT_GUN { score += 8 }
+        var score = option.kind == DZW_UNIT_INFANTRY ? 4 : 1
+        if unit.mobility == .armor, option.kind == DZW_UNIT_VEHICLE || option.kind == DZW_UNIT_ASSAULT_GUN { score += 8 }
         if unit.mobility == .engineer, text.contains("engineer") || text.contains("pioneer") { score += 8 }
         if unit.mobility == .gun || unit.mobility == .artillery, unifiedContainsAny(text, ["mortar", "mg", "anti", "gun", "battery"]) { score += 7 }
         if unit.mobility == .command, unifiedContainsAny(text, ["command", "hq", "officer", "observer"]) { score += 8 }
-        if unifiedContainsAny(unitText, ["tank", "armor", "armored", "panzer"]), option.kind == TE_UNIT_VEHICLE || option.kind == TE_UNIT_ASSAULT_GUN { score += 5 }
+        if unifiedContainsAny(unitText, ["tank", "armor", "armored", "panzer"]), option.kind == DZW_UNIT_VEHICLE || option.kind == DZW_UNIT_ASSAULT_GUN { score += 5 }
         if unifiedContainsAny(unitText, ["bridge", "crossing", "river"]), unifiedContainsAny(text, ["engineer", "pioneer", "sapper"]) { score += 4 }
         return score
     }
@@ -1525,7 +1525,7 @@ public final class LateCareerNativeBoardSession {
         guard unifiedBoardPhase(game_view(handle).phase) == .assault, unit.can_assault_now else {
             return failAction("Assault blocked", "\(unitDisplayName(unit)) cannot assault in the current phase.")
         }
-        let followUp = advance ? TE_FOLLOW_UP_ADVANCE : TE_FOLLOW_UP_CONSOLIDATE
+        let followUp = advance ? DZW_FOLLOW_UP_ADVANCE : DZW_FOLLOW_UP_CONSOLIDATE
         if game_assault_unit(handle, Int32(attackerID), Int32(targetID), followUp) {
             selectedUnitID = attackerID
             selectedTargetID = targetID
@@ -1662,7 +1662,7 @@ public final class LateCareerNativeBoardSession {
             return NativeBoardActionMessage(status: .blocked, title: "Assault blocked", detail: "No enemy unit is available.")
         }
 
-        if game_assault_unit(handle, Int32(unit.id), Int32(target.id), TE_FOLLOW_UP_ADVANCE) {
+        if game_assault_unit(handle, Int32(unit.id), Int32(target.id), DZW_FOLLOW_UP_ADVANCE) {
             resolveFirstPendingChoice()
             return NativeBoardActionMessage(status: .succeeded, title: "Assaulted", detail: "\(unifiedCString(unit.name)) assaulted \(unifiedCString(target.name)).")
         }
@@ -1693,7 +1693,7 @@ public final class LateCareerNativeBoardSession {
     private func nearestEnemy(to unit: unit_view_t) -> unit_view_t? {
         (0..<Int(game_unit_count(handle))).lazy
             .map { game_unit_view(self.handle, Int32($0)) }
-            .filter { $0.owner != unit.owner && $0.owner != TE_PLAYER_NONE && !$0.destroyed && !$0.embarked }
+            .filter { $0.owner != unit.owner && $0.owner != DZW_PLAYER_NONE && !$0.destroyed && !$0.embarked }
             .min { lhs, rhs in
                 unifiedDistance(from: unit, to: lhs) < unifiedDistance(from: unit, to: rhs)
             }
@@ -3814,11 +3814,11 @@ private func unifiedBlocksLineOfSightHint(for kind: ScenarioMapElementKind) -> B
 private func engineTerrainKind(for kind: NativeBattleTerrainKind) -> terrain_kind_t {
     switch kind {
     case .river, .canal, .lake:
-        return TE_TERRAIN_IMPASSABLE
+        return DZW_TERRAIN_IMPASSABLE
     case .town, .village, .urbanDistrict, .forest, .ridge, .bunker, .fortifiedLine, .marsh:
-        return TE_TERRAIN_DIFFICULT
+        return DZW_TERRAIN_DIFFICULT
     case .road, .railway, .bridge, .ford, .ferry, .objective, .artilleryPark, .airPressure, .phaseLine:
-        return TE_TERRAIN_OPEN
+        return DZW_TERRAIN_OPEN
     }
 }
 
@@ -3916,9 +3916,9 @@ private func unifiedNormalized(_ string: String) -> String {
 
 private func unifiedBoardPhase(_ phase: phase_t) -> NativeBoardPhase {
     switch phase {
-    case TE_PHASE_SHOOTING:
+    case DZW_PHASE_SHOOTING:
         return .shooting
-    case TE_PHASE_ASSAULT:
+    case DZW_PHASE_ASSAULT:
         return .assault
     default:
         return .movement
@@ -3927,9 +3927,9 @@ private func unifiedBoardPhase(_ phase: phase_t) -> NativeBoardPhase {
 
 private func unifiedUnitKindName(_ kind: unit_kind_t) -> String {
     switch kind {
-    case TE_UNIT_VEHICLE:
+    case DZW_UNIT_VEHICLE:
         return "Vehicle"
-    case TE_UNIT_ASSAULT_GUN:
+    case DZW_UNIT_ASSAULT_GUN:
         return "Assault gun"
     default:
         return "Infantry"
@@ -3938,9 +3938,9 @@ private func unifiedUnitKindName(_ kind: unit_kind_t) -> String {
 
 private func unifiedTerrainKindName(_ kind: terrain_kind_t) -> String {
     switch kind {
-    case TE_TERRAIN_DIFFICULT:
+    case DZW_TERRAIN_DIFFICULT:
         return "Difficult"
-    case TE_TERRAIN_IMPASSABLE:
+    case DZW_TERRAIN_IMPASSABLE:
         return "Impassable"
     default:
         return "Open"

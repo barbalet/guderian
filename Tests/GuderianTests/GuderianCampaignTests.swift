@@ -1037,6 +1037,7 @@ final class GuderianCampaignTests: XCTestCase {
     func testCycle820ReadmeBattleChronologyListsAllThirtyFiveWithLinks() throws {
         let report = UnifiedDocumentationCleanupCatalog.report
         let readme = try readmeText()
+        let plan = try planText()
         let chronologyRows = battleChronologyRows(in: readme)
 
         XCTAssertEqual(report.cycleRange, 816...820)
@@ -1057,10 +1058,14 @@ final class GuderianCampaignTests: XCTestCase {
         }
 
         for phrase in report.requiredReadmePhrases {
-            XCTAssertTrue(readme.localizedCaseInsensitiveContains(phrase), phrase)
+            XCTAssertTrue(
+                readme.localizedCaseInsensitiveContains(phrase) ||
+                    plan.localizedCaseInsensitiveContains(phrase),
+                phrase
+            )
         }
-        XCTAssertTrue(readme.contains("Cycle 830 update"))
-        XCTAssertTrue(readme.contains("no cycles remaining"))
+        XCTAssertTrue(plan.contains("Cycle 830 update"))
+        XCTAssertTrue(plan.localizedCaseInsensitiveContains("no cycles remaining"))
     }
 
     func testCycle825UnifiedBuildRegressionHardeningReportIsReady() {
@@ -1255,6 +1260,12 @@ final class GuderianCampaignTests: XCTestCase {
         return try String(contentsOf: url, encoding: .utf8)
     }
 
+    private func planText() throws -> String {
+        let url = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("PLAN.md")
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
     private func battleChronologyRows(in readme: String) -> [String] {
         var rows: [String] = []
         var isInChronology = false
@@ -1327,8 +1338,8 @@ final class GuderianCampaignTests: XCTestCase {
         let game = try XCTUnwrap(loadout.makeGame())
         defer { game_destroy(game) }
 
-        XCTAssertEqual(game_player_army(game, TE_PLAYER_ONE), loadout.playerArmy)
-        XCTAssertEqual(game_player_army(game, TE_PLAYER_TWO), loadout.opponentArmy)
+        XCTAssertEqual(game_player_army(game, DZW_PLAYER_ONE), loadout.playerArmy)
+        XCTAssertEqual(game_player_army(game, DZW_PLAYER_TWO), loadout.opponentArmy)
         XCTAssertGreaterThan(Int(game_unit_count(game)), 0)
         XCTAssertGreaterThan(Int(game_objective_count(game)), 0)
     }
@@ -1341,8 +1352,8 @@ final class GuderianCampaignTests: XCTestCase {
         let game = try XCTUnwrap(loadout.makeGame())
         defer { game_destroy(game) }
 
-        XCTAssertEqual(game_player_army(game, TE_PLAYER_ONE), TE_ARMY_SOVIET)
-        XCTAssertEqual(game_player_army(game, TE_PLAYER_TWO), TE_ARMY_GERMAN)
+        XCTAssertEqual(game_player_army(game, DZW_PLAYER_ONE), DZW_ARMY_SOVIET)
+        XCTAssertEqual(game_player_army(game, DZW_PLAYER_TWO), DZW_ARMY_GERMAN)
     }
 
     func testEveryScenarioHasRenderableMapAndAIPlan() {
@@ -1456,8 +1467,8 @@ final class GuderianCampaignTests: XCTestCase {
             let game = try XCTUnwrap(loadout.makeGame(), "\(loadout.scenario.title) should load through dzw proxy")
             defer { game_destroy(game) }
 
-            XCTAssertEqual(game_player_army(game, TE_PLAYER_ONE), loadout.playerArmy)
-            XCTAssertEqual(game_player_army(game, TE_PLAYER_TWO), loadout.opponentArmy)
+            XCTAssertEqual(game_player_army(game, DZW_PLAYER_ONE), loadout.playerArmy)
+            XCTAssertEqual(game_player_army(game, DZW_PLAYER_TWO), loadout.opponentArmy)
             XCTAssertGreaterThan(Int(game_unit_count(game)), 0)
             XCTAssertGreaterThan(Int(game_objective_count(game)), 0)
         }
@@ -2135,7 +2146,7 @@ final class GuderianCampaignTests: XCTestCase {
             let firstPlayerSpawn = try XCTUnwrap(loadout.blueprint.units.first { $0.side == .player })
             let playerUnit = try XCTUnwrap((0..<Int(game_unit_count(loadedGame.handle))).lazy
                 .map { game_unit_view(loadedGame.handle, Int32($0)) }
-                .first { $0.owner == TE_PLAYER_ONE && !$0.embarked })
+                .first { $0.owner == DZW_PLAYER_ONE && !$0.embarked })
 
             XCTAssertLessThanOrEqual(abs(Double(playerUnit.x) - firstPlayerSpawn.x), 8.5, scenario.title)
             XCTAssertLessThanOrEqual(abs(Double(playerUnit.y) - firstPlayerSpawn.y), 8.5, scenario.title)
