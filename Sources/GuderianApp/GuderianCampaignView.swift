@@ -1,7 +1,10 @@
 import GuderianCore
 import Foundation
 import Metal
+import OSLog
 import SwiftUI
+
+private let guderianCampaignLog = Logger(subsystem: "com.barbalet.guderian", category: "GuderianCampaign")
 
 private enum LateCareerScopeFilter: String, CaseIterable, Identifiable {
     case all
@@ -214,6 +217,7 @@ public struct GuderianCampaignView: View {
             }
         }
         .onAppear {
+            guderianCampaignLog.info("Campaign view appeared firstRunDismissed=\(firstRunHistoryDismissed, privacy: .public) hasEvaluatedTutorial=\(hasEvaluatedFirstRunTutorial, privacy: .public)")
             loadSavedCampaignState()
             loadSavedLateCareerState()
             presentFirstRunTutorialIfNeeded()
@@ -235,10 +239,12 @@ public struct GuderianCampaignView: View {
         }
         .sheet(isPresented: $showsFirstRunTutorial) {
             FirstRunTutorialView(flow: GuderianTutorialCatalog.firstRunHistoryFlow) { doNotShowAgain in
+                guderianCampaignLog.info("First-run tutorial finished doNotShowAgain=\(doNotShowAgain, privacy: .public)")
                 if doNotShowAgain {
                     firstRunHistoryDismissed = true
                 }
                 showsFirstRunTutorial = false
+                guderianCampaignLog.info("First-run tutorial sheet dismissed firstRunDismissed=\(firstRunHistoryDismissed, privacy: .public)")
             }
         }
     }
@@ -454,13 +460,16 @@ public struct GuderianCampaignView: View {
 
     private func presentFirstRunTutorialIfNeeded() {
         guard !hasEvaluatedFirstRunTutorial else {
+            guderianCampaignLog.info("First-run tutorial evaluation skipped because it already ran showsFirstRunTutorial=\(showsFirstRunTutorial, privacy: .public)")
             return
         }
         hasEvaluatedFirstRunTutorial = true
         showsFirstRunTutorial = !firstRunHistoryDismissed
+        guderianCampaignLog.info("First-run tutorial evaluated dismissed=\(firstRunHistoryDismissed, privacy: .public) presenting=\(showsFirstRunTutorial, privacy: .public)")
     }
 
     private func resetTutorialsForDebug() {
+        guderianCampaignLog.info("Tutorial debug reset requested.")
         firstRunHistoryDismissed = false
         hasEvaluatedFirstRunTutorial = false
         presentFirstRunTutorialIfNeeded()
@@ -494,6 +503,7 @@ struct FirstRunTutorialView: View {
                 }
                 Spacer()
                 Button {
+                    guderianCampaignLog.info("First-run tutorial skip tapped page=\(pageIndex + 1, privacy: .public)")
                     onFinish(false)
                 } label: {
                     Label("Skip", systemImage: "xmark")
@@ -528,6 +538,7 @@ struct FirstRunTutorialView: View {
             HStack {
                 Button {
                     pageIndex = max(0, pageIndex - 1)
+                    guderianCampaignLog.info("First-run tutorial back tapped page=\(pageIndex + 1, privacy: .public)")
                 } label: {
                     Label("Back", systemImage: "chevron.left")
                 }
@@ -538,9 +549,11 @@ struct FirstRunTutorialView: View {
 
                 Button {
                     if isLastPage {
+                        guderianCampaignLog.info("First-run tutorial finish tapped page=\(pageIndex + 1, privacy: .public) doNotShowAgain=\(doNotShowAgain, privacy: .public)")
                         onFinish(doNotShowAgain)
                     } else {
                         pageIndex = min(flow.pages.count - 1, pageIndex + 1)
+                        guderianCampaignLog.info("First-run tutorial next tapped page=\(pageIndex + 1, privacy: .public)")
                     }
                 } label: {
                     Label(isLastPage ? "Finish" : "Next", systemImage: isLastPage ? "checkmark" : "chevron.right")
@@ -554,6 +567,12 @@ struct FirstRunTutorialView: View {
         .frame(minHeight: 460)
         .background(Color(nsColor: .windowBackgroundColor))
         .accessibilityIdentifier("first-run-history-tutorial")
+        .onAppear {
+            guderianCampaignLog.info("First-run tutorial view appeared flow=\(flow.id.rawValue, privacy: .public) pages=\(flow.pages.count, privacy: .public)")
+        }
+        .onDisappear {
+            guderianCampaignLog.info("First-run tutorial view disappeared flow=\(flow.id.rawValue, privacy: .public) finalPage=\(pageIndex + 1, privacy: .public)")
+        }
     }
 }
 

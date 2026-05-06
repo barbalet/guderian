@@ -1077,7 +1077,6 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(report.gates.allSatisfy(\.passed))
         XCTAssertTrue(report.buildCommands.contains("swift build"))
         XCTAssertTrue(report.buildCommands.contains("swift test"))
-        XCTAssertTrue(report.buildCommands.contains("swift run GuderianTest"))
         XCTAssertTrue(report.buildCommands.contains { $0.contains("xcodebuild") && $0.contains("GuderianTest") })
     }
 

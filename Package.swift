@@ -19,10 +19,6 @@ let package = Package(
             name: "GuderianApp",
             targets: ["GuderianApp"]
         ),
-        .executable(
-            name: "GuderianTest",
-            targets: ["GuderianTest"]
-        ),
     ],
     dependencies: [
         .package(path: "dzw"),
@@ -51,15 +47,6 @@ let package = Package(
             name: "GuderianApp",
             dependencies: ["GuderianAppUI"],
             path: "Sources/GuderianAppHost",
-            linkerSettings: [
-                .linkedFramework("SwiftUI"),
-                .linkedFramework("AppKit"),
-            ]
-        ),
-        .executableTarget(
-            name: "GuderianTest",
-            dependencies: ["GuderianCore", "GuderianAppUI"],
-            path: "Sources/GuderianTest",
             linkerSettings: [
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("AppKit"),

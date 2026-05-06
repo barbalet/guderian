@@ -3034,7 +3034,6 @@ public struct UnifiedBuildRegressionHardeningReport: Codable, Hashable, Sendable
         cycleRange == 821...825 &&
             buildCommands.contains("swift build") &&
             buildCommands.contains("swift test") &&
-            buildCommands.contains("swift run GuderianTest") &&
             buildCommands.contains { $0.contains("xcodebuild") && $0.contains("GuderianTest") } &&
             fullHarnessBattleCount == 35 &&
             saveMigrationReady &&
@@ -3068,7 +3067,7 @@ public enum UnifiedBuildRegressionHardeningCatalog {
                 id: "guderian-test",
                 title: "GuderianTest automation",
                 passed: LateCareerAutomationCatalog.runAll.allPassed && harnessReady,
-                detail: "Run `swift run GuderianTest`; the automated catalogs cover field-command and added battles."
+                detail: "Build and launch the `GuderianTest` Xcode app scheme; the automated catalogs cover field-command and added battles."
             ),
             UnifiedRegressionGate(
                 id: "save-migration",
@@ -3096,7 +3095,6 @@ public enum UnifiedBuildRegressionHardeningCatalog {
             buildCommands: [
                 "swift build",
                 "swift test",
-                "swift run GuderianTest",
                 "xcodebuild -project Guderian.xcodeproj -scheme GuderianTest -destination 'platform=macOS' build",
             ],
             fullHarnessBattleCount: UnifiedPlayableScreenHarness.battleIDs.count,

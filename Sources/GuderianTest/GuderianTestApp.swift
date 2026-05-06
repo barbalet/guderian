@@ -1,15 +1,67 @@
+import AppKit
 import GuderianCore
-#if SWIFT_PACKAGE
 import GuderianAppUI
-#endif
+import OSLog
 import SwiftUI
+
+private let guderianTestLog = Logger(subsystem: "com.barbalet.guderian", category: "GuderianTest")
+
+private enum GuderianTestLaunchMode {
+    static var isUITesting: Bool {
+        let processInfo = ProcessInfo.processInfo
+        if processInfo.arguments.contains("--guderian-ui-testing") ||
+            processInfo.arguments.contains("-guderian-ui-testing") {
+            return true
+        }
+
+        return environmentFlagIsEnabled("GUDERIAN_UI_TESTING", environment: processInfo.environment)
+    }
+
+    private static func environmentFlagIsEnabled(_ key: String, environment: [String: String]) -> Bool {
+        guard let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return false
+        }
+
+        switch value.lowercased() {
+        case "1", "true", "yes", "on":
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+@MainActor
+private func logGuderianTestWindowSnapshot(_ context: String) {
+    let windows = NSApp.windows.map { window in
+        let title = window.title.isEmpty ? "<untitled>" : window.title
+        let visibility = window.isVisible ? "visible" : "hidden"
+        let keyState = window.isKeyWindow ? "key" : "not-key"
+        let frame = "\(Int(window.frame.minX)),\(Int(window.frame.minY)) \(Int(window.frame.width))x\(Int(window.frame.height))"
+        return "#\(window.windowNumber) \(title) \(visibility) \(keyState) \(frame)"
+    }.joined(separator: " | ")
+
+    guderianTestLog.info("Window snapshot [\(context, privacy: .public)] count=\(NSApp.windows.count, privacy: .public) windows=\(windows, privacy: .public)")
+}
 
 @main
 struct GuderianTestApp: App {
     var body: some Scene {
         WindowGroup("GuderianTest") {
-            GuderianTestFirstBattleAutoplayView()
+            GuderianTestFirstBattleAutoplayView(isUITesting: GuderianTestLaunchMode.isUITesting)
                 .frame(minWidth: 1280, minHeight: 820)
+                .onAppear {
+                    guderianTestLog.info("GuderianTest root view appeared uiTesting=\(GuderianTestLaunchMode.isUITesting, privacy: .public).")
+                    logGuderianTestWindowSnapshot("root-on-appear")
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        logGuderianTestWindowSnapshot("root-on-appear-delayed")
+                    }
+                }
+                .onDisappear {
+                    guderianTestLog.info("GuderianTest root view disappeared.")
+                    logGuderianTestWindowSnapshot("root-on-disappear")
+                }
         }
         .windowResizability(.contentMinSize)
     }
@@ -30,6 +82,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
 
     private var controller: GuderianTestFirstBattleRunController?
     private var runTask: Task<Void, Never>?
+    private var lastStateLogSignature = ""
 
     init() {
         do {
@@ -37,14 +90,17 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
             self.controller = controller
             scenario = controller.scenario
             syncFromController()
+            guderianTestLog.info("GuderianTest controller initialized scenario=\(self.scenario.id.rawValue, privacy: .public) title=\(self.scenario.title, privacy: .public)")
         } catch {
             scenario = (try? GuderianTestFirstBattleAutoplayContract.primaryScenario()) ?? GuderianCampaignCatalog.all.sorted { $0.order < $1.order }[0]
             runState = .failed
             errorMessage = "\(error)"
+            guderianTestLog.error("GuderianTest controller failed to initialize error=\(String(describing: error), privacy: .public)")
         }
     }
 
     deinit {
+        guderianTestLog.info("GuderianTest view model deinit; cancelling run task.")
         runTask?.cancel()
     }
 
@@ -93,6 +149,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
     }
 
     func setSpeed(_ speed: GuderianTestFirstBattleAutoplaySpeed) {
+        guderianTestLog.info("GuderianTest speed changed from \(self.speed.rawValue, privacy: .public) to \(speed.rawValue, privacy: .public)")
         self.speed = speed
     }
 
@@ -100,14 +157,19 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
         guard !isRunning, let controller else {
             if controller == nil {
                 errorMessage = "GuderianTest first-battle controller is unavailable."
+                guderianTestLog.error("Run requested but controller is unavailable.")
+            } else {
+                guderianTestLog.info("Run requested while already running.")
             }
             return
         }
 
         guard controller.canRun else {
+            guderianTestLog.info("Run requested but controller cannot run state=\(controller.runState.rawValue, privacy: .public)")
             return
         }
 
+        guderianTestLog.info("Run-to-debrief started state=\(controller.runState.rawValue, privacy: .public) speed=\(self.speed.rawValue, privacy: .public)")
         runTask?.cancel()
         errorMessage = nil
         controller.resume()
@@ -127,6 +189,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
                 } catch {
                     self.report = nil
                     self.errorMessage = "\(error)"
+                    guderianTestLog.error("Run-to-debrief failed error=\(String(describing: error), privacy: .public)")
                     self.syncFromController()
                     return
                 }
@@ -138,29 +201,35 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
 
             self.runTask = nil
             self.syncFromController()
+            guderianTestLog.info("Run-to-debrief stopped state=\(self.runState.rawValue, privacy: .public) report=\(self.report == nil ? "none" : "available", privacy: .public)")
         }
     }
 
     func stepOnce() {
         guard let controller else {
             errorMessage = "GuderianTest first-battle controller is unavailable."
+            guderianTestLog.error("Step requested but controller is unavailable.")
             return
         }
 
         guard controller.canStep, !isRunning else {
+            guderianTestLog.info("Step requested but unavailable state=\(controller.runState.rawValue, privacy: .public) isRunning=\(self.isRunning, privacy: .public)")
             return
         }
 
         do {
             _ = try controller.stepOnce()
             errorMessage = nil
+            guderianTestLog.info("Step completed state=\(controller.runState.rawValue, privacy: .public) steps=\(controller.steps.count, privacy: .public) phaseAdvances=\(controller.phaseAdvances, privacy: .public)")
         } catch {
             errorMessage = "\(error)"
+            guderianTestLog.error("Step failed error=\(String(describing: error), privacy: .public)")
         }
         syncFromController()
     }
 
     func pause() {
+        guderianTestLog.info("Pause requested state=\(self.runState.rawValue, privacy: .public)")
         runTask?.cancel()
         runTask = nil
         controller?.pause()
@@ -174,14 +243,17 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
     func runSynchronouslyForTests() {
         guard let controller else {
             errorMessage = "GuderianTest first-battle controller is unavailable."
+            guderianTestLog.error("Synchronous run requested but controller is unavailable.")
             return
         }
 
         do {
             _ = try controller.runToDebrief()
             errorMessage = nil
+            guderianTestLog.info("Synchronous run completed state=\(controller.runState.rawValue, privacy: .public) report=\(controller.lastReport == nil ? "none" : "available", privacy: .public)")
         } catch {
             errorMessage = "\(error)"
+            guderianTestLog.error("Synchronous run failed error=\(String(describing: error), privacy: .public)")
         }
         syncFromController()
     }
@@ -189,16 +261,20 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
     func restart() {
         guard let controller else {
             errorMessage = "GuderianTest first-battle controller is unavailable."
+            guderianTestLog.error("Restart requested but controller is unavailable.")
             return
         }
 
+        guderianTestLog.info("Restart requested state=\(controller.runState.rawValue, privacy: .public)")
         runTask?.cancel()
         runTask = nil
         do {
             try controller.restart()
             errorMessage = nil
+            guderianTestLog.info("Restart completed.")
         } catch {
             errorMessage = "\(error)"
+            guderianTestLog.error("Restart failed error=\(String(describing: error), privacy: .public)")
         }
         syncFromController()
     }
@@ -206,6 +282,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
     private func syncFromController() {
         guard let controller else {
             isRunning = false
+            logStateIfNeeded("controller-unavailable")
             return
         }
 
@@ -217,15 +294,40 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
         phaseAdvances = controller.phaseAdvances
         blockers = controller.blockers
         isRunning = controller.runState == .running
+        logStateIfNeeded("controller-sync")
+    }
+
+    private func logStateIfNeeded(_ context: String) {
+        let signature = [
+            context,
+            runState.rawValue,
+            "\(steps.count)",
+            "\(phaseAdvances)",
+            "\(blockers.count)",
+            report == nil ? "no-report" : "report",
+            errorMessage ?? "no-error",
+        ].joined(separator: "|")
+
+        guard signature != lastStateLogSignature else {
+            return
+        }
+
+        lastStateLogSignature = signature
+        guderianTestLog.info("State [\(context, privacy: .public)] runState=\(self.runState.rawValue, privacy: .public) isRunning=\(self.isRunning, privacy: .public) steps=\(self.steps.count, privacy: .public) phaseAdvances=\(self.phaseAdvances, privacy: .public) blockers=\(self.blockers.count, privacy: .public) report=\(self.report == nil ? "none" : "available", privacy: .public) error=\(self.errorMessage ?? "none", privacy: .public)")
     }
 }
 
 struct GuderianTestFirstBattleAutoplayView: View {
     @StateObject private var viewModel = GuderianTestFirstBattleAutoplayViewModel()
+    let isUITesting: Bool
 
     var body: some View {
         HSplitView {
-            DZWPlayableBattleView(scenario: viewModel.scenario)
+            DZWPlayableBattleView(
+                scenario: viewModel.scenario,
+                showsDefaultPanels: !isUITesting,
+                showsTutorials: !isUITesting
+            )
                 .frame(minWidth: 860, minHeight: 760)
                 .accessibilityIdentifier("guderian-test-primary-battle-surface")
 
@@ -234,6 +336,14 @@ struct GuderianTestFirstBattleAutoplayView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("guderian-test-first-battle-autoplay")
+        .onAppear {
+            guderianTestLog.info("GuderianTest autoplay view appeared scenario=\(viewModel.scenario.id.rawValue, privacy: .public) uiTesting=\(isUITesting, privacy: .public) showsDefaultPanels=\(!isUITesting, privacy: .public) showsTutorials=\(!isUITesting, privacy: .public)")
+            logGuderianTestWindowSnapshot("autoplay-view-on-appear")
+        }
+        .onDisappear {
+            guderianTestLog.info("GuderianTest autoplay view disappeared.")
+            logGuderianTestWindowSnapshot("autoplay-view-on-disappear")
+        }
     }
 }
 

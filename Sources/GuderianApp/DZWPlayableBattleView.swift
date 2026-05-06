@@ -1,6 +1,22 @@
 import GuderianCore
 import AppKit
+import OSLog
 import SwiftUI
+
+private let dzwPlayableLog = Logger(subsystem: "com.barbalet.guderian", category: "DZWPlayableBattle")
+
+@MainActor
+private func logDZWWindowSnapshot(_ context: String) {
+    let windows = NSApp.windows.map { window in
+        let title = window.title.isEmpty ? "<untitled>" : window.title
+        let visibility = window.isVisible ? "visible" : "hidden"
+        let keyState = window.isKeyWindow ? "key" : "not-key"
+        let frame = "\(Int(window.frame.minX)),\(Int(window.frame.minY)) \(Int(window.frame.width))x\(Int(window.frame.height))"
+        return "#\(window.windowNumber) \(title) \(visibility) \(keyState) \(frame)"
+    }.joined(separator: " | ")
+
+    dzwPlayableLog.info("Window snapshot [\(context, privacy: .public)] count=\(NSApp.windows.count, privacy: .public) windows=\(windows, privacy: .public)")
+}
 
 private protocol DZWPlayableBoardSession: AnyObject {
     func playableBoardSnapshot() -> NativeBoardSnapshot
@@ -170,6 +186,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         ]
         session = source.makeSession(restartCount: restartCount)
         refresh()
+        dzwPlayableLog.info("Battle model initialized source=fieldCommand battle=\(scenario.id.rawValue, privacy: .public) title=\(scenario.title, privacy: .public) session=\(self.session == nil ? "missing" : "ready", privacy: .public)")
     }
 
     init(lateCareerEntry: LateCareerGuderianPresentation) {
@@ -180,6 +197,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         ]
         session = source.makeSession(restartCount: restartCount)
         refresh()
+        dzwPlayableLog.info("Battle model initialized source=lateCareer battle=\(lateCareerEntry.id, privacy: .public) title=\(lateCareerEntry.title, privacy: .public) session=\(self.session == nil ? "missing" : "ready", privacy: .public)")
     }
 
     var selectedUnit: NativeBoardUnitSnapshot? {
@@ -230,6 +248,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     func select(_ unit: NativeBoardUnitSnapshot) {
         guard let snapshot, !isBattleOver else {
+            dzwPlayableLog.info("Select ignored battleOver=\(self.isBattleOver, privacy: .public) hasSnapshot=\(self.snapshot != nil, privacy: .public)")
             return
         }
         if unit.owner == snapshot.activePlayer {
@@ -239,6 +258,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             session?.selectTarget(unit.id)
         }
         refresh()
+        dzwPlayableLog.info("Unit selection owner=\(unit.owner.rawValue, privacy: .public) unitID=\(unit.id, privacy: .public) activePlayer=\(snapshot.activePlayer.rawValue, privacy: .public)")
         recordTutorialTrigger(.unitSelection)
     }
 
@@ -299,6 +319,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         )
         let moved = session?.moveUnit(id, to: coordinate) ?? false
         refresh()
+        dzwPlayableLog.info("Move requested unitID=\(id, privacy: .public) x=\(coordinate.x, privacy: .public) y=\(coordinate.y, privacy: .public) moved=\(moved, privacy: .public)")
         recordTutorialTrigger(moved ? .movementDrag : .blockedAction)
     }
 
@@ -333,6 +354,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         }
         let fired = session?.shootUnit(selectedUnit.id, targetID: selectedTarget.id) ?? false
         refresh()
+        dzwPlayableLog.info("Shoot requested attacker=\(selectedUnit.id, privacy: .public) target=\(selectedTarget.id, privacy: .public) fired=\(fired, privacy: .public)")
         recordTutorialTrigger(fired ? .shooting : .blockedAction)
     }
 
@@ -343,17 +365,20 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         }
         let assaulted = session?.assaultUnit(selectedUnit.id, targetID: selectedTarget.id, advance: advance) ?? false
         refresh()
+        dzwPlayableLog.info("Assault requested attacker=\(selectedUnit.id, privacy: .public) target=\(selectedTarget.id, privacy: .public) advance=\(advance, privacy: .public) assaulted=\(assaulted, privacy: .public)")
         recordTutorialTrigger(assaulted ? .assault : .blockedAction)
     }
 
     func resolvePendingChoice() {
         session?.resolveFirstPendingChoice()
         refresh()
+        dzwPlayableLog.info("Resolve pending choice requested.")
     }
 
     func advancePhase() {
         session?.advancePhase()
         refresh()
+        dzwPlayableLog.info("Phase advanced activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public) turn=\(self.snapshot?.turnNumber ?? -1, privacy: .public)")
         recordTutorialTrigger(.phaseAdvance)
         if snapshot?.activePlayer == .guderianAI {
             recordTutorialTrigger(.germanAITurn)
@@ -362,10 +387,12 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     func runAutomatedActiveStep() {
         guard let snapshot, !isBattleOver else {
+            dzwPlayableLog.info("Automated active step ignored battleOver=\(self.isBattleOver, privacy: .public) hasSnapshot=\(self.snapshot != nil, privacy: .public)")
             return
         }
 
         let before = "\(snapshot.activePlayer.rawValue) \(snapshot.phase.rawValue)"
+        dzwPlayableLog.info("Automated active step started state=\(before, privacy: .public) turn=\(snapshot.turnNumber, privacy: .public)")
         switch snapshot.phase {
         case .movement:
             if snapshot.activePlayer == .guderianAI {
@@ -387,9 +414,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     func runGermanTurn() {
         guard !isBattleOver else {
+            dzwPlayableLog.info("German turn ignored because battle is over.")
             return
         }
 
+        dzwPlayableLog.info("German turn runner started.")
         recordTutorialTrigger(.germanAITurn)
         recordAIEvent("German turn runner started.")
         var safety = 0
@@ -406,8 +435,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
         if snapshot?.activePlayer == .guderianAI {
             recordAIEvent("German turn paused: action loop hit its safety cap.")
+            dzwPlayableLog.info("German turn paused at safety cap activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         } else {
             recordAIEvent("German turn complete: control returned to \(snapshot?.activePlayer.rawValue ?? "the player").")
+            dzwPlayableLog.info("German turn complete activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         }
     }
 
@@ -421,23 +452,28 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             "Battle restarted: \(source.aiPostureName) ready for \(source.battleTitle)."
         ]
         refresh()
+        dzwPlayableLog.info("Battle restarted title=\(self.source.battleTitle, privacy: .public) restartCount=\(self.restartCount, privacy: .public) session=\(self.session == nil ? "missing" : "ready", privacy: .public)")
     }
 
     func recordTutorialTrigger(_ trigger: TutorialTrigger) {
         latestTutorialTrigger = trigger
         tutorialEventCount += 1
+        dzwPlayableLog.info("Model tutorial trigger recorded trigger=\(trigger.rawValue, privacy: .public) eventCount=\(self.tutorialEventCount, privacy: .public)")
     }
 
     func playBattleToEnd() -> DZWPlayableCompletionRecord? {
         guard let session else {
             debriefError = "Board session unavailable."
+            dzwPlayableLog.error("Play-to-end failed because board session is unavailable.")
             return nil
         }
 
+        dzwPlayableLog.info("Play-to-end requested source=\(self.source.battleTitle, privacy: .public)")
         switch source {
         case .fieldCommand:
             guard let nativeSession = session as? NativeBoardSession else {
                 debriefError = "Field-command board session unavailable."
+                dzwPlayableLog.error("Play-to-end failed because field-command session cast failed.")
                 return nil
             }
             do {
@@ -449,12 +485,14 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 refresh()
                 recordTutorialTrigger(.debrief)
                 recordAIEvent("Playable test game completed: \(result.antiGuderianStepCount) Anti-Guderian AI steps, \(result.germanStepCount) German AI steps.")
+                dzwPlayableLog.info("Play-to-end completed antiGuderianSteps=\(result.antiGuderianStepCount, privacy: .public) germanSteps=\(result.germanStepCount, privacy: .public) score=\(display.score, privacy: .public) band=\(display.victoryBandLabel, privacy: .public)")
                 return display.record
             } catch {
                 completion = nil
                 playableTestGameResult = nil
                 debriefError = "\(error)"
                 refresh()
+                dzwPlayableLog.error("Play-to-end failed error=\(String(describing: error), privacy: .public)")
                 return nil
             }
         case .lateCareer:
@@ -464,6 +502,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             if record != nil {
                 recordTutorialTrigger(.debrief)
             }
+            dzwPlayableLog.info("Late-career play-to-end finished record=\(record == nil ? "none" : "available", privacy: .public)")
             return record
         }
     }
@@ -471,13 +510,16 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     func completeBattle() -> DZWPlayableCompletionRecord? {
         guard let session else {
             debriefError = "Board session unavailable."
+            dzwPlayableLog.error("Complete battle failed because board session is unavailable.")
             return nil
         }
 
+        dzwPlayableLog.info("Complete battle requested source=\(self.source.battleTitle, privacy: .public)")
         switch source {
         case .fieldCommand:
             guard let nativeSession = session as? NativeBoardSession else {
                 debriefError = "Field-command board session unavailable."
+                dzwPlayableLog.error("Complete battle failed because field-command session cast failed.")
                 return nil
             }
             do {
@@ -489,11 +531,13 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 refresh()
                 recordTutorialTrigger(.debrief)
                 recordAIEvent("Debrief recorded: \(display.score) VP, \(display.victoryBandLabel).")
+                dzwPlayableLog.info("Complete battle recorded score=\(display.score, privacy: .public) band=\(display.victoryBandLabel, privacy: .public)")
                 return display.record
             } catch {
                 completion = nil
                 debriefError = "\(error)"
                 refresh()
+                dzwPlayableLog.error("Complete battle failed error=\(String(describing: error), privacy: .public)")
                 return nil
             }
         case .lateCareer:
@@ -502,6 +546,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 completion = nil
                 debriefError = "Late-career debrief is unavailable for \(source.battleTitle)."
                 refresh()
+                dzwPlayableLog.error("Complete battle failed because late-career debrief is unavailable title=\(self.source.battleTitle, privacy: .public)")
                 return nil
             }
             let display = DZWPlayableBattleCompletionDisplay(lateCareer: result)
@@ -511,6 +556,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             refresh()
             recordTutorialTrigger(.debrief)
             recordAIEvent("Debrief recorded: \(display.score) VP, \(display.victoryBandLabel).")
+            dzwPlayableLog.info("Late-career complete battle recorded score=\(display.score, privacy: .public) band=\(display.victoryBandLabel, privacy: .public)")
             return display.record
         }
     }
@@ -533,6 +579,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         }
 
         recordAIEvent("Playable test game completed through \(phaseAdvances) shared board phases.")
+        dzwPlayableLog.info("Shared autoplay ended phaseAdvances=\(phaseAdvances, privacy: .public) winner=\(self.snapshot?.mission.winner.rawValue ?? "none", privacy: .public) turn=\(self.snapshot?.turnNumber ?? -1, privacy: .public)")
     }
 
     private func recordAIEvent(_ message: String) {
@@ -540,6 +587,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         if aiTurnEvents.count > 8 {
             aiTurnEvents.removeFirst(aiTurnEvents.count - 8)
         }
+        dzwPlayableLog.info("AI event: \(message, privacy: .public)")
     }
 
     private static func prioritySummary(_ priorities: [String]) -> String {
@@ -598,9 +646,12 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         assaultAdvance: Binding<Bool>,
         onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
+        dzwPlayableLog.info("Showing default battle panels currentVisible=\(self.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
         for panel in [DZWPlayableBattlePanel.command, .inspector] {
             show(panel, model: model, assaultAdvance: assaultAdvance, onCompletion: onCompletion)
         }
+        dzwPlayableLog.info("Default battle panels shown visible=\(self.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
+        logDZWWindowSnapshot("dzw-panel-defaults")
     }
 
     func toggle(
@@ -609,6 +660,7 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         assaultAdvance: Binding<Bool>,
         onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
+        dzwPlayableLog.info("Panel toggle requested panel=\(panel.rawValue, privacy: .public) wasVisible=\(self.visiblePanels.contains(panel), privacy: .public)")
         if visiblePanels.contains(panel) {
             hide(panel)
         } else {
@@ -622,6 +674,7 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         assaultAdvance: Binding<Bool>,
         onCompletion: @escaping (DZWPlayableCompletionRecord) -> Void
     ) {
+        let reusedWindow = windows[panel] != nil
         let window = windows[panel] ?? makeWindow(for: panel)
         window.contentViewController = NSHostingController(
             rootView: DZWPlayableBattlePanelWindow(
@@ -634,14 +687,18 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         visiblePanels.insert(panel)
+        dzwPlayableLog.info("Panel shown panel=\(panel.rawValue, privacy: .public) reusedWindow=\(reusedWindow, privacy: .public) windowNumber=\(window.windowNumber, privacy: .public) frame=\(NSStringFromRect(window.frame), privacy: .public) visible=\(self.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
     }
 
     func hide(_ panel: DZWPlayableBattlePanel) {
         windows[panel]?.orderOut(nil)
         visiblePanels.remove(panel)
+        dzwPlayableLog.info("Panel hidden panel=\(panel.rawValue, privacy: .public) visible=\(self.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
+        logDZWWindowSnapshot("dzw-panel-hide-\(panel.rawValue)")
     }
 
     func closeAll() {
+        dzwPlayableLog.info("Closing all battle panels count=\(self.windows.count, privacy: .public) visible=\(self.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
         for window in windows.values {
             window.delegate = nil
             window.close()
@@ -649,14 +706,17 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         windows.removeAll()
         panelsByWindowID.removeAll()
         visiblePanels.removeAll()
+        logDZWWindowSnapshot("dzw-panel-close-all")
     }
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
               let panel = panelsByWindowID[ObjectIdentifier(window)] else {
+            dzwPlayableLog.info("Panel windowWillClose received for unknown window.")
             return
         }
         visiblePanels.remove(panel)
+        dzwPlayableLog.info("Panel window will close panel=\(panel.rawValue, privacy: .public) windowNumber=\(window.windowNumber, privacy: .public) visible=\(self.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
     }
 
     private func makeWindow(for panel: DZWPlayableBattlePanel) -> NSWindow {
@@ -672,6 +732,7 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
         window.delegate = self
         windows[panel] = window
         panelsByWindowID[ObjectIdentifier(window)] = panel
+        dzwPlayableLog.info("Panel window created panel=\(panel.rawValue, privacy: .public) title=\(window.title, privacy: .public) frame=\(NSStringFromRect(window.frame), privacy: .public)")
         return window
     }
 
@@ -1160,6 +1221,14 @@ private struct FirstBattleTutorialHintView: View {
         .shadow(color: .black.opacity(0.22), radius: 14, x: 0, y: 8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("first-battle-tutorial-hint")
+        .onAppear {
+            dzwPlayableLog.info("First-battle tutorial hint appeared hint=\(hint.accessibilityIdentifier, privacy: .public) isFinal=\(isFinalHint, privacy: .public) doNotShowAgain=\(doNotShowAgain, privacy: .public)")
+            logDZWWindowSnapshot("first-battle-tutorial-hint-appear")
+        }
+        .onDisappear {
+            dzwPlayableLog.info("First-battle tutorial hint disappeared hint=\(hint.accessibilityIdentifier, privacy: .public)")
+            logDZWWindowSnapshot("first-battle-tutorial-hint-disappear")
+        }
     }
 }
 
@@ -1173,9 +1242,18 @@ public struct DZWPlayableBattleView: View {
     @State private var firstBattleTutorialDoNotShowAgain = false
     @AppStorage("guderian.tutorial.firstBattleGuidance.v1.dismissed") private var firstBattleGuidanceDismissed = false
     private let onCompletion: (DZWPlayableCompletionRecord) -> Void
+    private let showsDefaultPanels: Bool
+    private let showsTutorials: Bool
 
-    public init(scenario: GuderianScenario, onCompletion: @escaping (CampaignCompletionRecord) -> Void = { _ in }) {
+    public init(
+        scenario: GuderianScenario,
+        showsDefaultPanels: Bool = true,
+        showsTutorials: Bool = true,
+        onCompletion: @escaping (CampaignCompletionRecord) -> Void = { _ in }
+    ) {
         _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(scenario: scenario))
+        self.showsDefaultPanels = showsDefaultPanels
+        self.showsTutorials = showsTutorials
         self.onCompletion = { record in
             if case .fieldCommand(let completionRecord) = record {
                 onCompletion(completionRecord)
@@ -1183,8 +1261,15 @@ public struct DZWPlayableBattleView: View {
         }
     }
 
-    public init(lateCareerEntry: LateCareerGuderianPresentation, onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }) {
+    public init(
+        lateCareerEntry: LateCareerGuderianPresentation,
+        showsDefaultPanels: Bool = true,
+        showsTutorials: Bool = true,
+        onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }
+    ) {
         _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(lateCareerEntry: lateCareerEntry))
+        self.showsDefaultPanels = showsDefaultPanels
+        self.showsTutorials = showsTutorials
         self.onCompletion = { record in
             if case .lateCareer(let completionRecord) = record {
                 onCompletion(completionRecord)
@@ -1234,21 +1319,33 @@ public struct DZWPlayableBattleView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("battle-screen")
             .onAppear {
-                panelWindows.showDefaults(
-                    model: model,
-                    assaultAdvance: $assaultAdvance,
-                    onCompletion: onCompletion
-                )
+                dzwPlayableLog.info("Battle view appeared title=\(model.title, privacy: .public) tutorialEligible=\(model.isFirstBattleTutorialEligible, privacy: .public) firstBattleDismissed=\(firstBattleGuidanceDismissed, privacy: .public) showsDefaultPanels=\(showsDefaultPanels, privacy: .public) showsTutorials=\(showsTutorials, privacy: .public)")
+                logDZWWindowSnapshot("dzw-battle-on-appear-before-panels")
+                if showsDefaultPanels {
+                    panelWindows.showDefaults(
+                        model: model,
+                        assaultAdvance: $assaultAdvance,
+                        onCompletion: onCompletion
+                    )
+                    dzwPlayableLog.info("Battle view default panels requested visible=\(panelWindows.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
+                } else {
+                    dzwPlayableLog.info("Battle view default panels suppressed by automation presentation options.")
+                }
                 recordFirstBattleTutorialTrigger(.battleOpened)
                 recordFirstBattleTutorialTrigger(.boardVisible)
+                logDZWWindowSnapshot("dzw-battle-on-appear-after-panels")
             }
             .onChange(of: model.tutorialEventCount) { _, _ in
                 if let trigger = model.latestTutorialTrigger {
+                    dzwPlayableLog.info("Battle view observed tutorial trigger event trigger=\(trigger.rawValue, privacy: .public) count=\(model.tutorialEventCount, privacy: .public)")
                     recordFirstBattleTutorialTrigger(trigger)
                 }
             }
             .onDisappear {
+                dzwPlayableLog.info("Battle view disappeared title=\(model.title, privacy: .public) visiblePanels=\(panelWindows.visiblePanels.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
+                logDZWWindowSnapshot("dzw-battle-on-disappear-before-close")
                 panelWindows.closeAll()
+                logDZWWindowSnapshot("dzw-battle-on-disappear-after-close")
             }
         } else {
             ContentUnavailableView(
@@ -1264,7 +1361,8 @@ public struct DZWPlayableBattleView: View {
     }
 
     private var activeFirstBattleHint: TutorialHint? {
-        guard model.isFirstBattleTutorialEligible,
+        guard showsTutorials,
+              model.isFirstBattleTutorialEligible,
               !firstBattleGuidanceDismissed else {
             return nil
         }
@@ -1272,18 +1370,32 @@ public struct DZWPlayableBattleView: View {
     }
 
     private func recordFirstBattleTutorialTrigger(_ trigger: TutorialTrigger) {
-        guard model.isFirstBattleTutorialEligible,
-              !firstBattleGuidanceDismissed else {
+        guard showsTutorials else {
+            dzwPlayableLog.info("First-battle tutorial trigger suppressed by automation presentation options trigger=\(trigger.rawValue, privacy: .public)")
+            return
+        }
+
+        guard model.isFirstBattleTutorialEligible else {
+            dzwPlayableLog.debug("First-battle tutorial trigger ignored because battle is not eligible trigger=\(trigger.rawValue, privacy: .public)")
+            return
+        }
+
+        guard !firstBattleGuidanceDismissed else {
+            dzwPlayableLog.info("First-battle tutorial trigger ignored because tutorial is dismissed trigger=\(trigger.rawValue, privacy: .public)")
             return
         }
         firstBattleTutorial.record(trigger, in: firstBattleTutorialFlow)
+        let activeHint = firstBattleTutorial.activeHint(in: firstBattleTutorialFlow)?.accessibilityIdentifier ?? "none"
+        dzwPlayableLog.info("First-battle tutorial trigger recorded trigger=\(trigger.rawValue, privacy: .public) activeHint=\(activeHint, privacy: .public) completedHints=\(firstBattleTutorial.progress.completedHintCount(in: firstBattleTutorialFlow), privacy: .public)")
     }
 
     private func advanceFirstBattleTutorial() {
         guard let hint = activeFirstBattleHint else {
+            dzwPlayableLog.info("First-battle tutorial advance requested with no active hint.")
             return
         }
         let isFinal = firstBattleTutorialFlow.isLastHint(hint)
+        dzwPlayableLog.info("First-battle tutorial advance hint=\(hint.accessibilityIdentifier, privacy: .public) isFinal=\(isFinal, privacy: .public) doNotShowAgain=\(firstBattleTutorialDoNotShowAgain, privacy: .public)")
         firstBattleTutorial.completeActiveHint(in: firstBattleTutorialFlow)
         if isFinal {
             if firstBattleTutorialDoNotShowAgain {
@@ -1291,10 +1403,19 @@ public struct DZWPlayableBattleView: View {
             }
             firstBattleTutorial.dismiss(firstBattleTutorialFlow)
         }
+        let activeHint = firstBattleTutorial.activeHint(in: firstBattleTutorialFlow)?.accessibilityIdentifier ?? "none"
+        dzwPlayableLog.info("First-battle tutorial advanced activeHint=\(activeHint, privacy: .public) dismissed=\(firstBattleGuidanceDismissed, privacy: .public) completedHints=\(firstBattleTutorial.progress.completedHintCount(in: firstBattleTutorialFlow), privacy: .public)")
     }
 
     private func skipFirstBattleTutorialHint() {
+        guard let hint = activeFirstBattleHint else {
+            dzwPlayableLog.info("First-battle tutorial skip requested with no active hint.")
+            return
+        }
+        dzwPlayableLog.info("First-battle tutorial skip hint=\(hint.accessibilityIdentifier, privacy: .public)")
         firstBattleTutorial.completeActiveHint(in: firstBattleTutorialFlow)
+        let activeHint = firstBattleTutorial.activeHint(in: firstBattleTutorialFlow)?.accessibilityIdentifier ?? "none"
+        dzwPlayableLog.info("First-battle tutorial skipped activeHint=\(activeHint, privacy: .public) completedHints=\(firstBattleTutorial.progress.completedHintCount(in: firstBattleTutorialFlow), privacy: .public)")
     }
 
     private var battlefieldToolbar: some View {

@@ -19,11 +19,8 @@
 		A20000000000000000000013 /* GuderianCampaignTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* GuderianCampaignTests.swift */; };
 		A30000000000000000000011 /* GuderianTestApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000000000000000000021 /* GuderianTestApp.swift */; };
 		A30000000000000000000012 /* GuderianCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000071 /* GuderianCore */; };
+		A30000000000000000000018 /* GuderianAppUI in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000072 /* GuderianAppUI */; };
 		A30000000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* Assets.xcassets */; };
-		A30000000000000000000014 /* ScenarioMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* ScenarioMapView.swift */; };
-		A30000000000000000000015 /* DZWPlayableBattleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* DZWPlayableBattleView.swift */; };
-		A30000000000000000000016 /* GuderianCampaignView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000026 /* GuderianCampaignView.swift */; };
-		A30000000000000000000017 /* BattlefieldWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* BattlefieldWorkspace.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -63,6 +60,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A30000000000000000000012 /* GuderianCore in Frameworks */,
+				A30000000000000000000018 /* GuderianAppUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -185,6 +183,7 @@
 			name = GuderianTest;
 			packageProductDependencies = (
 				A10000000000000000000071 /* GuderianCore */,
+				A10000000000000000000072 /* GuderianAppUI */,
 			);
 			productName = GuderianTest;
 			productReference = A30000000000000000000024 /* GuderianTest.app */;
@@ -287,10 +286,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A30000000000000000000011 /* GuderianTestApp.swift in Sources */,
-				A30000000000000000000016 /* GuderianCampaignView.swift in Sources */,
-				A30000000000000000000017 /* BattlefieldWorkspace.swift in Sources */,
-				A30000000000000000000015 /* DZWPlayableBattleView.swift in Sources */,
-				A30000000000000000000014 /* ScenarioMapView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -593,6 +588,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000070 /* XCLocalSwiftPackageReference "." */;
 			productName = GuderianCore;
+		};
+		A10000000000000000000072 /* GuderianAppUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000070 /* XCLocalSwiftPackageReference "." */;
+			productName = GuderianAppUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
