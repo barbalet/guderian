@@ -1,16 +1,8 @@
 import GuderianCore
 import SwiftUI
 
-protocol ScenarioMapRenderable {
-    var title: String { get }
-    var width: Double { get }
-    var height: Double { get }
-    var elements: [ScenarioMapElement] { get }
-    var deploymentZones: [ScenarioDeploymentZone] { get }
-}
-
-extension ScenarioMapLayout: ScenarioMapRenderable {}
-extension LateCareerStaffBattlefieldMap: ScenarioMapRenderable {}
+private let scenarioMapGridColumns = 10
+private let scenarioMapGridRows = 8
 
 struct ScenarioMapView<Layout: ScenarioMapRenderable>: View {
     let layout: Layout
@@ -45,20 +37,18 @@ struct ScenarioMapView<Layout: ScenarioMapRenderable>: View {
     }
 
     private var mapBackground: Color {
-        Color(red: 0.79, green: 0.82, blue: 0.74)
+        GuderianAppPalette.scenarioMapBackground
     }
 
     private func grid(in size: CGSize) -> some View {
         Path { path in
-            let columns = 10
-            let rows = 8
-            for column in 1..<columns {
-                let x = size.width * CGFloat(column) / CGFloat(columns)
+            for column in 1..<scenarioMapGridColumns {
+                let x = size.width * CGFloat(column) / CGFloat(scenarioMapGridColumns)
                 path.move(to: CGPoint(x: x, y: 0))
                 path.addLine(to: CGPoint(x: x, y: size.height))
             }
-            for row in 1..<rows {
-                let y = size.height * CGFloat(row) / CGFloat(rows)
+            for row in 1..<scenarioMapGridRows {
+                let y = size.height * CGFloat(row) / CGFloat(scenarioMapGridRows)
                 path.move(to: CGPoint(x: 0, y: y))
                 path.addLine(to: CGPoint(x: size.width, y: y))
             }

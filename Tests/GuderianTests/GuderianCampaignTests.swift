@@ -689,7 +689,7 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertGreaterThan(Int(game_zone_count(game.handle)), 0)
 
         let session = try XCTUnwrap(LateCareerNativeBoardSession(battlefieldID: "kursk-armored-force-pressure", seed: 750_002))
-        let snapshot = session.snapshot()
+        let snapshot = session.lateCareerSnapshot()
         XCTAssertTrue(snapshot.isScenarioBoardPlayable)
         XCTAssertEqual(snapshot.battlefieldID, "kursk-armored-force-pressure")
         XCTAssertEqual(snapshot.mission.targetScore, loadout.blueprint.missionTargetScore)
@@ -790,7 +790,7 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(kurskRoute.supportsDebriefPersistence)
 
         let session = try XCTUnwrap(LateCareerNativeBoardSession(battlefieldID: "kursk-armored-force-pressure", seed: 765_001))
-        let snapshot = session.snapshot()
+        let snapshot = session.lateCareerSnapshot()
         XCTAssertTrue(snapshot.isScenarioBoardPlayable)
         XCTAssertGreaterThan(snapshot.unitCount, 0)
         XCTAssertGreaterThan(snapshot.objectiveCount, 0)
@@ -839,7 +839,7 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertTrue(vistulaOderRoute.supportsGermanAIRunner)
 
         let session = try XCTUnwrap(LateCareerNativeBoardSession(battlefieldID: "vistula-oder-breakthrough", seed: 775_001))
-        let snapshot = session.snapshot()
+        let snapshot = session.lateCareerSnapshot()
         XCTAssertTrue(snapshot.isScenarioBoardPlayable)
         XCTAssertGreaterThan(snapshot.unitCount, 0)
         XCTAssertGreaterThan(snapshot.objectiveCount, 0)
@@ -1145,9 +1145,9 @@ final class GuderianCampaignTests: XCTestCase {
         XCTAssertEqual(flow.pages.count, 4)
         XCTAssertEqual(flow.doNotShowAgainLabel, "Do not show again")
         XCTAssertEqual(flow.storageKey, catalog.firstRunHistoryStorageKey)
-        XCTAssertEqual(catalog.firstBattleGuidanceFlowStub.storageKey, catalog.firstBattleGuidanceStorageKey)
+        XCTAssertEqual(catalog.firstBattleGuidanceFlow.storageKey, catalog.firstBattleGuidanceStorageKey)
         XCTAssertTrue(flow.usesReusableStorageContract)
-        XCTAssertTrue(catalog.firstBattleGuidanceFlowStub.usesReusableStorageContract)
+        XCTAssertTrue(catalog.firstBattleGuidanceFlow.usesReusableStorageContract)
         XCTAssertTrue(flow.pages.allSatisfy { (80...125).contains($0.wordCount) })
         XCTAssertTrue(flow.pages.allSatisfy(\.containsRequiredTopics))
         XCTAssertTrue(flow.pages.allSatisfy { $0.accessibilityIdentifier.hasPrefix("first-run-history-page-") })

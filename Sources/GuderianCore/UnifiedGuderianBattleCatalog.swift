@@ -8,24 +8,102 @@ public enum UnifiedGuderianBattleKind: String, Codable, Hashable, Sendable {
 }
 
 public struct UnifiedGuderianBattleID: Codable, Hashable, Sendable, CustomStringConvertible {
-    public let rawValue: String
-    public let kind: UnifiedGuderianBattleKind
+    private enum Storage: Hashable, Sendable {
+        case fieldCommand(GuderianBattleID)
+        case lateCareer(String)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case rawValue
+        case kind
+    }
+
+    private let storage: Storage
+
+    public var rawValue: String {
+        switch storage {
+        case .fieldCommand(let id):
+            return id.rawValue
+        case .lateCareer(let id):
+            return id
+        }
+    }
+
+    public var kind: UnifiedGuderianBattleKind {
+        switch storage {
+        case .fieldCommand:
+            return .fieldCommand
+        case .lateCareer:
+            return .lateCareer
+        }
+    }
+
+    public var fieldCommandID: GuderianBattleID? {
+        guard case .fieldCommand(let id) = storage else {
+            return nil
+        }
+        return id
+    }
+
+    public var lateCareerID: String? {
+        guard case .lateCareer(let id) = storage else {
+            return nil
+        }
+        return id
+    }
 
     public init(rawValue: String, kind: UnifiedGuderianBattleKind) {
-        self.rawValue = rawValue
-        self.kind = kind
+        switch kind {
+        case .fieldCommand:
+            guard let id = GuderianBattleID(rawValue: rawValue) else {
+                preconditionFailure("Unknown field-command Guderian battle ID: \(rawValue)")
+            }
+            storage = .fieldCommand(id)
+        case .lateCareer:
+            storage = .lateCareer(rawValue)
+        }
     }
 
     public static func fieldCommand(_ id: GuderianBattleID) -> UnifiedGuderianBattleID {
-        UnifiedGuderianBattleID(rawValue: id.rawValue, kind: .fieldCommand)
+        UnifiedGuderianBattleID(storage: .fieldCommand(id))
     }
 
     public static func lateCareer(_ id: String) -> UnifiedGuderianBattleID {
-        UnifiedGuderianBattleID(rawValue: id, kind: .lateCareer)
+        UnifiedGuderianBattleID(storage: .lateCareer(id))
     }
 
     public var description: String {
         "\(kind.rawValue): \(rawValue)"
+    }
+
+    private init(storage: Storage) {
+        self.storage = storage
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let rawValue = try container.decode(String.self, forKey: .rawValue)
+        let kind = try container.decode(UnifiedGuderianBattleKind.self, forKey: .kind)
+
+        switch kind {
+        case .fieldCommand:
+            guard let id = GuderianBattleID(rawValue: rawValue) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .rawValue,
+                    in: container,
+                    debugDescription: "Unknown field-command Guderian battle ID: \(rawValue)"
+                )
+            }
+            storage = .fieldCommand(id)
+        case .lateCareer:
+            storage = .lateCareer(rawValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(rawValue, forKey: .rawValue)
+        try container.encode(kind, forKey: .kind)
     }
 }
 
@@ -52,11 +130,7 @@ public enum UnifiedGuderianBattleCatalog {
     public static let cycleRange = 736...740
     public static let hostSurfaceName = PlayableBattleSurfaceCatalog.hostSurfaceName
 
-    public static var allEntries: [UnifiedGuderianBattleEntry] {
-        fieldCommandEntries + lateCareerEntries
-    }
-
-    public static var fieldCommandEntries: [UnifiedGuderianBattleEntry] {
+    public static let fieldCommandEntries: [UnifiedGuderianBattleEntry] =
         GuderianCampaignCatalog.all
             .sorted { $0.order < $1.order }
             .map { scenario in
@@ -72,9 +146,8 @@ public enum UnifiedGuderianBattleCatalog {
                     sourceLinks: scenario.sourceLinks
                 )
             }
-    }
 
-    public static var lateCareerEntries: [UnifiedGuderianBattleEntry] {
+    public static let lateCareerEntries: [UnifiedGuderianBattleEntry] =
         LateCareerGuderianPresentationCatalog.allEntries
             .sorted { $0.order < $1.order }
             .map { entry in
@@ -89,22 +162,14 @@ public enum UnifiedGuderianBattleCatalog {
                     sourceLinks: entry.battlefield.sourceLinks
                 )
             }
-    }
+
+    public static let allEntries: [UnifiedGuderianBattleEntry] =
+        fieldCommandEntries + lateCareerEntries
 
     public static func entry(for id: UnifiedGuderianBattleID) -> UnifiedGuderianBattleEntry? {
         allEntries.first { $0.id == id }
     }
 
-    public static var acceptanceReadyThroughCycle740: Bool {
-        cycleRange == 736...740 &&
-            allEntries.count == 35 &&
-            fieldCommandEntries.count == GuderianCampaignCatalog.all.count &&
-            lateCareerEntries.count == LateCareerGuderianPresentationCatalog.visibleEntryCount &&
-            allEntries.map(\.order) == Array(1...35) &&
-            allEntries.allSatisfy(\.usesUnifiedPlayableSurface) &&
-            allEntries.allSatisfy(\.hasHistoricalCaveatOnly) &&
-            Set(allEntries.map(\.id)).count == 35
-    }
 }
 
 public struct UnifiedPlayableAcceptanceReport: Codable, Hashable, Sendable {
@@ -273,7 +338,7 @@ public enum UnifiedCampaignListCatalog {
 
         switch entry.id.kind {
         case .fieldCommand:
-            if let battleID = GuderianBattleID(rawValue: entry.id.rawValue),
+            if let battleID = entry.id.fieldCommandID,
                let scenario = GuderianCampaignCatalog.scenario(id: battleID) {
                 completionState = progress.isCompleted(battleID) ? .complete : .open
                 availability = progress.isAvailable(scenario, in: playMode) ? .available : .locked
@@ -370,7 +435,7 @@ public enum UnifiedBattleBriefingCatalog {
     public static func shell(for id: UnifiedGuderianBattleID) -> UnifiedBattleBriefingShell? {
         switch id.kind {
         case .fieldCommand:
-            guard let battleID = GuderianBattleID(rawValue: id.rawValue),
+            guard let battleID = id.fieldCommandID,
                   let scenario = GuderianCampaignCatalog.scenario(id: battleID),
                   let entry = UnifiedGuderianBattleCatalog.entry(for: id) else {
                 return nil
@@ -551,7 +616,7 @@ public enum UnifiedPlayableBoardRouteCatalog {
     public static func route(for id: UnifiedGuderianBattleID) -> UnifiedPlayableBattleRoute? {
         switch id.kind {
         case .fieldCommand:
-            guard let battleID = GuderianBattleID(rawValue: id.rawValue),
+            guard let battleID = id.fieldCommandID,
                   PlayableBattleSurfaceCatalog.isRoutedToPlayableScreen(battleID),
                   let scenario = GuderianCampaignCatalog.scenario(id: battleID),
                   let entry = UnifiedGuderianBattleCatalog.entry(for: id) else {
@@ -1260,8 +1325,8 @@ public final class LateCareerNativeBoardSession {
         return steps
     }
 
-    public func snapshot() -> LateCareerNativeBoardSnapshot {
-        let fullSnapshot = playableBoardSnapshot()
+    public func lateCareerSnapshot() -> LateCareerNativeBoardSnapshot {
+        let fullSnapshot = snapshot()
         return LateCareerNativeBoardSnapshot(
             battlefieldID: loadout.battlefield.id,
             title: loadout.battlefield.title,
@@ -1275,7 +1340,7 @@ public final class LateCareerNativeBoardSession {
         )
     }
 
-    public func playableBoardSnapshot() -> NativeBoardSnapshot {
+    public func snapshot() -> NativeBoardSnapshot {
         let view = game_view(handle)
         let mission = game_mission_view(handle)
         return NativeBoardSnapshot(
@@ -1860,7 +1925,7 @@ public enum UnifiedLateCareerAIExecutionCatalog {
 
         let priorities = plan.priorities.map(\.targetName)
         let steps = session.runGermanTurn(priorityNames: priorities)
-        let snapshot = session.snapshot()
+        let snapshot = session.lateCareerSnapshot()
         let blockers = [
             route.isFullPlayableBoardRoute ? nil : "\(route.title) is not routed through the full playable board contract.",
             priorities.isEmpty ? "\(route.title) has no AI target priorities." : nil,
@@ -1935,7 +2000,7 @@ public enum UnifiedLateCareerCompletionResolver {
             return nil
         }
 
-        let snapshot = session.snapshot()
+        let snapshot = session.lateCareerSnapshot()
         let score = score(for: snapshot, report: report)
         let band = victoryBand(for: score, report: report)
         let completedTurn = max(snapshot.turnNumber, report.scoringProfile.targetTurnUpperBound)
@@ -1969,7 +2034,7 @@ public enum UnifiedLateCareerCompletionResolver {
             return nil
         }
 
-        let snapshot = session.snapshot()
+        let snapshot = session.lateCareerSnapshot()
         let completedTurn = max(snapshot.turnNumber, report.scoringProfile.targetTurnUpperBound)
         let persistenceKey = report.scoringProfile.persistenceKey
         let debrief = failureHandling(for: report)
@@ -2259,7 +2324,7 @@ public struct UnifiedCampaignProgress: Codable, Hashable, Sendable {
     public var fieldCommandProgress: CampaignProgress {
         let campaignRecords = completionRecords.values.reduce(into: [GuderianBattleID: CampaignCompletionRecord]()) { result, record in
             guard record.source == .fieldCommand,
-                  let id = GuderianBattleID(rawValue: record.id.rawValue) else {
+                  let id = record.id.fieldCommandID else {
                 return
             }
             result[id] = CampaignCompletionRecord(
@@ -2569,7 +2634,7 @@ public enum UnifiedPlayableScreenHarness {
     ) throws -> UnifiedPlayableScreenHarnessResult {
         switch id.kind {
         case .fieldCommand:
-            guard let battleID = GuderianBattleID(rawValue: id.rawValue) else {
+            guard let battleID = id.fieldCommandID else {
                 throw NativeDemoParityError.boardSessionUnavailable(.tucholaForest)
             }
             let result = try DZWPlayableScreenHarness.runBattleFlow(for: battleID, seed: seed)
@@ -2619,7 +2684,7 @@ public enum UnifiedPlayableScreenHarness {
 
         var steps: [DZWPlayableScreenHarnessStep] = []
         var blockers: [String] = []
-        let snapshot = session.snapshot()
+        let snapshot = session.lateCareerSnapshot()
         appendLateCareerStep(.launch, battlefieldID: battlefieldID, status: snapshot.isScenarioBoardPlayable ? .succeeded : .blocked, id: "battle-screen", detail: "\(route.title) opened on the unified DZW-style board.", into: &steps)
         appendLateCareerStep(.selection, battlefieldID: battlefieldID, status: route.supportsSelectableUnits ? .succeeded : .blocked, id: "battle-sidebar-scroll", detail: "Scenario units are selectable.", into: &steps)
         appendLateCareerStep(.movement, battlefieldID: battlefieldID, status: route.supportsDraggedMovement ? .succeeded : .blocked, id: "battle-board", detail: "Scenario units support board movement.", into: &steps)
@@ -3292,7 +3357,7 @@ public enum UnifiedRealDZWPlayableParityCatalog {
             return nil
         }
 
-        let opening = session.playableBoardSnapshot()
+        let opening = session.snapshot()
         if opening.selectedUnit != nil {
             switch opening.phase {
             case .movement:
@@ -3304,9 +3369,9 @@ public enum UnifiedRealDZWPlayableParityCatalog {
                 session.resolveFirstPendingChoice()
             }
         }
-        let afterAction = session.playableBoardSnapshot()
+        let afterAction = session.snapshot()
         session.advancePhase()
-        let afterPhase = session.playableBoardSnapshot()
+        let afterPhase = session.snapshot()
         let completion = UnifiedLateCareerCompletionResolver.completeBattle(from: session)
 
         return UnifiedRealDZWPlayableParityBattleReport(

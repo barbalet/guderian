@@ -10,6 +10,13 @@ The intended stack is a macOS game using SwiftUI, Metal, and a C rules core. The
 
 That define is enabled only for the Guderian workspace/package path so upstream `dzw` development is not affected.
 
+The local engine boundary currently includes the Guderian scenario board bridge:
+
+- Guarded by `HEINZ_GUDERIAN_GAME`: `TE_GUDERIAN_LABEL_LENGTH`, the Guderian label buffers stored on `game_t`, and `game_apply_guderian_scenario_board`, which replaces the generic skirmish board with scenario-authored mission text, terrain zones, objectives, and target score.
+- The public board-size boundary functions `game_board_width()` and `game_board_height()`, which let Swift UI code read the engine dimensions without duplicating the C constants.
+
+Keep new engine changes outside `dzw` when possible. When a C rules change is unavoidable for Guderian, guard it with `HEINZ_GUDERIAN_GAME`, document the symbol here, and treat it as local to this checkout unless a later upstreaming pass explicitly promotes it.
+
 ## Included Engine Review
 
 The `dzw` directory is a complete playable World War II skirmish engine and app:
@@ -89,6 +96,8 @@ The detailed development plan is tracked in [PLAN.md](PLAN.md). The short versio
 - Cycles 731-830: unified 35-battle playable campaign, removing the UI/playability split so all 35 rows use one Battles list, one DZW-style playable surface, one progress/save model, one harness, README chronology coverage, and final acceptance with command caveats retained as historical labels only.
 - Cycles 831-890: corrected real DZW UI parity, routing battles 20-35 through the same live playable board, controls, AI turn flow, debrief, and persistence path as battles 1-19.
 - Cycles 891-930: tutorial onboarding and reusable guidance, adding a four-screen first-run historical tutorial plus first-battle contextual hints with versioned `Do not show again` persistence.
+- Cycles 931-960: `GuderianTest` first-battle autoplay replacement, making the test app visibly play Tuchola Forest through the same DZW-style battle surface as the main app.
+- Cycles 961-1080: `REVIEW.md` local hardening, implementing the review cleanup inside this checkout and embedded `dzw` without changing the sibling `derZweiteWeltkrieg` checkout.
 
 Cycle 451 correction: after running `derZweiteWeltkrieg`, the accepted playability bar is the actual DZW battle screen: terrain board, objectives, opposing units, direct unit selection, draggable movement, phase/action controls, pending-choice handling, and a visible combat log. Earlier cycle 400/450 reports proved native data, diagnostics, and automation stability, but they overstated product playability because the Guderian app still surfaced a simplified board instead of the full DZW-style playable screen.
 
@@ -224,6 +233,8 @@ Cycle 910 update: cycles 891-910 add reusable tutorial models, versioned dismiss
 
 Cycle 930 update: cycles 911-930 add first-battle contextual guidance for Tuchola Forest. The first-battle tutorial now responds to battle opening, board visibility, unit selection, objective inspection, movement, phase changes, shooting, assault, blocked actions, German AI turn flow, and debrief, with a final `Do not show again` checkbox and acceptance coverage proving normal battle completion is unaffected.
 
+Cycle 1080 update: the `REVIEW.md` local hardening block is complete. The local Guderian checkout now has engine-sourced board dimensions, cached catalogs, test-only acceptance gates, reusable tutorial content, typed IDs/stages, consolidated campaign save migration, focused progress persistence coverage, smaller controller state snapshots, documented local `DerZweiteWeltkriegGuderian` ownership, executable German AI target-priority input, public scenario map renderability, debug-only window snapshot logging, and hardened battle panel routing. The sibling `derZweiteWeltkrieg` checkout was intentionally left untouched; any upstream/back-port work should be planned separately from this local block.
+
 ## Run
 
 Build and test from the repository root:
@@ -253,9 +264,9 @@ Then upload `dist/Guderian-1.0.0.zip` to the GitHub release at `https://github.c
 
 ## Ship Status
 
-The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19. Cycle 930 completes the tutorial onboarding block with first-run historical context and first-battle contextual hints.
+The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19. Cycle 930 completes the tutorial onboarding block with first-run historical context and first-battle contextual hints. Cycle 1080 closes the local `REVIEW.md` hardening pass.
 
-Remaining playable-screen estimate: battles 1-35 are complete through cycle 890, and tutorial onboarding is complete through cycle 930. There are no cycles remaining in the current unified 35-battle playable-campaign or tutorial-onboarding plans.
+Remaining playable-screen estimate: battles 1-35 are complete through cycle 890, tutorial onboarding is complete through cycle 930, and the local review hardening plan is complete through cycle 1080. There are no cycles remaining in the current unified 35-battle playable-campaign, tutorial-onboarding, or `REVIEW.md` local-hardening plans.
 
 ## App Identity
 

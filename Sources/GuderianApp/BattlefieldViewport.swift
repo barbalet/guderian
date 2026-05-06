@@ -33,7 +33,7 @@ struct BattlefieldViewport<Content: View>: View {
                         alignment: .topLeading
                     )
             }
-            .background(Color(red: 0.10, green: 0.14, blue: 0.10))
+            .background(GuderianAppPalette.battlefieldBackground)
         }
     }
 

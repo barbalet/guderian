@@ -15,21 +15,17 @@ public enum LateCareerPlayableSet: String, CaseIterable, Codable, Hashable, Send
     case setD = "Set D"
 
     public static func set(for id: String) -> LateCareerPlayableSet? {
-        if LateCareerStaffBattlefieldSetACatalog.battlefieldIDs.contains(id) {
-            return .setA
-        }
-        if LateCareerStaffBattlefieldSetBCatalog.battlefieldIDs.contains(id) {
-            return .setB
-        }
-        if LateCareerStaffBattlefieldSetCCatalog.battlefieldIDs.contains(id) {
-            return .setC
-        }
-        if LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs.contains(id) {
-            return .setD
-        }
-
-        return nil
+        index[id]
     }
+
+    private static let index: [String: LateCareerPlayableSet] = {
+        var result: [String: LateCareerPlayableSet] = [:]
+        for id in LateCareerStaffBattlefieldSetACatalog.battlefieldIDs { result[id] = .setA }
+        for id in LateCareerStaffBattlefieldSetBCatalog.battlefieldIDs { result[id] = .setB }
+        for id in LateCareerStaffBattlefieldSetCCatalog.battlefieldIDs { result[id] = .setC }
+        for id in LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs { result[id] = .setD }
+        return result
+    }()
 }
 
 public enum LateCareerPlayableReportStatus: String, Codable, Hashable, Sendable {
@@ -1007,14 +1003,13 @@ public enum LateCareerGuderianPresentationCatalog {
         LateCareerStaffBattlefieldSetACatalog.battlefieldIDs
     }
 
-    public static var allEntries: [LateCareerGuderianPresentation] {
+    public static let allEntries: [LateCareerGuderianPresentation] =
         LateCareerStaffBattlefieldAcceptanceCatalog.allLateCareerBattlefields.map { battlefield in
             LateCareerGuderianPresentation(
                 battlefield: battlefield,
                 readiness: readiness(for: battlefield.id)
             )
         }
-    }
 
     public static var fieldCommandCampaignCount: Int {
         GuderianCampaignCatalog.all.count

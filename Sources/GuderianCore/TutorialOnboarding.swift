@@ -1,6 +1,6 @@
 import Foundation
 
-public enum TutorialFlowID: String, Codable, Hashable, Sendable {
+public enum TutorialFlowID: String, Codable, CaseIterable, Hashable, Sendable {
     case firstRunHistory
     case firstBattleGuidance
 }
@@ -25,6 +25,20 @@ public enum TutorialTrigger: String, Codable, CaseIterable, Hashable, Sendable {
     case debrief
 }
 
+public enum FirstBattleGuidanceHintID: String, Codable, CaseIterable, Hashable, Sendable {
+    case orientation = "firstBattleGuidance-orientation"
+    case board = "firstBattleGuidance-board"
+    case selection = "firstBattleGuidance-selection"
+    case objectives = "firstBattleGuidance-objectives"
+    case movement = "firstBattleGuidance-movement"
+    case phase = "firstBattleGuidance-phase"
+    case shooting = "firstBattleGuidance-shooting"
+    case assault = "firstBattleGuidance-assault"
+    case blocked = "firstBattleGuidance-blocked"
+    case germanAI = "firstBattleGuidance-germanAI"
+    case debrief = "firstBattleGuidance-debrief"
+}
+
 public struct TutorialStorageKey: Codable, Hashable, Sendable {
     public let rawValue: String
 
@@ -33,7 +47,26 @@ public struct TutorialStorageKey: Codable, Hashable, Sendable {
     }
 }
 
-public struct TutorialPage: Identifiable, Codable, Hashable, Sendable {
+public protocol TutorialContent {
+    var body: String { get }
+    var requiredTopics: [String] { get }
+}
+
+public extension TutorialContent {
+    var wordCount: Int {
+        body
+            .split { $0.isWhitespace || $0.isNewline }
+            .count
+    }
+
+    var containsRequiredTopics: Bool {
+        requiredTopics.allSatisfy { topic in
+            body.localizedCaseInsensitiveContains(topic)
+        }
+    }
+}
+
+public struct TutorialPage: Identifiable, Codable, Hashable, Sendable, TutorialContent {
     public let id: String
     public let title: String
     public let body: String
@@ -53,21 +86,9 @@ public struct TutorialPage: Identifiable, Codable, Hashable, Sendable {
         self.accessibilityIdentifier = accessibilityIdentifier
         self.requiredTopics = requiredTopics
     }
-
-    public var wordCount: Int {
-        body
-            .split { $0.isWhitespace || $0.isNewline }
-            .count
-    }
-
-    public var containsRequiredTopics: Bool {
-        requiredTopics.allSatisfy { topic in
-            body.localizedCaseInsensitiveContains(topic)
-        }
-    }
 }
 
-public struct TutorialHint: Identifiable, Codable, Hashable, Sendable {
+public struct TutorialHint: Identifiable, Codable, Hashable, Sendable, TutorialContent {
     public let id: String
     public let trigger: TutorialTrigger
     public let order: Int
@@ -92,18 +113,6 @@ public struct TutorialHint: Identifiable, Codable, Hashable, Sendable {
         self.body = body
         self.accessibilityIdentifier = accessibilityIdentifier
         self.requiredTopics = requiredTopics
-    }
-
-    public var wordCount: Int {
-        body
-            .split { $0.isWhitespace || $0.isNewline }
-            .count
-    }
-
-    public var containsRequiredTopics: Bool {
-        requiredTopics.allSatisfy { topic in
-            body.localizedCaseInsensitiveContains(topic)
-        }
     }
 }
 
@@ -241,8 +250,11 @@ public struct TutorialTriggerEvent: Identifiable, Codable, Hashable, Sendable {
 
 public struct TutorialHintCoordinator: Codable, Hashable, Sendable {
     public private(set) var progress: TutorialProgress
-    public private(set) var triggeredHintIDs: Set<String>
     public private(set) var events: [TutorialTriggerEvent]
+
+    public var triggeredHintIDs: Set<String> {
+        Set(events.flatMap(\.hintIDs))
+    }
 
     public init(
         progress: TutorialProgress = TutorialProgress(),
@@ -250,8 +262,7 @@ public struct TutorialHintCoordinator: Codable, Hashable, Sendable {
         events: [TutorialTriggerEvent] = []
     ) {
         self.progress = progress
-        self.triggeredHintIDs = triggeredHintIDs
-        self.events = events
+        self.events = events + Self.legacyEvents(for: triggeredHintIDs.subtracting(Set(events.flatMap(\.hintIDs))))
     }
 
     public mutating func record(_ trigger: TutorialTrigger, in flow: TutorialFlow) {
@@ -261,7 +272,6 @@ public struct TutorialHintCoordinator: Codable, Hashable, Sendable {
         }
 
         let ids = matchingHints.map(\.id)
-        triggeredHintIDs.formUnion(ids)
         events.append(TutorialTriggerEvent(flowID: flow.id, trigger: trigger, hintIDs: ids))
     }
 
@@ -286,11 +296,41 @@ public struct TutorialHintCoordinator: Codable, Hashable, Sendable {
     public mutating func reset(_ id: TutorialFlowID? = nil) {
         progress.reset(id)
         if let id {
-            triggeredHintIDs = triggeredHintIDs.filter { !$0.hasPrefix("\(id.rawValue)-") }
             events = events.filter { $0.flowID != id }
         } else {
-            triggeredHintIDs.removeAll()
             events.removeAll()
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case progress
+        case triggeredHintIDs
+        case events
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        progress = try container.decode(TutorialProgress.self, forKey: .progress)
+        let events = try container.decodeIfPresent([TutorialTriggerEvent].self, forKey: .events) ?? []
+        let legacyIDs = try container.decodeIfPresent(Set<String>.self, forKey: .triggeredHintIDs) ?? []
+        self.events = events + Self.legacyEvents(for: legacyIDs.subtracting(Set(events.flatMap(\.hintIDs))))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(progress, forKey: .progress)
+        try container.encode(events, forKey: .events)
+    }
+
+    private static func legacyEvents(for ids: Set<String>) -> [TutorialTriggerEvent] {
+        TutorialFlowID.allCases.compactMap { flowID in
+            let matchingIDs = ids
+                .filter { $0.hasPrefix("\(flowID.rawValue)-") }
+                .sorted()
+            guard !matchingIDs.isEmpty else {
+                return nil
+            }
+            return TutorialTriggerEvent(flowID: flowID, trigger: .battleOpened, hintIDs: matchingIDs)
         }
     }
 }
@@ -351,10 +391,6 @@ public enum GuderianTutorialCatalog {
         )
     }
 
-    public static var firstBattleGuidanceFlowStub: TutorialFlow {
-        firstBattleGuidanceFlow
-    }
-
     public static var firstRunHistoryPages: [TutorialPage] {
         [
             TutorialPage(
@@ -388,40 +424,10 @@ public enum GuderianTutorialCatalog {
         ]
     }
 
-    public static var acceptanceReadyThroughCycle910: Bool {
-        let flow = firstRunHistoryFlow
-        var progress = TutorialProgress()
-        let initiallyPresents = progress.shouldPresent(flow)
-        progress.dismiss(flow)
-        let dismissedStaysHidden = !progress.shouldPresent(flow)
-        let nextVersionShows = progress.shouldPresent(
-            TutorialFlow(
-                id: flow.id,
-                version: flow.version + 1,
-                title: flow.title,
-                presentationKind: flow.presentationKind,
-                storageKey: TutorialStorageKey("guderian.tutorial.firstRunHistory.v2.dismissed"),
-                openingTrigger: flow.openingTrigger,
-                pages: flow.pages
-            )
-        )
-
-        return firstRunCycleRange == 891...910 &&
-            flow.pages.count == 4 &&
-            flow.presentationKind == .pagedOnboarding &&
-            flow.openingTrigger == .appFirstLaunch &&
-            flow.usesReusableStorageContract &&
-            flow.pages.allSatisfy { (80...125).contains($0.wordCount) } &&
-            flow.pages.allSatisfy(\.containsRequiredTopics) &&
-            initiallyPresents &&
-            dismissedStaysHidden &&
-            nextVersionShows
-    }
-
     public static var firstBattleGuidanceHints: [TutorialHint] {
         [
             TutorialHint(
-                id: "firstBattleGuidance-orientation",
+                id: FirstBattleGuidanceHintID.orientation.rawValue,
                 trigger: .battleOpened,
                 order: 1,
                 title: "You Are The Blocking Force",
@@ -430,7 +436,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["Tuchola Forest", "Polish", "delaying"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-board",
+                id: FirstBattleGuidanceHintID.board.rawValue,
                 trigger: .boardVisible,
                 order: 2,
                 title: "Read The Board Before Acting",
@@ -439,7 +445,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["strategy", "objectives", "terrain"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-selection",
+                id: FirstBattleGuidanceHintID.selection.rawValue,
                 trigger: .unitSelection,
                 order: 3,
                 title: "Select A Ready Unit",
@@ -448,7 +454,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["Click", "inspector", "Next Ready"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-objectives",
+                id: FirstBattleGuidanceHintID.objectives.rawValue,
                 trigger: .objectiveInspection,
                 order: 4,
                 title: "Objectives Explain The Plan",
@@ -457,7 +463,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["objectives", "bridges", "withdrawal"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-movement",
+                id: FirstBattleGuidanceHintID.movement.rawValue,
                 trigger: .movementDrag,
                 order: 5,
                 title: "Drag To Move, Then Anchor",
@@ -466,7 +472,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["movement", "drag", "feedback"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-phase",
+                id: FirstBattleGuidanceHintID.phase.rawValue,
                 trigger: .phaseAdvance,
                 order: 6,
                 title: "Phases Set What Is Legal",
@@ -475,7 +481,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["movement", "shooting", "assault"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-shooting",
+                id: FirstBattleGuidanceHintID.shooting.rawValue,
                 trigger: .shooting,
                 order: 7,
                 title: "Shoot To Disrupt, Not To Duel",
@@ -484,7 +490,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["shooting", "German tempo", "Resolve Pending"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-assault",
+                id: FirstBattleGuidanceHintID.assault.rawValue,
                 trigger: .assault,
                 order: 8,
                 title: "Assault Is A Commitment",
@@ -493,7 +499,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["Assaults", "objective", "follow-up"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-blocked",
+                id: FirstBattleGuidanceHintID.blocked.rawValue,
                 trigger: .blockedAction,
                 order: 9,
                 title: "Blocked Actions Are Useful",
@@ -502,7 +508,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["blocked action", "rules", "feedback"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-germanAI",
+                id: FirstBattleGuidanceHintID.germanAI.rawValue,
                 trigger: .germanAITurn,
                 order: 10,
                 title: "Let The German AI Reveal Pressure",
@@ -511,7 +517,7 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["German Turn", "AI", "delay"]
             ),
             TutorialHint(
-                id: "firstBattleGuidance-debrief",
+                id: FirstBattleGuidanceHintID.debrief.rawValue,
                 trigger: .debrief,
                 order: 11,
                 title: "Debrief Saves The Lesson",
@@ -520,39 +526,6 @@ public enum GuderianTutorialCatalog {
                 requiredTopics: ["debrief", "campaign persistence", "checkbox"]
             ),
         ]
-    }
-
-    public static var acceptanceReadyThroughCycle930: Bool {
-        let flow = firstBattleGuidanceFlow
-        var coordinator = TutorialHintCoordinator()
-        for trigger in requiredFirstBattleTriggers {
-            coordinator.record(trigger, in: flow)
-        }
-
-        let orderedHints = flow.orderedHints
-        let firstHint = coordinator.activeHint(in: flow)
-        for _ in orderedHints.indices {
-            coordinator.completeActiveHint(in: flow)
-        }
-        let allHintsCompleted = coordinator.progress.isComplete(flow)
-        coordinator.dismiss(flow)
-
-        return cycleRange == 891...930 &&
-            firstBattleCycleRange == 911...930 &&
-            acceptanceReadyThroughCycle910 &&
-            flow.presentationKind == .contextualBattleHints &&
-            flow.openingTrigger == .battleOpened &&
-            flow.pages.isEmpty &&
-            flow.hints.count == requiredFirstBattleTriggers.count &&
-            orderedHints.map(\.order) == Array(1...orderedHints.count) &&
-            Set(flow.hints.map(\.trigger)) == Set(requiredFirstBattleTriggers) &&
-            flow.hints.allSatisfy { $0.accessibilityIdentifier.hasPrefix("first-battle-tutorial-hint-") } &&
-            flow.hints.allSatisfy { (28...55).contains($0.wordCount) } &&
-            flow.hints.allSatisfy(\.containsRequiredTopics) &&
-            flow.usesReusableStorageContract &&
-            firstHint?.trigger == .battleOpened &&
-            allHintsCompleted &&
-            coordinator.progress.shouldPresent(flow) == false
     }
 
     public static let requiredFirstBattleTriggers: [TutorialTrigger] = [
@@ -568,77 +541,4 @@ public enum GuderianTutorialCatalog {
         .germanAITurn,
         .debrief,
     ]
-}
-
-public struct GuderianTutorialAcceptanceReport: Codable, Hashable, Sendable {
-    public let cycleRange: ClosedRange<Int>
-    public let firstRunReady: Bool
-    public let firstBattleReady: Bool
-    public let reusableModelReady: Bool
-    public let firstBattleHintCount: Int
-    public let requiredTriggers: [TutorialTrigger]
-    public let storageKeys: [TutorialStorageKey]
-    public let uiAccessibilityIdentifiers: [String]
-    public let remainingCycles: Int
-    public let blockers: [String]
-
-    public var isReady: Bool {
-        cycleRange == 911...930 &&
-            firstRunReady &&
-            firstBattleReady &&
-            reusableModelReady &&
-            firstBattleHintCount == requiredTriggers.count &&
-            storageKeys.contains(GuderianTutorialCatalog.firstRunHistoryStorageKey) &&
-            storageKeys.contains(GuderianTutorialCatalog.firstBattleGuidanceStorageKey) &&
-            uiAccessibilityIdentifiers.contains("first-run-history-tutorial") &&
-            uiAccessibilityIdentifiers.contains("first-battle-tutorial-hint") &&
-            remainingCycles == 0 &&
-            blockers.isEmpty
-    }
-}
-
-public enum GuderianTutorialAcceptanceCatalog {
-    public static let cycleRange = 911...930
-
-    public static var report: GuderianTutorialAcceptanceReport {
-        let firstRunReady = GuderianTutorialCatalog.acceptanceReadyThroughCycle910
-        let firstBattleReady = GuderianTutorialCatalog.acceptanceReadyThroughCycle930
-        let flow = GuderianTutorialCatalog.firstBattleGuidanceFlow
-
-        var blockers: [String] = []
-        if !firstRunReady {
-            blockers.append("First-run historical tutorial is not acceptance-ready.")
-        }
-        if !firstBattleReady {
-            blockers.append("First-battle contextual tutorial is not acceptance-ready.")
-        }
-        if !flow.usesReusableStorageContract {
-            blockers.append("First-battle tutorial does not use the reusable storage contract.")
-        }
-
-        return GuderianTutorialAcceptanceReport(
-            cycleRange: cycleRange,
-            firstRunReady: firstRunReady,
-            firstBattleReady: firstBattleReady,
-            reusableModelReady: flow.usesReusableStorageContract,
-            firstBattleHintCount: flow.hints.count,
-            requiredTriggers: GuderianTutorialCatalog.requiredFirstBattleTriggers,
-            storageKeys: [
-                GuderianTutorialCatalog.firstRunHistoryStorageKey,
-                GuderianTutorialCatalog.firstBattleGuidanceStorageKey,
-            ],
-            uiAccessibilityIdentifiers: [
-                "first-run-history-tutorial",
-                "first-battle-tutorial-hint",
-                "first-battle-tutorial-do-not-show-again",
-                "first-battle-tutorial-next-button",
-            ],
-            remainingCycles: 0,
-            blockers: blockers
-        )
-    }
-
-    public static var acceptanceReadyThroughCycle930: Bool {
-        report.isReady
-    }
 }

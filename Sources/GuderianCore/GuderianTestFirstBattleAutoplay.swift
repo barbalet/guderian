@@ -537,7 +537,7 @@ public final class GuderianTestFirstBattleRunController {
 
     private func movementPriorityNames(for activePlayer: NativeBoardPlayer) -> [String] {
         if activePlayer == .guderianAI {
-            return germanPlan.targetPriorities
+            return germanPlan.targetPriorities(for: .movement)
         }
 
         if scenario.id == .tucholaForest {

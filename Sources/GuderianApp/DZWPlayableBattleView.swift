@@ -5,6 +5,7 @@ import SwiftUI
 
 private let dzwPlayableLog = Logger(subsystem: "com.barbalet.guderian", category: "DZWPlayableBattle")
 
+#if DEBUG
 @MainActor
 private func logDZWWindowSnapshot(_ context: String) {
     let windows = NSApp.windows.map { window in
@@ -17,42 +18,31 @@ private func logDZWWindowSnapshot(_ context: String) {
 
     dzwPlayableLog.info("Window snapshot [\(context, privacy: .public)] count=\(NSApp.windows.count, privacy: .public) windows=\(windows, privacy: .public)")
 }
+#else
+@MainActor
+private func logDZWWindowSnapshot(_ context: String) {}
+#endif
 
 private protocol DZWPlayableBoardSession: AnyObject {
-    func playableBoardSnapshot() -> NativeBoardSnapshot
+    func snapshot() -> NativeBoardSnapshot
     func selectUnit(_ id: Int)
     func selectTarget(_ id: Int)
     func selectFirstActiveUnit()
     func selectNearestEnemyToSelectedUnit()
-    @discardableResult
     func moveSelectedUnitTowardNearestObjective(maxDistance: Double) -> Bool
-    @discardableResult
     func moveSelectedUnitTowardPriorityObjective(named priorityNames: [String], maxDistance: Double) -> Bool
-    @discardableResult
     func moveUnit(_ id: Int, to point: NativeBattleCoordinate) -> Bool
-    @discardableResult
     func rotateUnit(_ id: Int, to facingDegrees: Double) -> Bool
-    @discardableResult
     func toggleCover(for id: Int, enabled: Bool) -> Bool
-    @discardableResult
     func toggleHullDown(for id: Int, enabled: Bool) -> Bool
-    @discardableResult
     func shootUnit(_ attackerID: Int, targetID: Int) -> Bool
-    @discardableResult
     func assaultUnit(_ attackerID: Int, targetID: Int, advance: Bool) -> Bool
-    @discardableResult
     func shootSelectedTarget() -> Bool
-    @discardableResult
     func resolveFirstPendingChoice() -> Bool
     func advancePhase()
 }
 
-extension NativeBoardSession: DZWPlayableBoardSession {
-    func playableBoardSnapshot() -> NativeBoardSnapshot {
-        snapshot()
-    }
-}
-
+extension NativeBoardSession: DZWPlayableBoardSession {}
 extension LateCareerNativeBoardSession: DZWPlayableBoardSession {}
 
 private enum DZWPlayableCompletionRecord {
@@ -125,7 +115,7 @@ private enum DZWPlayableBattleSource {
     var aiTargetPriorities: [String] {
         switch self {
         case .fieldCommand(let scenario):
-            return ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities
+            return ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities(for: .movement)
         case .lateCareer(let entry):
             return LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)?.priorities.map(\.targetName) ?? []
         }
@@ -161,8 +151,8 @@ private enum DZWPlayableBattleSource {
 
 @MainActor
 private final class DZWPlayableBattleViewModel: ObservableObject {
-    static let boardWidth: CGFloat = 72
-    static let boardHeight: CGFloat = 48
+    static let boardWidth = CGFloat(game_board_width())
+    static let boardHeight = CGFloat(game_board_height())
 
     @Published private(set) var snapshot: NativeBoardSnapshot?
     @Published private(set) var lastError: String = ""
@@ -338,7 +328,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         guard let selectedUnit else {
             return
         }
-        session?.rotateUnit(selectedUnit.id, to: selectedUnit.facingDegrees + degrees)
+        let rotated = session?.rotateUnit(selectedUnit.id, to: selectedUnit.facingDegrees + degrees) ?? false
+        logBoardActionFailure(rotated, action: "Rotate selected unit")
         refresh()
     }
 
@@ -346,7 +337,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         guard let selectedUnit else {
             return
         }
-        session?.toggleCover(for: selectedUnit.id, enabled: enabled)
+        let toggled = session?.toggleCover(for: selectedUnit.id, enabled: enabled) ?? false
+        logBoardActionFailure(toggled, action: "Toggle cover")
         refresh()
     }
 
@@ -354,7 +346,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         guard let selectedUnit else {
             return
         }
-        session?.toggleHullDown(for: selectedUnit.id, enabled: enabled)
+        let toggled = session?.toggleHullDown(for: selectedUnit.id, enabled: enabled) ?? false
+        logBoardActionFailure(toggled, action: "Toggle hull down")
         refresh()
     }
 
@@ -381,7 +374,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func resolvePendingChoice() {
-        session?.resolveFirstPendingChoice()
+        let resolved = session?.resolveFirstPendingChoice() ?? false
+        logBoardActionFailure(resolved, action: "Resolve pending choice")
         refresh()
         dzwPlayableLog.info("Resolve pending choice requested.")
     }
@@ -412,20 +406,24 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
         let before = "\(snapshot.activePlayer.rawValue) \(snapshot.phase.rawValue)"
         dzwPlayableLog.info("Automated active step started state=\(before, privacy: .public) turn=\(snapshot.turnNumber, privacy: .public)")
+        let actionSucceeded: Bool
         switch snapshot.phase {
         case .movement:
             if snapshot.activePlayer == .guderianAI {
-                session?.moveSelectedUnitTowardPriorityObjective(named: aiTargetPriorities, maxDistance: 6)
+                actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: aiTargetPriorities, maxDistance: 6) ?? false
             } else {
-                session?.moveSelectedUnitTowardNearestObjective(maxDistance: 4)
+                actionSucceeded = session?.moveSelectedUnitTowardNearestObjective(maxDistance: 4) ?? false
             }
         case .shooting:
             session?.selectNearestEnemyToSelectedUnit()
-            _ = session?.shootSelectedTarget()
+            actionSucceeded = session?.shootSelectedTarget() ?? false
         case .assault:
-            _ = session?.resolveFirstPendingChoice()
+            actionSucceeded = session?.resolveFirstPendingChoice() ?? false
         }
-        let actionDetail = session?.playableBoardSnapshot().lastAction.detail ?? "No action resolved."
+        let actionDetail = session?.snapshot().lastAction.detail ?? "No action resolved."
+        if !actionSucceeded {
+            recordAIEvent("\(before): blocked or unavailable action - \(actionDetail)")
+        }
         session?.advancePhase()
         refresh()
         recordAIEvent("\(before): \(actionDetail)")
@@ -627,8 +625,16 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     private func refresh() {
-        snapshot = session?.playableBoardSnapshot()
+        snapshot = session?.snapshot()
         lastError = snapshot?.lastAction.detail ?? "Board session unavailable."
+    }
+
+    private func logBoardActionFailure(_ succeeded: Bool, action: String) {
+        guard !succeeded else {
+            return
+        }
+        let detail = session?.snapshot().lastAction.detail ?? "Board session unavailable."
+        dzwPlayableLog.warning("\(action, privacy: .public) returned false detail=\(detail, privacy: .public)")
     }
 
     @discardableResult
@@ -752,6 +758,10 @@ private enum DZWPlayableBattlePanel: String, CaseIterable, Identifiable {
             return "list.bullet.rectangle"
         }
     }
+
+    var windowIdentifier: NSUserInterfaceItemIdentifier {
+        NSUserInterfaceItemIdentifier("com.barbalet.guderian.dzwPlayableBattle.\(rawValue)")
+    }
 }
 
 @MainActor
@@ -759,7 +769,6 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
     @Published private(set) var visiblePanels: Set<DZWPlayableBattlePanel> = []
 
     private var windows: [DZWPlayableBattlePanel: NSWindow] = [:]
-    private var panelsByWindowID: [ObjectIdentifier: DZWPlayableBattlePanel] = [:]
 
     func showDefaults(
         model: DZWPlayableBattleViewModel,
@@ -824,15 +833,14 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
             window.close()
         }
         windows.removeAll()
-        panelsByWindowID.removeAll()
         visiblePanels.removeAll()
         logDZWWindowSnapshot("dzw-panel-close-all")
     }
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow,
-              let panel = panelsByWindowID[ObjectIdentifier(window)] else {
-            dzwPlayableLog.info("Panel windowWillClose received for unknown window.")
+              let panel = panel(for: window) else {
+            dzwPlayableLog.info("Panel windowWillClose received for unknown window identifier=\(notification.object.debugDescription, privacy: .public)")
             return
         }
         visiblePanels.remove(panel)
@@ -847,13 +855,17 @@ private final class DZWPlayableBattleWindowCoordinator: NSObject, ObservableObje
             defer: false
         )
         window.title = "Guderian \(panel.title)"
+        window.identifier = panel.windowIdentifier
         window.minSize = panel.minimumSize
         window.isReleasedWhenClosed = false
         window.delegate = self
         windows[panel] = window
-        panelsByWindowID[ObjectIdentifier(window)] = panel
         dzwPlayableLog.info("Panel window created panel=\(panel.rawValue, privacy: .public) title=\(window.title, privacy: .public) frame=\(NSStringFromRect(window.frame), privacy: .public)")
         return window
+    }
+
+    private func panel(for window: NSWindow) -> DZWPlayableBattlePanel? {
+        windows.first { _, storedWindow in storedWindow === window }?.key
     }
 
     private func defaultFrame(for panel: DZWPlayableBattlePanel) -> CGRect {
@@ -1443,7 +1455,7 @@ public struct DZWPlayableBattleView: View {
                     .zIndex(20)
                 }
             }
-            .background(Color(red: 0.10, green: 0.14, blue: 0.10))
+            .background(GuderianAppPalette.battlefieldBackground)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("battle-screen")
             .onAppear {

@@ -6,26 +6,21 @@ import SwiftUI
 
 private let guderianCampaignLog = Logger(subsystem: "com.barbalet.guderian", category: "GuderianCampaign")
 
+private enum GuderianCampaignStorageKeys {
+    static let legacyCampaignSave = UnifiedCampaignSaveCodec.migratedCampaignStorageKey
+    static let lateCareerProgress = UnifiedCampaignSaveCodec.migratedLateCareerStorageKey
+    static let unifiedCampaignSave = UnifiedCampaignSaveCodec.appStorageKey
+}
+
 private enum LateCareerScopeFilter: String, CaseIterable, Identifiable {
-    case all
-    case inspectorGeneral
-    case armyGeneralStaff
-    case epilogue
+    case all = "All"
+    case inspectorGeneral = "Inspector"
+    case armyGeneralStaff = "General Staff"
+    case epilogue = "Epilogue"
 
     var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .all:
-            return "All"
-        case .inspectorGeneral:
-            return "Inspector"
-        case .armyGeneralStaff:
-            return "General Staff"
-        case .epilogue:
-            return "Epilogue"
-        }
-    }
+    var title: String { rawValue }
 
     var scope: GuderianCommandScope? {
         switch self {
@@ -62,9 +57,8 @@ public struct GuderianCampaignView: View {
     @State private var hasLoadedLateCareerState = false
     @State private var hasEvaluatedFirstRunTutorial = false
     @State private var showsFirstRunTutorial = false
-    @AppStorage("guderian.campaignSaveState.v1") private var savedCampaignStateData = Data()
-    @AppStorage("guderian.lateCareerProgress.v1") private var savedLateCareerProgressData = Data()
-    @AppStorage("guderian.unifiedCampaignSave.v2") private var savedUnifiedCampaignStateData = Data()
+    @AppStorage(GuderianCampaignStorageKeys.lateCareerProgress) private var savedLateCareerProgressData = Data()
+    @AppStorage(GuderianCampaignStorageKeys.unifiedCampaignSave) private var savedUnifiedCampaignStateData = Data()
     @AppStorage("guderian.tutorial.firstRunHistory.v1.dismissed") private var firstRunHistoryDismissed = false
 
     private var selectedScenario: GuderianScenario {
@@ -123,7 +117,7 @@ public struct GuderianCampaignView: View {
             .navigationDestination(for: UnifiedGuderianBattleID.self) { id in
                 switch id.kind {
                 case .fieldCommand:
-                    if let battleID = GuderianBattleID(rawValue: id.rawValue),
+                    if let battleID = id.fieldCommandID,
                        let scenario = scenarios.first(where: { $0.id == battleID }) {
                         ScenarioBriefingView(
                             scenario: scenario,
@@ -289,8 +283,7 @@ public struct GuderianCampaignView: View {
                         return
                     }
                     selectedBattleID = row.id
-                    if row.id.kind == .fieldCommand,
-                       let battleID = GuderianBattleID(rawValue: row.id.rawValue) {
+                    if let battleID = row.id.fieldCommandID {
                         selectedID = battleID
                     }
                 })
@@ -361,7 +354,7 @@ public struct GuderianCampaignView: View {
     private func markSelectedBattleComplete() {
         switch selectedBattleID.kind {
         case .fieldCommand:
-            guard let battleID = GuderianBattleID(rawValue: selectedBattleID.rawValue),
+            guard let battleID = selectedBattleID.fieldCommandID,
                   let scenario = scenarios.first(where: { $0.id == battleID }) else {
                 return
             }
@@ -392,14 +385,6 @@ public struct GuderianCampaignView: View {
     }
 
     private func persistCampaignState() {
-        let state = CampaignSaveState(
-            selectedScenarioID: selectedScenario.id,
-            playMode: playMode,
-            progress: progress
-        )
-        if let data = try? CampaignSaveCodec.encode(state) {
-            savedCampaignStateData = data
-        }
         persistUnifiedCampaignState()
     }
 
@@ -409,22 +394,25 @@ public struct GuderianCampaignView: View {
         }
         hasLoadedSaveState = true
 
+        let legacyCampaignData = Self.legacyCampaignStateData()
         let envelope = UnifiedCampaignSaveCodec.decodeOrMigrate(
             unifiedData: savedUnifiedCampaignStateData,
-            legacyCampaignData: savedCampaignStateData,
+            legacyCampaignData: legacyCampaignData,
             legacyLateCareerData: savedLateCareerProgressData
         )
         progress = envelope.progress.fieldCommandProgress
         lateCareerProgress = envelope.progress.lateCareerProgress
         playMode = envelope.playMode
         selectedBattleID = envelope.selectedBattleID
-        if envelope.selectedBattleID.kind == .fieldCommand,
-           let battleID = GuderianBattleID(rawValue: envelope.selectedBattleID.rawValue),
+        if let battleID = envelope.selectedBattleID.fieldCommandID,
            scenarios.contains(where: { $0.id == battleID }) {
             selectedID = battleID
         }
         hasLoadedLateCareerState = true
         persistUnifiedCampaignState()
+        if !legacyCampaignData.isEmpty {
+            Self.clearLegacyCampaignStateData()
+        }
     }
 
     private func persistLateCareerState() {
@@ -456,6 +444,14 @@ public struct GuderianCampaignView: View {
         }
 
         lateCareerProgress = progress
+    }
+
+    private static func legacyCampaignStateData() -> Data {
+        UserDefaults.standard.data(forKey: GuderianCampaignStorageKeys.legacyCampaignSave) ?? Data()
+    }
+
+    private static func clearLegacyCampaignStateData() {
+        UserDefaults.standard.removeObject(forKey: GuderianCampaignStorageKeys.legacyCampaignSave)
     }
 
     private func presentFirstRunTutorialIfNeeded() {
@@ -808,7 +804,7 @@ struct LateCareerUnifiedPlayableBoardView: View {
     }
 
     private var boardSnapshot: LateCareerNativeBoardSnapshot? {
-        LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(790_000 + entry.order))?.snapshot()
+        LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(790_000 + entry.order))?.lateCareerSnapshot()
     }
 
     private var playableControls: some View {
@@ -2275,6 +2271,9 @@ struct ScenarioBriefingView: View {
                 .font(.body.weight(.medium))
             Text(aiPlan.strategicGoal)
                 .font(.callout)
+                .foregroundStyle(.secondary)
+            Text(aiPlan.executionMode.rawValue)
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
             ForEach(aiPlan.orders) { order in
                 HStack(alignment: .firstTextBaseline) {
