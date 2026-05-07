@@ -3,4 +3,5 @@
 // app UI, and automation share one stable import while the reusable engine
 // target remains content-agnostic.
 @_exported import DerZweiteWeltkriegCore
+@_exported import DerZweiteWeltkriegHistorical
 @_exported import DerZweiteWeltkriegGuderian

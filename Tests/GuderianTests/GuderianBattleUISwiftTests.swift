@@ -118,6 +118,29 @@ struct GuderianBattleUISwiftTests {
         #expect(GuderianTestFirstBattleAutoplayContract.requiredAccessibilityIdentifiers.contains("guderian-test-result-summary"))
     }
 
+    @Test("Cycles 41-60 Guderian exposes first-battle autoplay through shared historical contracts")
+    func guderianTestSharedHistoricalAutoplayAdapterIsReady() throws {
+        let historicalScenario = try GuderianTestFirstBattleAutoplayContract.sharedHistoricalScenario()
+        let contract = GuderianTestFirstBattleAutoplayContract.sharedHistoricalAutoplayContract
+        let report = GuderianHistoricalAutoplayCatalog.rewriteReport
+        let nativeScenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let configuration = GuderianHistoricalAutoplayCatalog.configuration(for: nativeScenario)
+
+        #expect(report.isReady)
+        #expect(historicalScenario.id == .tucholaForest)
+        #expect(historicalScenario.hasTwoPlayableSides)
+        #expect(historicalScenario.sideOptions.map(\.id) == [
+            GuderianHistoricalSideID.guderianCommand,
+            GuderianHistoricalSideID.opposingForce,
+        ])
+        #expect(contract.embeddedBattleSurfaceName == HistoricalPlayableSurfaceCatalog.sharedHostSurfaceName)
+        #expect(contract.retiredEmbeddedSurfaceNames.contains("DZWPlayableBattleView"))
+        #expect(contract.isFirstBattleAutoplayContract)
+        #expect(configuration.seed == GuderianHistoricalAutoplayCatalog.defaultSeed)
+        #expect(configuration.sidePlans.count == 2)
+        #expect(GuderianTestFirstBattleAutoplayContract.embeddedBattleSurfaceName == "DZWPlayableBattleView")
+    }
+
     @Test("Cycles 931-940 GuderianTest first-battle controller reaches a real debrief")
     func guderianTestFirstBattleAutoplayControllerCompletesTuchola() throws {
         let controller = try GuderianTestFirstBattleRunController()

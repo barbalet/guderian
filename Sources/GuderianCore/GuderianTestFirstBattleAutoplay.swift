@@ -76,6 +76,17 @@ public enum GuderianTestFirstBattleAutoplayContract {
         "guderian-test-result-summary",
     ]
 
+    public static var sharedHistoricalAutoplayContract: HistoricalAutoplayContract {
+        GuderianHistoricalAutoplayCatalog.firstBattleContract
+    }
+
+    public static func sharedHistoricalScenario() throws -> HistoricalBattleScenario<GuderianBattleID> {
+        guard let scenario = GuderianHistoricalAutoplayCatalog.firstBattleScenario() else {
+            throw GuderianTestFirstBattleAutoplayError.missingPrimaryScenario(primaryBattleID)
+        }
+        return scenario
+    }
+
     public static func primaryScenario() throws -> GuderianScenario {
         guard let scenario = GuderianCampaignCatalog.scenario(id: primaryBattleID) else {
             throw GuderianTestFirstBattleAutoplayError.missingPrimaryScenario(primaryBattleID)

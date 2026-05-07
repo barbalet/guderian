@@ -28,6 +28,7 @@ let package = Package(
             name: "GuderianCore",
             dependencies: [
                 .product(name: "DerZweiteWeltkriegCore", package: "dzw"),
+                .product(name: "DerZweiteWeltkriegHistorical", package: "dzw"),
                 .product(name: "DerZweiteWeltkriegGuderian", package: "dzw"),
             ],
             path: "Sources/GuderianCore"
