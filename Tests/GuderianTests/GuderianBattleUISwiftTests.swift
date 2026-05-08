@@ -1,4 +1,5 @@
 import DerZweiteWeltkriegHistorical
+import Foundation
 import GuderianCore
 import SwiftUI
 import Testing
@@ -185,6 +186,23 @@ struct GuderianBattleUISwiftTests {
         #expect(historicalScenario.sideOption(id: GuderianHistoricalSideID.guderianCommand)?.title == "Guderian's command")
         #expect(historicalScenario.sideOption(id: GuderianHistoricalSideID.opposingForce)?.title == "Opposing army")
         #expect(String(describing: type(of: picker)).contains("HistoricalBattleSidePicker"))
+    }
+
+    @Test("Guderian battle selection keeps the side dropdown outside the navigation link")
+    func guderianBattleSelectionDropdownIsSeparateFromNavigationLink() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+        let rowFunction = try #require(source.range(of: "private func unifiedBattleSelectionRow"))
+        let nextFunction = try #require(source.range(of: "private func fieldCommandScenario"))
+        let rowSource = String(source[rowFunction.lowerBound..<nextFunction.lowerBound])
+        let navigationLink = try #require(rowSource.range(of: "NavigationLink(value: row.id)"))
+        let sidePicker = try #require(rowSource.range(of: "HistoricalBattleSidePicker"))
+
+        #expect(navigationLink.upperBound < sidePicker.lowerBound)
+        #expect(rowSource.contains("UnifiedCampaignBattleRow(row: row)"))
+        #expect(rowSource.contains("battle-selection-side-picker-\\(row.id.rawValue)"))
     }
 
     @Test("Cycles 931-940 GuderianTest first-battle controller reaches a real debrief")

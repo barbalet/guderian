@@ -279,28 +279,28 @@ public struct GuderianCampaignView: View {
     private var unifiedBattleListSection: some View {
         Section(UnifiedCampaignListCatalog.sectionTitle) {
             ForEach(unifiedRows) { row in
-                NavigationLink(value: row.id) {
-                    unifiedBattleSelectionLabel(for: row)
-                }
-                .disabled(!row.isAvailable)
-                .simultaneousGesture(TapGesture().onEnded {
-                    guard row.isAvailable else {
-                        return
-                    }
-                    selectedBattleID = row.id
-                    if let battleID = row.id.fieldCommandID {
-                        selectedID = battleID
-                    }
-                })
-                .accessibilityIdentifier(row.navigationAccessibilityIdentifier)
+                unifiedBattleSelectionRow(for: row)
             }
         }
     }
 
     @ViewBuilder
-    private func unifiedBattleSelectionLabel(for row: UnifiedCampaignListRow) -> some View {
+    private func unifiedBattleSelectionRow(for row: UnifiedCampaignListRow) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            UnifiedCampaignBattleRow(row: row)
+            NavigationLink(value: row.id) {
+                UnifiedCampaignBattleRow(row: row)
+            }
+            .disabled(!row.isAvailable)
+            .simultaneousGesture(TapGesture().onEnded {
+                guard row.isAvailable else {
+                    return
+                }
+                selectedBattleID = row.id
+                if let battleID = row.id.fieldCommandID {
+                    selectedID = battleID
+                }
+            })
+            .accessibilityIdentifier(row.navigationAccessibilityIdentifier)
 
             if let scenario = fieldCommandScenario(for: row) {
                 HistoricalBattleSidePicker(
