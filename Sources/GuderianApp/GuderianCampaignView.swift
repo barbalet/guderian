@@ -1591,6 +1591,7 @@ struct ScenarioBriefingView: View {
     let shipReport: FullCampaignShipReport
     let onCompletion: (CampaignCompletionRecord) -> Void
     @State private var logCategory: ScenarioLogCategory? = nil
+    @AppStorage("guderian.campaign.selected-side.v1") private var selectedSideID = GuderianHistoricalSideSelectionResolver.defaultHumanSideID
 
     var loadout: DZWScenarioLoadout? {
         DZWScenarioLoader.load(scenario.id)
@@ -1618,6 +1619,16 @@ struct ScenarioBriefingView: View {
 
     var historicalOverlay: ScenarioHistoricalOverlay {
         content.historicalOverlay
+    }
+
+    var historicalScenario: HistoricalBattleScenario<GuderianBattleID> {
+        GuderianHistoricalScenarioAdapter.scenario(for: scenario)
+    }
+
+    var effectiveSelectedSideID: String {
+        historicalScenario.sideOption(id: selectedSideID) == nil
+            ? GuderianHistoricalSideSelectionResolver.defaultHumanSideID
+            : selectedSideID
     }
 
     var aiSnapshot: GermanAISnapshot {
@@ -1657,13 +1668,59 @@ struct ScenarioBriefingView: View {
 
     var body: some View {
         if PlayableBattleSurfaceCatalog.isRoutedToPlayableScreen(scenario.id) {
-            DZWPlayableBattleView(scenario: scenario, onCompletion: onCompletion)
-                .id(scenario.id)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .windowBackgroundColor))
+            VStack(spacing: 0) {
+                fieldCommandSideSelector
+                    .padding(.horizontal, 18)
+                    .padding(.top, 14)
+                    .padding(.bottom, 10)
+                    .background(Color(nsColor: .windowBackgroundColor))
+
+                DZWPlayableBattleView(
+                    scenario: scenario,
+                    chosenSideID: effectiveSelectedSideID,
+                    onCompletion: onCompletion
+                )
+                .id("\(scenario.id.rawValue)-\(effectiveSelectedSideID)")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .windowBackgroundColor))
         } else {
             briefingWorkspace
         }
+    }
+
+    private var fieldCommandSideSelector: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Playable Side", systemImage: "person.crop.circle.badge.checkmark")
+                    .font(.headline)
+                Text("\(historicalScenario.sideOption(id: effectiveSelectedSideID)?.title ?? "Selected side") under human control")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minWidth: 240, alignment: .leading)
+
+            ForEach(historicalScenario.sideOptions) { side in
+                Button {
+                    selectedSideID = side.id
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label(side.title, systemImage: side.role == .protagonist ? "bolt.horizontal" : "shield.lefthalf.filled")
+                            .font(.callout.weight(.semibold))
+                        Text(side.playerBriefing)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+                .tint(effectiveSelectedSideID == side.id ? Color.accentColor : Color.secondary)
+                .accessibilityIdentifier("guderian-side-option-\(side.id)")
+                .help(side.playerBriefing)
+            }
+        }
+        .accessibilityIdentifier("battle-side-selector")
     }
 
     private var briefingWorkspace: some View {

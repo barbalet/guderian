@@ -78,7 +78,7 @@ private struct DZWPlayableBattleCompletionDisplay {
 }
 
 private enum DZWPlayableBattleSource {
-    case fieldCommand(GuderianScenario)
+    case fieldCommand(GuderianScenario, chosenSideID: String)
     case lateCareer(LateCareerGuderianPresentation)
 
     var boardTitle: String {
@@ -87,7 +87,7 @@ private enum DZWPlayableBattleSource {
 
     var battleTitle: String {
         switch self {
-        case .fieldCommand(let scenario):
+        case .fieldCommand(let scenario, _):
             return scenario.title
         case .lateCareer(let entry):
             return entry.title
@@ -105,26 +105,78 @@ private enum DZWPlayableBattleSource {
 
     var matchupText: String {
         switch self {
-        case .fieldCommand(let scenario):
+        case .fieldCommand(let scenario, let chosenSideID):
+            let seed = Self.fieldCommandSeed(for: scenario, restartCount: 0)
+            if let selection = try? GuderianHistoricalSideSelectionResolver.resolvedSelection(
+                for: scenario,
+                chosenHumanSideID: chosenSideID,
+                seed: seed
+            ) {
+                return "\(selection.selectedSideTitle) vs \(selection.opposingSideTitle)"
+            }
             return "\(scenario.playerForceSummary) vs \(scenario.guderianCommand)"
         case .lateCareer(let entry):
             return "\(entry.playerRole) vs \(entry.germanContext)"
         }
     }
 
-    var aiTargetPriorities: [String] {
+    var humanPlayer: NativeBoardPlayer {
         switch self {
-        case .fieldCommand(let scenario):
-            return ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities(for: .movement)
+        case .fieldCommand(_, let chosenSideID):
+            return GuderianHistoricalSideSelectionResolver.nativePlayer(for: chosenSideID) ?? .player
+        case .lateCareer:
+            return .player
+        }
+    }
+
+    var aiPlayer: NativeBoardPlayer {
+        switch humanPlayer {
+        case .guderianAI:
+            return .player
+        default:
+            return .guderianAI
+        }
+    }
+
+    var aiTurnButtonTitle: String {
+        aiPlayer == .guderianAI ? "German Turn" : "Opposing Turn"
+    }
+
+    func sideTitle(for player: NativeBoardPlayer) -> String {
+        switch self {
+        case .fieldCommand(let scenario, _):
+            return GuderianHistoricalSideSelectionResolver.sideTitle(for: player, in: scenario)
+        case .lateCareer:
+            switch player {
+            case .player:
+                return "Player force"
+            case .guderianAI:
+                return "German force"
+            case .none:
+                return "No side"
+            }
+        }
+    }
+
+    func aiTargetPriorities(for player: NativeBoardPlayer) -> [String] {
+        switch self {
+        case .fieldCommand(let scenario, _):
+            if player == .guderianAI {
+                return ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities(for: .movement)
+            }
+            return AntiGuderianAIPlanCatalog.plan(for: scenario).targetPriorities
         case .lateCareer(let entry):
             return LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)?.priorities.map(\.targetName) ?? []
         }
     }
 
-    var aiPostureName: String {
+    func aiPostureName(for player: NativeBoardPlayer) -> String {
         switch self {
-        case .fieldCommand(let scenario):
-            return ScenarioContentCatalog.bundle(for: scenario).aiPlan.postureName
+        case .fieldCommand(let scenario, _):
+            if player == .guderianAI {
+                return ScenarioContentCatalog.bundle(for: scenario).aiPlan.postureName
+            }
+            return AntiGuderianAIPlanCatalog.plan(for: scenario).postureName
         case .lateCareer:
             return "Unified German AI"
         }
@@ -132,7 +184,7 @@ private enum DZWPlayableBattleSource {
 
     var targetTurnUpperBound: Int {
         switch self {
-        case .fieldCommand(let scenario):
+        case .fieldCommand(let scenario, _):
             return ScenarioBalanceCatalog.profile(for: scenario).targetTurns.upperBound
         case .lateCareer(let entry):
             return LateCareerPlayableSurfaceCatalog.report(for: entry.id)?.scoringProfile.targetTurnUpperBound ?? 8
@@ -141,11 +193,21 @@ private enum DZWPlayableBattleSource {
 
     func makeSession(restartCount: Int) -> DZWPlayableBoardSession? {
         switch self {
-        case .fieldCommand(let scenario):
-            return NativeBoardSession(scenario: scenario, seed: UInt32(510_000 + scenario.order + restartCount * 97))
+        case .fieldCommand(let scenario, let chosenSideID):
+            let seed = Self.fieldCommandSeed(for: scenario, restartCount: restartCount)
+            let launch = try? GuderianHistoricalSideSelectionResolver.makeLaunch(
+                for: scenario,
+                chosenHumanSideID: chosenSideID,
+                seed: seed
+            )
+            return NativeBoardSession(scenario: scenario, seed: seed, launch: launch)
         case .lateCareer(let entry):
             return LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(890_000 + entry.order + restartCount * 97))
         }
+    }
+
+    private static func fieldCommandSeed(for scenario: GuderianScenario, restartCount: Int) -> UInt32 {
+        UInt32(510_000 + scenario.order + restartCount * 97)
     }
 }
 
@@ -166,18 +228,18 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     let source: DZWPlayableBattleSource
     private var session: DZWPlayableBoardSession?
     private let guderianTestController: GuderianTestFirstBattleRunController?
-    private let aiTargetPriorities: [String]
     private var restartCount = 0
 
     init(
         scenario: GuderianScenario,
+        chosenSideID: String = GuderianHistoricalSideSelectionResolver.defaultHumanSideID,
         guderianTestController: GuderianTestFirstBattleRunController? = nil
     ) {
-        self.source = .fieldCommand(scenario)
+        let resolvedSideID = guderianTestController?.session.launch.chosenHumanSideID ?? chosenSideID
+        self.source = .fieldCommand(scenario, chosenSideID: resolvedSideID)
         self.guderianTestController = guderianTestController
-        aiTargetPriorities = source.aiTargetPriorities
         aiTurnEvents = [
-            "German AI ready: \(source.aiPostureName) will pressure \(Self.prioritySummary(aiTargetPriorities))."
+            "\(source.sideTitle(for: source.aiPlayer)) AI ready: \(source.aiPostureName(for: source.aiPlayer)) will pressure \(Self.prioritySummary(source.aiTargetPriorities(for: source.aiPlayer)))."
         ]
         if let guderianTestController {
             session = guderianTestController.session
@@ -192,9 +254,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     init(lateCareerEntry: LateCareerGuderianPresentation) {
         self.source = .lateCareer(lateCareerEntry)
         guderianTestController = nil
-        aiTargetPriorities = source.aiTargetPriorities
         aiTurnEvents = [
-            "German AI ready: \(source.aiPostureName) will pressure \(Self.prioritySummary(aiTargetPriorities))."
+            "\(source.sideTitle(for: source.aiPlayer)) AI ready: \(source.aiPostureName(for: source.aiPlayer)) will pressure \(Self.prioritySummary(source.aiTargetPriorities(for: source.aiPlayer)))."
         ]
         session = source.makeSession(restartCount: restartCount)
         refresh()
@@ -219,7 +280,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     var isFirstBattleTutorialEligible: Bool {
         switch source {
-        case .fieldCommand(let scenario):
+        case .fieldCommand(let scenario, _):
             return scenario.id == .tucholaForest
         case .lateCareer:
             return false
@@ -236,6 +297,14 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     var matchupText: String {
         source.matchupText
+    }
+
+    var aiTurnButtonTitle: String {
+        source.aiTurnButtonTitle
+    }
+
+    func sideTitle(for player: NativeBoardPlayer) -> String {
+        source.sideTitle(for: player)
     }
 
     var activeUnits: [NativeBoardUnitSnapshot] {
@@ -389,7 +458,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         refresh()
         dzwPlayableLog.info("Phase advanced activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public) turn=\(self.snapshot?.turnNumber ?? -1, privacy: .public)")
         recordTutorialTrigger(.phaseAdvance)
-        if snapshot?.activePlayer == .guderianAI {
+        if snapshot?.activePlayer == source.aiPlayer {
             recordTutorialTrigger(.germanAITurn)
         }
     }
@@ -409,8 +478,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         let actionSucceeded: Bool
         switch snapshot.phase {
         case .movement:
-            if snapshot.activePlayer == .guderianAI {
-                actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: aiTargetPriorities, maxDistance: 6) ?? false
+            let priorities = source.aiTargetPriorities(for: snapshot.activePlayer)
+            if !priorities.isEmpty {
+                let distance = snapshot.activePlayer == .guderianAI ? 6.0 : 5.0
+                actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: distance) ?? false
             } else {
                 actionSucceeded = session?.moveSelectedUnitTowardNearestObjective(maxDistance: 4) ?? false
             }
@@ -447,26 +518,28 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             return
         }
 
-        dzwPlayableLog.info("German turn runner started.")
+        let aiPlayer = source.aiPlayer
+        let aiLabel = source.sideTitle(for: aiPlayer)
+        dzwPlayableLog.info("AI turn runner started aiPlayer=\(aiPlayer.rawValue, privacy: .public)")
         recordTutorialTrigger(.germanAITurn)
-        recordAIEvent("German turn runner started.")
+        recordAIEvent("\(aiLabel) AI turn runner started.")
         var safety = 0
-        while snapshot?.activePlayer != .guderianAI && isBattleOver == false && safety < 4 {
+        while snapshot?.activePlayer != aiPlayer && isBattleOver == false && safety < 4 {
             session?.advancePhase()
             refresh()
             safety += 1
         }
 
-        while snapshot?.activePlayer == .guderianAI && isBattleOver == false && safety < 10 {
+        while snapshot?.activePlayer == aiPlayer && isBattleOver == false && safety < 10 {
             runAutomatedActiveStep()
             safety += 1
         }
 
-        if snapshot?.activePlayer == .guderianAI {
-            recordAIEvent("German turn paused: action loop hit its safety cap.")
+        if snapshot?.activePlayer == aiPlayer {
+            recordAIEvent("\(aiLabel) AI turn paused: action loop hit its safety cap.")
             dzwPlayableLog.info("German turn paused at safety cap activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         } else {
-            recordAIEvent("German turn complete: control returned to \(snapshot?.activePlayer.rawValue ?? "the player").")
+            recordAIEvent("\(aiLabel) AI turn complete: control returned to \(snapshot.map { self.source.sideTitle(for: $0.activePlayer) } ?? "the player").")
             dzwPlayableLog.info("German turn complete activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         }
     }
@@ -490,7 +563,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         debriefError = nil
         playableTestGameResult = nil
         aiTurnEvents = [
-            "Battle restarted: \(source.aiPostureName) ready for \(source.battleTitle)."
+            "Battle restarted: \(source.sideTitle(for: source.aiPlayer)) AI ready for \(source.battleTitle)."
         ]
         refresh()
         dzwPlayableLog.info("Battle restarted title=\(self.source.battleTitle, privacy: .public) restartCount=\(self.restartCount, privacy: .public) session=\(self.session == nil ? "missing" : "ready", privacy: .public)")
@@ -1314,7 +1387,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                 Text(model.nativeScenarioLabel)
                     .font(.headline)
                     .foregroundStyle(Color(red: 0.55, green: 0.39, blue: 0.12))
-                Text("Turn \(snapshot.turnNumber) | \(snapshot.activePlayer.rawValue) | \(snapshot.phase.rawValue)")
+                Text("Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
                     .font(.headline)
                     .accessibilityIdentifier("battle-phase-label")
                 Text("\(snapshot.mission.name) | P1 \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) P2")
@@ -1344,7 +1417,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     markButtonCoachUsed(.germanTurn)
                     model.runGermanTurn()
                 } label: {
-                    Label("German Turn", systemImage: "forward.frame.fill")
+                    Label(model.aiTurnButtonTitle, systemImage: "forward.frame.fill")
                 }
                 .disabled(model.isBattleOver)
                 .accessibilityIdentifier("german-turn-button")
@@ -1852,6 +1925,7 @@ public struct DZWPlayableBattleView: View {
 
     public init(
         scenario: GuderianScenario,
+        chosenSideID: String = GuderianHistoricalSideSelectionResolver.defaultHumanSideID,
         showsDefaultPanels: Bool = true,
         showsTutorials: Bool = true,
         guderianTestController: GuderianTestFirstBattleRunController? = nil,
@@ -1860,6 +1934,7 @@ public struct DZWPlayableBattleView: View {
     ) {
         _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(
             scenario: scenario,
+            chosenSideID: chosenSideID,
             guderianTestController: guderianTestController
         ))
         self.showsDefaultPanels = showsDefaultPanels
@@ -2193,7 +2268,7 @@ public struct DZWPlayableBattleView: View {
                 Text(model.nativeScenarioLabel)
                     .font(.headline)
                     .foregroundStyle(Color(red: 0.92, green: 0.78, blue: 0.42))
-                Text("Turn \(snapshot.turnNumber) | \(snapshot.activePlayer.rawValue) | \(snapshot.phase.rawValue)")
+                Text("Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("battle-phase-label")
@@ -2226,7 +2301,7 @@ public struct DZWPlayableBattleView: View {
                     markButtonCoachUsed(.germanTurn)
                     model.runGermanTurn()
                 } label: {
-                    Label("German Turn", systemImage: "forward.frame.fill")
+                    Label(model.aiTurnButtonTitle, systemImage: "forward.frame.fill")
                 }
                 .disabled(model.isBattleOver)
                 .accessibilityIdentifier("german-turn-button")

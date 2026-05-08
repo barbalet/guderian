@@ -141,6 +141,29 @@ struct GuderianBattleUISwiftTests {
         #expect(GuderianTestFirstBattleAutoplayContract.embeddedBattleSurfaceName == "DZWPlayableBattleView")
     }
 
+    @Test("Guderian side selection can bind the human player to either historical side")
+    func guderianPlayableSideSelectionCanChooseGuderianCommand() throws {
+        let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let opposingLaunch = try GuderianHistoricalSideSelectionResolver.makeLaunch(
+            for: scenario,
+            chosenHumanSideID: GuderianHistoricalSideID.opposingForce,
+            seed: 620_001
+        )
+        let guderianLaunch = try GuderianHistoricalSideSelectionResolver.makeLaunch(
+            for: scenario,
+            chosenHumanSideID: GuderianHistoricalSideID.guderianCommand,
+            seed: 620_002
+        )
+        let session = try #require(NativeBoardSession(scenario: scenario, launch: guderianLaunch))
+
+        #expect(opposingLaunch.humanBinding?.enginePlayerSlot == .playerOne)
+        #expect(guderianLaunch.humanBinding?.enginePlayerSlot == .playerTwo)
+        #expect(guderianLaunch.aiBinding?.enginePlayerSlot == .playerOne)
+        #expect(session.humanPlayer == .guderianAI)
+        #expect(session.aiPlayer == .player)
+        #expect(GuderianHistoricalSideSelectionResolver.sideTitle(for: session.humanPlayer, in: scenario) == "Guderian's command")
+    }
+
     @Test("Cycles 931-940 GuderianTest first-battle controller reaches a real debrief")
     func guderianTestFirstBattleAutoplayControllerCompletesTuchola() throws {
         let controller = try GuderianTestFirstBattleRunController()
