@@ -969,23 +969,18 @@ private extension DZWPlayableBattlePanel {
 }
 
 private enum FirstBattleButtonCoachPopoverPlacement {
-    case aboveRight
-    case belowLeft
+    case above
+    case below
 
     var anchor: PopoverAttachmentAnchor {
-        switch self {
-        case .aboveRight:
-            return .point(.topTrailing)
-        case .belowLeft:
-            return .point(.bottomLeading)
-        }
+        .rect(.bounds)
     }
 
     var arrowEdge: Edge {
         switch self {
-        case .aboveRight:
+        case .above:
             return .bottom
-        case .belowLeft:
+        case .below:
             return .top
         }
     }
@@ -1056,13 +1051,17 @@ private struct FirstBattleButtonCoachModifier: ViewModifier {
     let progress: FirstBattleButtonCoachProgress
     let completedFirstGame: Bool
 
-    @State private var isHovering = false
+    @State private var isAnchorHovering = false
+    @State private var isDialogHovering = false
+    @State private var isPopoverPresented = false
+    @State private var hoverRevision = 0
     @State private var buttonFrame: CGRect = .zero
     @State private var windowSize: CGSize = .zero
 
-    private let dialogWidth: CGFloat = 270
     private let dialogHeightEstimate: CGFloat = 120
     private let edgePadding: CGFloat = 20
+    private let presentationDelay: Duration = .milliseconds(180)
+    private let dismissalDelay: Duration = .milliseconds(650)
 
     private var tip: FirstBattleButtonCoachTip? {
         GuderianTutorialCatalog.firstBattleButtonCoachTip(for: id)
@@ -1079,14 +1078,13 @@ private struct FirstBattleButtonCoachModifier: ViewModifier {
         let size = windowSize == .zero
             ? (NSScreen.main?.visibleFrame.size ?? CGSize(width: 1440, height: 900))
             : windowSize
-        let closeToRightEdge = buttonFrame.maxX + dialogWidth + edgePadding > size.width
-        let closeToTopEdge = buttonFrame.minY - dialogHeightEstimate - edgePadding < 0
-        let invertedCloseToTopEdge = size.height - buttonFrame.maxY - dialogHeightEstimate - edgePadding < 0
+        let availableAbove = buttonFrame.minY - edgePadding
+        let availableBelow = size.height - buttonFrame.maxY - edgePadding
 
-        if closeToRightEdge || closeToTopEdge || invertedCloseToTopEdge {
-            return .belowLeft
+        if availableAbove >= dialogHeightEstimate || availableAbove >= availableBelow {
+            return .above
         }
-        return .aboveRight
+        return .below
     }
 
     func body(content: Content) -> some View {
@@ -1108,29 +1106,115 @@ private struct FirstBattleButtonCoachModifier: ViewModifier {
                 buttonFrame = frame
             }
             .onHover { hovering in
-                guard canPresent else {
-                    isHovering = false
-                    return
-                }
-                isHovering = hovering
+                setAnchorHovering(hovering)
             }
             .onChange(of: canPresent) { _, canPresent in
                 if !canPresent {
-                    isHovering = false
+                    dismissImmediately()
                 }
             }
             .popover(
                 isPresented: Binding(
-                    get: { isHovering && canPresent },
-                    set: { isHovering = $0 }
+                    get: { isPopoverPresented && canPresent },
+                    set: { presented in
+                        if presented {
+                            presentAfterHoverSettles()
+                        } else {
+                            dismissImmediately()
+                        }
+                    }
                 ),
                 attachmentAnchor: placement.anchor,
                 arrowEdge: placement.arrowEdge
             ) {
                 if let tip {
                     FirstBattleButtonCoachDialog(tip: tip)
+                        .onHover { hovering in
+                            setDialogHovering(hovering)
+                        }
                 }
             }
+    }
+
+    private var isHoveringCoachSurface: Bool {
+        isAnchorHovering || isDialogHovering
+    }
+
+    private func setAnchorHovering(_ hovering: Bool) {
+        guard canPresent else {
+            dismissImmediately()
+            return
+        }
+
+        isAnchorHovering = hovering
+        if hovering {
+            presentAfterHoverSettles()
+        } else {
+            dismissAfterGracePeriod()
+        }
+    }
+
+    private func setDialogHovering(_ hovering: Bool) {
+        guard canPresent else {
+            dismissImmediately()
+            return
+        }
+
+        isDialogHovering = hovering
+        if hovering {
+            presentImmediately()
+        } else {
+            dismissAfterGracePeriod()
+        }
+    }
+
+    private func presentAfterHoverSettles() {
+        hoverRevision += 1
+        let revision = hoverRevision
+
+        Task { @MainActor in
+            do {
+                try await Task.sleep(for: presentationDelay)
+            } catch {
+                return
+            }
+            guard hoverRevision == revision,
+                  canPresent,
+                  isHoveringCoachSurface else {
+                return
+            }
+            isPopoverPresented = true
+        }
+    }
+
+    private func presentImmediately() {
+        hoverRevision += 1
+        isPopoverPresented = true
+    }
+
+    private func dismissAfterGracePeriod() {
+        hoverRevision += 1
+        let revision = hoverRevision
+
+        Task { @MainActor in
+            do {
+                try await Task.sleep(for: dismissalDelay)
+            } catch {
+                return
+            }
+            guard hoverRevision == revision,
+                  !isHoveringCoachSurface else {
+                return
+            }
+            isPopoverPresented = false
+        }
+    }
+
+    private func dismissImmediately() {
+        hoverRevision += 1
+        isAnchorHovering = false
+        isDialogHovering = false
+        isPopoverPresented = false
     }
 }
 
