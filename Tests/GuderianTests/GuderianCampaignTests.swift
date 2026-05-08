@@ -4,6 +4,30 @@ import Foundation
 import XCTest
 
 final class GuderianCampaignTests: XCTestCase {
+    func testAboutCatalogUsesCurrentReleaseVersionAndDevelopmentText() {
+        XCTAssertEqual(GuderianAppAboutCatalog.appName, "Guderian")
+        XCTAssertEqual(GuderianAppAboutCatalog.releaseVersion, "1.02")
+        XCTAssertEqual(
+            GuderianAppAboutCatalog.displayVersion(
+                bundleInfo: ["CFBundleShortVersionString": "$(MARKETING_VERSION)"]
+            ),
+            "1.02"
+        )
+        XCTAssertEqual(
+            GuderianAppAboutCatalog.displayVersion(
+                bundleInfo: ["CFBundleShortVersionString": "1.0"]
+            ),
+            "1.02"
+        )
+        XCTAssertGreaterThanOrEqual(GuderianAppAboutCatalog.developmentParagraphs.count, 4)
+
+        let aboutText = GuderianAppAboutCatalog.developmentParagraphs.joined(separator: " ")
+        XCTAssertTrue(aboutText.localizedCaseInsensitiveContains("SwiftUI"))
+        XCTAssertTrue(aboutText.localizedCaseInsensitiveContains("dzw"))
+        XCTAssertTrue(aboutText.localizedCaseInsensitiveContains("side selection"))
+        XCTAssertTrue(aboutText.localizedCaseInsensitiveContains("sober"))
+    }
+
     func testCampaignCatalogLocksNineteenCommandScopeScenarios() {
         XCTAssertEqual(GuderianCampaignCatalog.all.count, 19)
         XCTAssertEqual(GuderianCampaignCatalog.all.map(\.order), Array(1...19))
