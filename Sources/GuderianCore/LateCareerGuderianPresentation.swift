@@ -1171,7 +1171,7 @@ private extension LateCareerPlayableSurfaceCatalog {
                 id: "\(battlefield.id)-blocked-offmap-exit",
                 battlefieldID: battlefield.id,
                 action: "Score an off-map withdrawal without corridor continuity",
-                reason: "The player must be able to block road, rail, or fortress exits before German pressure receives withdrawal credit."
+                reason: "The playable force must be able to block road, rail, or fortress exits before German pressure receives withdrawal credit."
             ),
         ]
     }
@@ -1207,7 +1207,7 @@ private extension LateCareerConsolidatedPlaybookCatalog {
                 family: .railInterdiction,
                 sourceRule: thirdRule,
                 title: "Rail and road interdiction",
-                trigger: "The player contests a rail, road, or corridor marker tied to operational withdrawal.",
+                trigger: "The playable force contests a rail, road, or corridor marker tied to operational withdrawal.",
                 effect: "Delay German pressure and reduce withdrawal scoring until corridor continuity is restored."
             ),
             binding(

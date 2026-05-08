@@ -7,6 +7,37 @@ import SwiftUI
 
 private let guderianCampaignLog = Logger(subsystem: "com.barbalet.guderian", category: "GuderianCampaign")
 
+private func fieldCommandSideTitle(_ side: NativeBattleSide) -> String {
+    switch side {
+    case .player:
+        return "Opposing side"
+    case .guderianAI:
+        return "Guderian command"
+    case .neutral:
+        return "Neutral"
+    }
+}
+
+private func fieldCommandSideTitle(_ side: ScenarioUnitSide) -> String {
+    switch side {
+    case .player:
+        return "Opposing side"
+    case .guderianAI:
+        return "Guderian command"
+    }
+}
+
+private func lateCareerSideTitle(_ side: ScenarioSide) -> String {
+    switch side {
+    case .player:
+        return "Playable force"
+    case .guderianAI:
+        return "German command"
+    case .neutral:
+        return "Neutral"
+    }
+}
+
 private enum GuderianCampaignStorageKeys {
     static let legacyCampaignSave = UnifiedCampaignSaveCodec.migratedCampaignStorageKey
     static let lateCareerProgress = UnifiedCampaignSaveCodec.migratedLateCareerStorageKey
@@ -765,7 +796,7 @@ struct LateCareerSharedBriefingView: View {
                 LateCareerHeader(entry: entry)
                 LateCareerMetricStrip(entry: entry)
                 LateCareerMapSurface(entry: entry, zoom: $zoom, height: 520)
-                LateCareerTextSection(title: "Player Force", text: entry.playerRole, icon: "person.crop.square")
+                LateCareerTextSection(title: "Playable Force", text: entry.playerRole, icon: "person.crop.square")
                 LateCareerTextSection(title: "German Context", text: entry.germanContext, icon: "bolt.horizontal")
                 LateCareerTextSection(title: "Design Intent", text: entry.playableFraming, icon: "scope")
                 LateCareerObjectiveGrid(entry: entry)
@@ -869,7 +900,7 @@ struct LateCareerUnifiedPlayableBoardView: View {
                 Button {
                     runGermanTurn()
                 } label: {
-                    Label("German Turn", systemImage: "forward.frame.fill")
+                    Label("AI Turn", systemImage: "forward.frame.fill")
                 }
                 .accessibilityIdentifier("german-turn-button")
 
@@ -1067,7 +1098,7 @@ struct LateCareerContextBriefingView: View {
                 LateCareerHeader(entry: entry)
                 LateCareerMetricStrip(entry: entry)
                 LateCareerMapSurface(entry: entry, zoom: $zoom, height: 520)
-                LateCareerTextSection(title: "Player Role", text: entry.playerRole, icon: "person.crop.square")
+                LateCareerTextSection(title: "Playable Role", text: entry.playerRole, icon: "person.crop.square")
                 LateCareerTextSection(title: "German Context", text: entry.germanContext, icon: "bolt.horizontal")
                 LateCareerTextSection(title: "Playable Framing", text: entry.playableFraming, icon: "scope")
                 LateCareerObjectiveGrid(entry: entry)
@@ -1093,7 +1124,7 @@ struct LateCareerPlayablePilotView: View {
     @State private var completionRecord: LateCareerCompletionRecord?
     @State private var actionLog: [String]
 
-    private let phases = ["Briefing", "Player Pressure", "German Response", "Assessment"]
+    private let phases = ["Briefing", "Playable Pressure", "German Response", "Assessment"]
 
     init(
         entry: LateCareerGuderianPresentation,
@@ -1205,7 +1236,7 @@ struct LateCareerPlayablePilotView: View {
                     .font(.headline)
                 Text(activeForce.name)
                     .font(.body.weight(.semibold))
-                Text(activeForce.side.rawValue)
+                Text(lateCareerSideTitle(activeForce.side))
                     .font(.caption)
                     .foregroundStyle(activeForce.side == .player ? .blue : .red)
                 Text(activeForce.role)
@@ -1525,7 +1556,7 @@ struct LateCareerObjectiveGrid: View {
                             Text("\(objective.victoryPoints) VP")
                                 .font(.caption.weight(.semibold))
                         }
-                        Text(objective.side.rawValue)
+                        Text(lateCareerSideTitle(objective.side))
                             .font(.caption)
                             .foregroundStyle(objective.side == .player ? .blue : .red)
                         Text(objective.description)
@@ -1558,7 +1589,7 @@ struct LateCareerForceGrid: View {
                             Text(force.name)
                                 .font(.body.weight(.medium))
                                 .foregroundStyle(.primary)
-                            Text(force.side.rawValue)
+                            Text(lateCareerSideTitle(force.side))
                                 .font(.caption)
                                 .foregroundStyle(force.side == .player ? .blue : .red)
                             Text(force.role)
@@ -1779,7 +1810,7 @@ struct ScenarioBriefingView: View {
                 NativeBattleBoardView(scenario: scenario)
                     .id(scenario.id)
                     .frame(maxWidth: 1120)
-                briefingSection("Player Force", scenario.playerForceSummary, icon: "shield.lefthalf.filled")
+                briefingSection("Opposing Force", scenario.playerForceSummary, icon: "shield.lefthalf.filled")
                 briefingSection("Guderian Command", scenario.guderianCommand, icon: "bolt.horizontal")
                 briefingSection("Design Intent", scenario.designIntent, icon: "scope")
                 historicalOverlayView
@@ -2005,7 +2036,7 @@ struct ScenarioBriefingView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 240), spacing: 10)], alignment: .leading, spacing: 10) {
                 ForEach(setup.units) { unit in
                     VStack(alignment: .leading, spacing: 4) {
-                        Label(unit.side.rawValue, systemImage: unit.side == .player ? "shield" : "bolt")
+                        Label(fieldCommandSideTitle(unit.side), systemImage: unit.side == .player ? "shield" : "bolt")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(unit.side == .player ? .blue : .red)
                         Text(unit.name)
@@ -2190,7 +2221,7 @@ struct ScenarioBriefingView: View {
                 .foregroundStyle(.secondary)
             HStack {
                 Label("Turns \(balance.targetTurns.lowerBound)-\(balance.targetTurns.upperBound)", systemImage: "clock")
-                Label("\(balance.maxPlayerScore) player VP available", systemImage: "sum")
+                Label("\(balance.maxPlayerScore) default-side VP available", systemImage: "sum")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -2204,7 +2235,7 @@ struct ScenarioBriefingView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(channel.name)
                             .font(.body.weight(.medium))
-                        Text("\(channel.side.rawValue) | \(channel.timing)")
+                        Text("\(scoreSideTitle(channel.side)) | \(channel.timing)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(channel.description)
@@ -2227,10 +2258,21 @@ struct ScenarioBriefingView: View {
                 .foregroundStyle(.secondary)
             HStack {
                 Label("\(balanceAudit.victoryGradeCount) grades", systemImage: "chart.bar")
-                Label("\(balanceAudit.maximumPlayerScore) max VP", systemImage: "sum")
+                Label("\(balanceAudit.maximumPlayerScore) max default-side VP", systemImage: "sum")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+        }
+    }
+
+    private func scoreSideTitle(_ side: ScenarioScoringSide) -> String {
+        switch side {
+        case .player:
+            return "Opposing side"
+        case .guderianAI:
+            return "Guderian command"
+        case .contested:
+            return "Contested"
         }
     }
 
@@ -2249,7 +2291,7 @@ struct ScenarioBriefingView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(reinforcement.unitName)
                                 .font(.body.weight(.medium))
-                            Text("\(reinforcement.side.rawValue) | \(reinforcement.role)")
+                            Text("\(fieldCommandSideTitle(reinforcement.side)) | \(reinforcement.role)")
                                 .font(.caption)
                                 .foregroundStyle(reinforcement.side == .player ? .blue : .red)
                             Text(reinforcement.entryCondition)
@@ -2363,7 +2405,7 @@ struct ScenarioBriefingView: View {
 
     private var aiPlanView: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Guderian AI Plan", systemImage: "arrow.triangle.branch")
+            Label("German AI Plan", systemImage: "arrow.triangle.branch")
                 .font(.headline)
             Text(aiPlan.postureName)
                 .font(.body.weight(.medium))
@@ -2555,6 +2597,10 @@ final class NativeBattleBoardViewModel: ObservableObject {
         refresh()
     }
 
+    func sideTitle(for player: NativeBoardPlayer) -> String {
+        GuderianHistoricalSideSelectionResolver.sideTitle(for: player, in: scenario)
+    }
+
     func completeNativeBattle() {
         guard let session else {
             debriefError = "Board session unavailable."
@@ -2684,7 +2730,7 @@ struct NativeBattleBoardView: View {
                 Text(snapshot.mission.name)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
-                Text("Turn \(snapshot.turnNumber) | \(snapshot.activePlayer.rawValue) | \(snapshot.phase.rawValue)")
+                Text("Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("\(snapshot.mission.playerScore)-\(snapshot.mission.opponentScore) / \(snapshot.mission.targetScore) VP")
@@ -2759,7 +2805,7 @@ struct NativeBattleBoardView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Label(selected.name, systemImage: "dot.scope")
                         .font(.caption.weight(.semibold))
-                    Text("\(selected.kind) | \(selected.owner.rawValue)")
+                    Text("\(selected.kind) | \(model.sideTitle(for: selected.owner))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("Wounds \(selected.totalWoundsRemaining), \(selected.inCover ? "in cover" : "open"), \(selected.hullDown ? "hull-down" : "exposed")")
@@ -2855,7 +2901,7 @@ struct NativeBattleBoardView: View {
         }
         .buttonStyle(.plain)
         .position(x: size.width * unit.x / 72, y: size.height * unit.y / 48)
-        .accessibilityLabel("\(unit.name), \(unit.owner.rawValue)")
+        .accessibilityLabel("\(unit.name), \(model.sideTitle(for: unit.owner))")
     }
 
     private func terrainColor(_ zone: NativeBoardZoneSnapshot) -> Color {

@@ -373,7 +373,7 @@ public enum UnifiedCampaignListCatalog {
 
 public enum UnifiedBriefingSectionKind: String, CaseIterable, Codable, Hashable, Sendable {
     case overview = "Overview"
-    case playerForce = "Player Force"
+    case playerForce = "Playable Force"
     case germanContext = "German Context"
     case designIntent = "Design Intent"
     case objectives = "Objectives"
@@ -449,7 +449,7 @@ public enum UnifiedBattleBriefingCatalog {
                 caveatLabels: entry.caveatLabel.map { [$0] } ?? [],
                 sections: [
                     UnifiedBriefingSection(id: .overview, title: "Overview", body: scenario.historicalResult),
-                    UnifiedBriefingSection(id: .playerForce, title: "Player Force", body: scenario.playerForceSummary),
+                    UnifiedBriefingSection(id: .playerForce, title: "Opposing Force", body: scenario.playerForceSummary),
                     UnifiedBriefingSection(id: .germanContext, title: "German Context", body: scenario.guderianCommand),
                     UnifiedBriefingSection(id: .designIntent, title: "Design Intent", body: scenario.designIntent),
                     UnifiedBriefingSection(id: .objectives, title: "Objectives", body: scenario.objectives.map(\.name).joined(separator: ", ")),
@@ -475,7 +475,7 @@ public enum UnifiedBattleBriefingCatalog {
                 caveatLabels: [entry.visibleCommandCaveatLabel],
                 sections: [
                     UnifiedBriefingSection(id: .overview, title: "Overview", body: entry.playableFraming),
-                    UnifiedBriefingSection(id: .playerForce, title: "Player Force", body: entry.playerRole),
+                    UnifiedBriefingSection(id: .playerForce, title: "Playable Force", body: entry.playerRole),
                     UnifiedBriefingSection(id: .germanContext, title: "German Context", body: entry.germanContext),
                     UnifiedBriefingSection(id: .designIntent, title: "Design Intent", body: entry.battlefield.rules.map(\.effect).joined(separator: " ")),
                     UnifiedBriefingSection(id: .objectives, title: "Objectives", body: entry.battlefield.objectives.map(\.name).joined(separator: ", ")),

@@ -21,7 +21,7 @@ For Guderian, fun is:
 
 > The player's voluntary, absorbed, and meaningful enjoyment of difficult historical decisions, produced by readable rules, consequential choices, responsive feedback, learnable systems, and ethically grounded scenario drama.
 
-Fun does not mean making the subject light. Guderian is about resisting, delaying, escaping, or counterattacking Nazi German offensives. Fun here means the player feels agency, mastery, tension, discovery, and narrative payoff while the game remains historically sober.
+Fun does not mean making the subject light. Guderian's default play lens is resisting, delaying, escaping, or counterattacking Nazi German offensives. Field-command battles can also be played from Guderian's command side as sober command study, comparison, and systems learning. Fun here means the player feels agency, mastery, tension, discovery, and narrative payoff while the game remains historically sober.
 
 ## Core Principle
 
@@ -52,6 +52,7 @@ Dynamics are what happens when those mechanics interact:
 - A Soviet tank ambush delays a road axis but risks being pinned before withdrawal.
 - A port defense trades casualties for evacuation time.
 - A player gives up terrain to preserve scoring units.
+- A player chooses Guderian's command to study operational pressure, while the UI and debrief keep the context non-celebratory.
 
 ### Aesthetics
 
@@ -61,7 +62,7 @@ Aesthetics are the player's felt experience:
 - Narrative: understanding why a battle matters.
 - Discovery: reading a new map and finding hidden routes or chokepoints.
 - Expression: choosing a defensive style, withdrawal pattern, or counterattack plan.
-- Competition: trying to outplay the German AI and improve a score band.
+- Competition: trying to outplay the automated opposing side and improve a score band.
 - Sensation: a readable, tactile board with distinct units, terrain, and logs.
 - Submission: wanting another turn because the campaign loop is coherent.
 - Fellowship: discussing strategies, history, issues, and scenario outcomes with other players.
@@ -193,14 +194,15 @@ Enjoyment must not become celebration of Nazi command.
 
 Design requirements:
 
-- Player fantasy remains resistance, delay, survival, evacuation, counterattack, or containment.
+- The default player fantasy remains resistance, delay, survival, evacuation, counterattack, or containment.
+- If the player selects Guderian's command, the experience must read as command study and comparison, not admiration, conquest fantasy, or moral laundering.
 - Guderian's command scope and late-career caveats remain visible.
 - Scenario language should avoid glamorizing German offensives.
-- German AI can be tactically threatening without becoming aspirational.
+- German AI and German-side play can be tactically threatening without becoming aspirational.
 
 Failure signs:
 
-- Player-facing copy admires the attacker.
+- Player-facing copy admires the attacker or treats German command play as heroic.
 - Caveats disappear in late-career scenarios.
 - The game rewards harm without context or consequence.
 
@@ -364,7 +366,9 @@ These are candidate metrics for future code under `fun/`.
 
 ### Ethical Framing Metrics
 
-- `resistance_fantasy_integrity`: player goals oppose, delay, or contain German operations.
+- `selected_side_integrity`: the selected side's goals, controls, feedback, and debrief all match the side the player chose.
+- `resistance_fantasy_integrity`: default-side goals oppose, delay, or contain German operations.
+- `command_study_caveat`: Guderian command play remains analytical and non-celebratory.
 - `command_caveat_visibility`: late-career and indirect-command caveats are visible.
 - `non_celebratory_language`: copy avoids heroic framing of Nazi command.
 - `historical_context_presence`: scenario notes explain why the event matters.
@@ -438,7 +442,7 @@ The board must invite touching: selecting, moving, inspecting, zooming, and unde
 
 ### The Enemy Must Feel Intentional
 
-German AI pressure should feel like a plan the player can read and resist. It should not feel like random movement or hidden dice.
+Opposing-side AI pressure should feel like a plan the player can read and answer. It should not feel like random movement or hidden dice.
 
 ### The Best Stories Are Partial Successes
 

@@ -1308,12 +1308,12 @@ final class GuderianCampaignTests: XCTestCase {
             XCTAssertFalse(scenario.mapFeatures.isEmpty, "\(scenario.title) needs terrain features")
             XCTAssertFalse(scenario.objectives.isEmpty, "\(scenario.title) needs objectives")
             XCTAssertTrue(
-                scenario.forces.contains { $0.side == "Player" },
-                "\(scenario.title) needs a player force slot"
+                scenario.forces.contains { $0.side == "Opposing side" },
+                "\(scenario.title) needs an opposing-side force slot"
             )
             XCTAssertTrue(
-                scenario.forces.contains { $0.side == "Guderian AI" },
-                "\(scenario.title) needs a Guderian AI force slot"
+                scenario.forces.contains { $0.side == "Guderian command" },
+                "\(scenario.title) needs a Guderian-command force slot"
             )
         }
     }

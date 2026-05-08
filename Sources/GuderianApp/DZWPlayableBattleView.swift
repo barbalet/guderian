@@ -67,6 +67,19 @@ private struct DZWPlayableBattleCompletionDisplay {
         record = .fieldCommand(summary.completionRecord)
     }
 
+    init(
+        sourceName: String,
+        completionRecord: CampaignCompletionRecord,
+        debriefSummary: String
+    ) {
+        self.sourceName = sourceName
+        score = completionRecord.score
+        victoryBandLabel = completionRecord.victoryBand.rawValue
+        completedTurn = completionRecord.completedTurn
+        self.debriefSummary = debriefSummary
+        record = .fieldCommand(completionRecord)
+    }
+
     init(lateCareer summary: UnifiedLateCareerPlayableCompletionSummary) {
         sourceName = summary.sourceName
         score = summary.completionRecord.score
@@ -139,7 +152,7 @@ private enum DZWPlayableBattleSource {
     }
 
     var aiTurnButtonTitle: String {
-        aiPlayer == .guderianAI ? "German Turn" : "Opposing Turn"
+        "AI Turn"
     }
 
     func sideTitle(for player: NativeBoardPlayer) -> String {
@@ -149,7 +162,7 @@ private enum DZWPlayableBattleSource {
         case .lateCareer:
             switch player {
             case .player:
-                return "Player force"
+                return "Playable force"
             case .guderianAI:
                 return "German force"
             case .none:
@@ -274,6 +287,33 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         snapshot?.mission.winner != NativeBoardPlayer.none
     }
 
+    var humanPlayer: NativeBoardPlayer {
+        source.humanPlayer
+    }
+
+    var aiPlayer: NativeBoardPlayer {
+        source.aiPlayer
+    }
+
+    var humanSideTitle: String {
+        source.sideTitle(for: humanPlayer)
+    }
+
+    var aiSideTitle: String {
+        source.sideTitle(for: aiPlayer)
+    }
+
+    var aiTurnSectionTitle: String {
+        "\(aiSideTitle) AI"
+    }
+
+    var canIssueHumanOrders: Bool {
+        guard let snapshot else {
+            return false
+        }
+        return !isBattleOver && snapshot.activePlayer == humanPlayer
+    }
+
     var hasCompletion: Bool {
         completion != nil
     }
@@ -308,11 +348,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     var activeUnits: [NativeBoardUnitSnapshot] {
-        guard let snapshot else {
+        guard let snapshot, canIssueHumanOrders else {
             return []
         }
         return snapshot.units
-            .filter { $0.owner == snapshot.activePlayer && !$0.destroyed }
+            .filter { $0.owner == humanPlayer && !$0.destroyed }
             .sorted { $0.id < $1.id }
     }
 
@@ -323,7 +363,9 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         }
         if unit.owner == snapshot.activePlayer {
             session?.selectUnit(unit.id)
-            session?.selectNearestEnemyToSelectedUnit()
+            if snapshot.activePlayer == humanPlayer {
+                session?.selectNearestEnemyToSelectedUnit()
+            }
         } else {
             session?.selectTarget(unit.id)
         }
@@ -356,10 +398,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func clearSelection() {
-        guard let snapshot else {
+        guard let snapshot, canIssueHumanOrders else {
             return
         }
-        if let first = snapshot.units.first(where: { $0.owner == snapshot.activePlayer && !$0.destroyed }) {
+        if let first = snapshot.units.first(where: { $0.owner == humanPlayer && !$0.destroyed }) {
             session?.selectUnit(first.id)
             session?.selectNearestEnemyToSelectedUnit()
         }
@@ -368,6 +410,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func selectNearestEnemy() {
+        guard canIssueHumanOrders else {
+            recordTutorialTrigger(.blockedAction)
+            return
+        }
         session?.selectNearestEnemyToSelectedUnit()
         refresh()
     }
@@ -376,13 +422,19 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         guard let snapshot, !isBattleOver else {
             return false
         }
-        return unit.owner == snapshot.activePlayer &&
+        return canIssueHumanOrders &&
+            unit.owner == humanPlayer &&
             snapshot.phase == .movement &&
             unit.canMoveNow &&
             !unit.destroyed
     }
 
     func moveUnit(id: Int, to point: CGPoint) {
+        guard canIssueHumanOrders else {
+            dzwPlayableLog.info("Move ignored because active side is not human-controlled.")
+            recordTutorialTrigger(.blockedAction)
+            return
+        }
         let coordinate = NativeBattleCoordinate(
             x: min(max(Double(point.x), 1), Double(Self.boardWidth - 1)),
             y: min(max(Double(point.y), 1), Double(Self.boardHeight - 1))
@@ -394,7 +446,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func rotateSelected(by degrees: Double) {
-        guard let selectedUnit else {
+        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer else {
+            recordTutorialTrigger(.blockedAction)
             return
         }
         let rotated = session?.rotateUnit(selectedUnit.id, to: selectedUnit.facingDegrees + degrees) ?? false
@@ -403,7 +456,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func toggleCover(_ enabled: Bool) {
-        guard let selectedUnit else {
+        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer else {
+            recordTutorialTrigger(.blockedAction)
             return
         }
         let toggled = session?.toggleCover(for: selectedUnit.id, enabled: enabled) ?? false
@@ -412,7 +466,8 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func toggleHullDown(_ enabled: Bool) {
-        guard let selectedUnit else {
+        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer else {
+            recordTutorialTrigger(.blockedAction)
             return
         }
         let toggled = session?.toggleHullDown(for: selectedUnit.id, enabled: enabled) ?? false
@@ -421,7 +476,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func shootSelected() {
-        guard let selectedUnit, let selectedTarget else {
+        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer, let selectedTarget else {
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -432,7 +487,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func assaultSelected(advance: Bool) {
-        guard let selectedUnit, let selectedTarget else {
+        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer, let selectedTarget else {
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -443,6 +498,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func resolvePendingChoice() {
+        guard canIssueHumanOrders else {
+            recordTutorialTrigger(.blockedAction)
+            return
+        }
         let resolved = session?.resolveFirstPendingChoice() ?? false
         logBoardActionFailure(resolved, action: "Resolve pending choice")
         refresh()
@@ -454,6 +513,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             return
         }
 
+        guard canIssueHumanOrders else {
+            dzwPlayableLog.info("Phase advance ignored because active side is not human-controlled.")
+            recordTutorialTrigger(.blockedAction)
+            return
+        }
         session?.advancePhase()
         refresh()
         dzwPlayableLog.info("Phase advanced activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public) turn=\(self.snapshot?.turnNumber ?? -1, privacy: .public)")
@@ -505,16 +569,16 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             do {
                 _ = try guderianTestController.runUntilPauseOrDebrief(maxSteps: 6)
                 syncFromGuderianTestController(context: "visible-german-turn")
-                dzwPlayableLog.info("Visible German Turn routed through external GuderianTest controller.")
+                dzwPlayableLog.info("Visible AI turn routed through external GuderianTest controller.")
             } catch {
                 debriefError = "\(error)"
-                dzwPlayableLog.error("Visible German Turn failed through external GuderianTest controller error=\(String(describing: error), privacy: .public)")
+                dzwPlayableLog.error("Visible AI turn failed through external GuderianTest controller error=\(String(describing: error), privacy: .public)")
             }
             return
         }
 
         guard !isBattleOver else {
-            dzwPlayableLog.info("German turn ignored because battle is over.")
+            dzwPlayableLog.info("AI turn ignored because battle is over.")
             return
         }
 
@@ -537,10 +601,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
         if snapshot?.activePlayer == aiPlayer {
             recordAIEvent("\(aiLabel) AI turn paused: action loop hit its safety cap.")
-            dzwPlayableLog.info("German turn paused at safety cap activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
+            dzwPlayableLog.info("AI turn paused at safety cap activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         } else {
             recordAIEvent("\(aiLabel) AI turn complete: control returned to \(snapshot.map { self.source.sideTitle(for: $0.activePlayer) } ?? "the player").")
-            dzwPlayableLog.info("German turn complete activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
+            dzwPlayableLog.info("AI turn complete activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         }
     }
 
@@ -598,7 +662,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
         dzwPlayableLog.info("Play-to-end requested source=\(self.source.battleTitle, privacy: .public)")
         switch source {
-        case .fieldCommand:
+        case .fieldCommand(let scenario, _):
             guard let nativeSession = session as? NativeBoardSession else {
                 debriefError = "Field-command board session unavailable."
                 dzwPlayableLog.error("Play-to-end failed because field-command session cast failed.")
@@ -606,13 +670,13 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             }
             do {
                 let result = try PlayableTestGameRunner.runBattle(from: nativeSession)
-                let display = DZWPlayableBattleCompletionDisplay(fieldCommand: result.completion)
+                let display = fieldCommandDisplay(from: result.completion, scenario: scenario)
                 playableTestGameResult = result
                 completion = display
                 debriefError = nil
                 refresh()
                 recordTutorialTrigger(.debrief)
-                recordAIEvent("Playable test game completed: \(result.antiGuderianStepCount) Anti-Guderian AI steps, \(result.germanStepCount) German AI steps.")
+                recordAIEvent("Playable test game completed: \(result.antiGuderianStepCount) default-side automation steps, \(result.germanStepCount) Guderian-command automation steps.")
                 dzwPlayableLog.info("Play-to-end completed antiGuderianSteps=\(result.antiGuderianStepCount, privacy: .public) germanSteps=\(result.germanStepCount, privacy: .public) score=\(display.score, privacy: .public) band=\(display.victoryBandLabel, privacy: .public)")
                 return display.record
             } catch {
@@ -652,7 +716,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
         dzwPlayableLog.info("Complete battle requested source=\(self.source.battleTitle, privacy: .public)")
         switch source {
-        case .fieldCommand:
+        case .fieldCommand(let scenario, _):
             guard let nativeSession = session as? NativeBoardSession else {
                 debriefError = "Field-command board session unavailable."
                 dzwPlayableLog.error("Complete battle failed because field-command session cast failed.")
@@ -660,7 +724,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             }
             do {
                 let result = try PlayableBattleCompletionResolver.completeBattle(from: nativeSession)
-                let display = DZWPlayableBattleCompletionDisplay(fieldCommand: result)
+                let display = fieldCommandDisplay(from: result, scenario: scenario)
                 completion = display
                 playableTestGameResult = nil
                 debriefError = nil
@@ -695,6 +759,43 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             dzwPlayableLog.info("Late-career complete battle recorded score=\(display.score, privacy: .public) band=\(display.victoryBandLabel, privacy: .public)")
             return display.record
         }
+    }
+
+    private func fieldCommandDisplay(
+        from summary: PlayableBattleCompletionSummary,
+        scenario: GuderianScenario
+    ) -> DZWPlayableBattleCompletionDisplay {
+        guard humanPlayer == .guderianAI else {
+            return DZWPlayableBattleCompletionDisplay(fieldCommand: summary)
+        }
+
+        let balance = ScenarioBalanceCatalog.profile(for: scenario)
+        let opposingScore = summary.completionRecord.score
+        let selectedScore = min(balance.maxPlayerScore, max(0, balance.maxPlayerScore - opposingScore))
+        let selectedBand = Self.outcomeBand(for: selectedScore, balance: balance)
+        let note = "Completed as \(humanSideTitle) in selected-side study mode. Opposing-force campaign score was \(opposingScore)/\(balance.maxPlayerScore); this debrief inverts it so the saved result matches the side you chose."
+        let record = CampaignCompletionRecord(
+            scenarioID: summary.completionRecord.scenarioID,
+            score: selectedScore,
+            victoryBand: selectedBand,
+            completedTurn: summary.completionRecord.completedTurn,
+            note: note
+        )
+        let debrief = "\(humanSideTitle) completed \(scenario.title) on turn \(record.completedTurn) with \(selectedScore)/\(balance.maxPlayerScore) VP. This is a sober command-study result, not celebratory framing; the original opposing-force score was \(opposingScore)."
+        return DZWPlayableBattleCompletionDisplay(
+            sourceName: "\(summary.sourceName) | \(humanSideTitle) study mode",
+            completionRecord: record,
+            debriefSummary: debrief
+        )
+    }
+
+    private static func outcomeBand(for score: Int, balance: ScenarioBalanceProfile) -> VictoryBand {
+        if let exact = balance.outcomeBands.first(where: { $0.scoreRange.contains(score) }) {
+            return exact.grade
+        }
+        return balance.outcomeBands
+            .sorted { $0.scoreRange.lowerBound < $1.scoreRange.lowerBound }
+            .last { score >= $0.scoreRange.lowerBound }?.grade ?? .historicalPressure
     }
 
     private func refresh() {
@@ -1390,10 +1491,10 @@ private struct DZWPlayableBattlePanelWindow: View {
                 Text("Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
                     .font(.headline)
                     .accessibilityIdentifier("battle-phase-label")
-                Text("\(snapshot.mission.name) | P1 \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) P2")
+                Text("\(snapshot.mission.name) | \(model.sideTitle(for: .player)) \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) \(model.sideTitle(for: .guderianAI))")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color(red: 0.55, green: 0.39, blue: 0.12))
-                Text(snapshot.mission.winner == .none ? "Native battle in progress" : "\(snapshot.mission.winner.rawValue) wins the scenario")
+                Text(snapshot.mission.winner == .none ? "Native battle in progress" : "\(model.sideTitle(for: snapshot.mission.winner)) controls the scenario")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
@@ -1451,7 +1552,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                 } label: {
                     Label("Next Phase", systemImage: "forward.end.fill")
                 }
-                .disabled(model.isBattleOver)
+                .disabled(!model.canIssueHumanOrders)
                 .accessibilityIdentifier("next-phase-button")
                 .firstBattleButtonCoach(
                     .nextPhase,
@@ -1504,7 +1605,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             if let selected = snapshot.selectedUnit {
                 Text(selected.name)
                     .font(.title3.weight(.bold))
-                Text("\(selected.owner.rawValue) | \(selected.roleLine)")
+                Text("\(model.sideTitle(for: selected.owner)) | \(selected.roleLine)")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text("Wounds \(selected.totalWoundsRemaining) | \(selected.inCover ? "Cover" : "Open") | \(selected.hullDown ? "Hull-down" : "Exposed")")
@@ -1540,6 +1641,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
             }
+            .disabled(!model.canIssueHumanOrders)
             HStack {
                 Button("Nearest Enemy") {
                     markButtonCoachUsed(.nearestEnemy)
@@ -1564,6 +1666,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
             }
+            .disabled(!model.canIssueHumanOrders)
         }
         .buttonStyle(.bordered)
     }
@@ -1601,7 +1704,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
             }
-            .disabled(snapshot.selectedUnit == nil || model.isBattleOver)
+            .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
 
             HStack {
                 Toggle("Manual Cover", isOn: Binding(
@@ -1632,7 +1735,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                 )
             }
             .font(.caption.weight(.semibold))
-            .disabled(snapshot.selectedUnit == nil || model.isBattleOver)
+            .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
 
             Button {
                 markButtonCoachUsed(.shootTarget)
@@ -1640,7 +1743,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             } label: {
                 Label("Shoot Target", systemImage: "scope")
             }
-            .disabled(snapshot.phase != .shooting || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
+            .disabled(!model.canIssueHumanOrders || snapshot.phase != .shooting || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("shoot-target-button")
             .firstBattleButtonCoach(
                 .shootTarget,
@@ -1663,6 +1766,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     progress: firstBattleButtonCoachProgress,
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
+                .disabled(!model.canIssueHumanOrders)
 
             Button {
                 markButtonCoachUsed(.assaultTarget)
@@ -1670,7 +1774,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             } label: {
                 Label("Assault Target", systemImage: "figure.run")
             }
-            .disabled(snapshot.phase != .assault || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
+            .disabled(!model.canIssueHumanOrders || snapshot.phase != .assault || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("assault-target-button")
             .firstBattleButtonCoach(
                 .assaultTarget,
@@ -1685,6 +1789,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             } label: {
                 Label("Resolve Pending", systemImage: "checkmark.circle")
             }
+            .disabled(!model.canIssueHumanOrders)
             .accessibilityIdentifier("resolve-pending-button")
             .firstBattleButtonCoach(
                 .resolvePending,
@@ -1716,7 +1821,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 if let playableTestGameResult = model.playableTestGameResult {
-                    Text("\(playableTestGameResult.antiGuderianStepCount) Anti-Guderian AI steps | \(playableTestGameResult.germanStepCount) German AI steps")
+                    Text("\(playableTestGameResult.antiGuderianStepCount) default-side steps | \(playableTestGameResult.germanStepCount) Guderian-command steps")
                         .font(.caption.monospaced())
                         .foregroundStyle(playableTestGameResult.completedToEnd ? .green : .orange)
                     Text(playableTestGameResult.summary)
@@ -1736,10 +1841,10 @@ private struct DZWPlayableBattlePanelWindow: View {
                 Label(debriefError, systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.orange)
-            } else if snapshot.mission.winner == .guderianAI {
-                Label("Failure: Guderian AI has won the scenario.", systemImage: "xmark.octagon")
+            } else if snapshot.mission.winner != .none {
+                Label("\(model.sideTitle(for: snapshot.mission.winner)) has reached the scenario result.", systemImage: "flag.checkered")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(snapshot.mission.winner == model.humanPlayer ? .green : .orange)
             } else {
                 Text("No debrief recorded yet.")
                     .font(.caption)
@@ -1760,7 +1865,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(objective.name)
                         .font(.subheadline.weight(.bold))
-                    Text("\(objective.controller.rawValue) | \(objective.playerPresence)-\(objective.opponentPresence)")
+                    Text("\(model.sideTitle(for: objective.controller)) | \(objective.playerPresence)-\(objective.opponentPresence)")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                 }
@@ -1778,14 +1883,14 @@ private struct DZWPlayableBattlePanelWindow: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Matchup")
                 .font(.headline)
-            Text("You command the force resisting Guderian's formation. The red force can be inspected and advanced through the same rules-backed board state.")
+            Text("Selected side: \(model.humanSideTitle). Opposing automation: \(model.aiSideTitle). Both forces use the same rules-backed board state.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             ForEach([NativeBoardPlayer.player, NativeBoardPlayer.guderianAI], id: \.self) { owner in
                 let units = snapshot.units.filter { $0.owner == owner }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(owner.rawValue)
+                    Text("\(model.sideTitle(for: owner))\(owner == model.humanPlayer ? " (you)" : " (AI)")")
                         .font(.subheadline.weight(.bold))
                     ForEach(units.prefix(8)) { unit in
                         Text("\(unit.name) | \(unit.role) | \(unit.totalWoundsRemaining) wounds")
@@ -1801,7 +1906,7 @@ private struct DZWPlayableBattlePanelWindow: View {
 
     private func aiTurnSection() -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("German AI")
+            Text(model.aiTurnSectionTitle)
                 .font(.headline)
             ForEach(Array(model.aiTurnEvents.enumerated()), id: \.offset) { _, event in
                 Text(event)
@@ -2272,10 +2377,10 @@ public struct DZWPlayableBattleView: View {
                     .font(.headline)
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("battle-phase-label")
-                Text("\(snapshot.mission.name) | P1 \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) P2")
+                Text("\(snapshot.mission.name) | \(model.sideTitle(for: .player)) \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) \(model.sideTitle(for: .guderianAI))")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color(red: 0.92, green: 0.78, blue: 0.42))
-                Text(snapshot.mission.winner == .none ? "Native battle in progress" : "\(snapshot.mission.winner.rawValue) wins the scenario")
+                Text(snapshot.mission.winner == .none ? "Native battle in progress" : "\(model.sideTitle(for: snapshot.mission.winner)) controls the scenario")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.88))
             }
@@ -2335,7 +2440,7 @@ public struct DZWPlayableBattleView: View {
                 } label: {
                     Label("Next Phase", systemImage: "forward.end.fill")
                 }
-                .disabled(model.isBattleOver)
+                .disabled(!model.canIssueHumanOrders)
                 .accessibilityIdentifier("next-phase-button")
                 .firstBattleButtonCoach(
                     .nextPhase,
@@ -2437,7 +2542,7 @@ public struct DZWPlayableBattleView: View {
             if let selected = snapshot.selectedUnit {
                 Text(selected.name)
                     .font(.title3.weight(.bold))
-                Text("\(selected.owner.rawValue) | \(selected.roleLine)")
+                Text("\(model.sideTitle(for: selected.owner)) | \(selected.roleLine)")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text("Wounds \(selected.totalWoundsRemaining) | \(selected.inCover ? "Cover" : "Open") | \(selected.hullDown ? "Hull-down" : "Exposed")")
@@ -2473,6 +2578,7 @@ public struct DZWPlayableBattleView: View {
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
             }
+            .disabled(!model.canIssueHumanOrders)
             HStack {
                 Button("Nearest Enemy") {
                     markButtonCoachUsed(.nearestEnemy)
@@ -2497,6 +2603,7 @@ public struct DZWPlayableBattleView: View {
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
             }
+            .disabled(!model.canIssueHumanOrders)
         }
         .buttonStyle(.bordered)
     }
@@ -2534,7 +2641,7 @@ public struct DZWPlayableBattleView: View {
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
             }
-            .disabled(snapshot.selectedUnit == nil || model.isBattleOver)
+            .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
 
             HStack {
                 Toggle("Manual Cover", isOn: Binding(
@@ -2565,7 +2672,7 @@ public struct DZWPlayableBattleView: View {
                 )
             }
             .font(.caption.weight(.semibold))
-            .disabled(snapshot.selectedUnit == nil || model.isBattleOver)
+            .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
 
             Button {
                 markButtonCoachUsed(.shootTarget)
@@ -2573,7 +2680,7 @@ public struct DZWPlayableBattleView: View {
             } label: {
                 Label("Shoot Target", systemImage: "scope")
             }
-            .disabled(snapshot.phase != .shooting || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
+            .disabled(!model.canIssueHumanOrders || snapshot.phase != .shooting || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("shoot-target-button")
             .firstBattleButtonCoach(
                 .shootTarget,
@@ -2596,6 +2703,7 @@ public struct DZWPlayableBattleView: View {
                     progress: firstBattleButtonCoachProgress,
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
+                .disabled(!model.canIssueHumanOrders)
 
             Button {
                 markButtonCoachUsed(.assaultTarget)
@@ -2603,7 +2711,7 @@ public struct DZWPlayableBattleView: View {
             } label: {
                 Label("Assault Target", systemImage: "figure.run")
             }
-            .disabled(snapshot.phase != .assault || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
+            .disabled(!model.canIssueHumanOrders || snapshot.phase != .assault || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("assault-target-button")
             .firstBattleButtonCoach(
                 .assaultTarget,
@@ -2618,6 +2726,7 @@ public struct DZWPlayableBattleView: View {
             } label: {
                 Label("Resolve Pending", systemImage: "checkmark.circle")
             }
+            .disabled(!model.canIssueHumanOrders)
             .accessibilityIdentifier("resolve-pending-button")
             .firstBattleButtonCoach(
                 .resolvePending,
@@ -2649,7 +2758,7 @@ public struct DZWPlayableBattleView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 if let playableTestGameResult = model.playableTestGameResult {
-                    Text("\(playableTestGameResult.antiGuderianStepCount) Anti-Guderian AI steps | \(playableTestGameResult.germanStepCount) German AI steps")
+                    Text("\(playableTestGameResult.antiGuderianStepCount) default-side steps | \(playableTestGameResult.germanStepCount) Guderian-command steps")
                         .font(.caption.monospaced())
                         .foregroundStyle(playableTestGameResult.completedToEnd ? .green : .orange)
                     Text(playableTestGameResult.summary)
@@ -2669,10 +2778,10 @@ public struct DZWPlayableBattleView: View {
                 Label(debriefError, systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.orange)
-            } else if snapshot.mission.winner == .guderianAI {
-                Label("Failure: Guderian AI has won the scenario.", systemImage: "xmark.octagon")
+            } else if snapshot.mission.winner != .none {
+                Label("\(model.sideTitle(for: snapshot.mission.winner)) has reached the scenario result.", systemImage: "flag.checkered")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(snapshot.mission.winner == model.humanPlayer ? .green : .orange)
             } else {
                 Text("No debrief recorded yet.")
                     .font(.caption)
@@ -2693,7 +2802,7 @@ public struct DZWPlayableBattleView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(objective.name)
                         .font(.subheadline.weight(.bold))
-                    Text("\(objective.controller.rawValue) | \(objective.playerPresence)-\(objective.opponentPresence)")
+                    Text("\(model.sideTitle(for: objective.controller)) | \(objective.playerPresence)-\(objective.opponentPresence)")
                         .font(.caption.monospaced())
                         .foregroundStyle(.secondary)
                 }
@@ -2711,14 +2820,14 @@ public struct DZWPlayableBattleView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Matchup")
                 .font(.headline)
-            Text("You command the force resisting Guderian's formation. The red force can be inspected and advanced through the same rules-backed board state.")
+            Text("Selected side: \(model.humanSideTitle). Opposing automation: \(model.aiSideTitle). Both forces use the same rules-backed board state.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             ForEach([NativeBoardPlayer.player, NativeBoardPlayer.guderianAI], id: \.self) { owner in
                 let units = snapshot.units.filter { $0.owner == owner }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(owner.rawValue)
+                    Text("\(model.sideTitle(for: owner))\(owner == model.humanPlayer ? " (you)" : " (AI)")")
                         .font(.subheadline.weight(.bold))
                     ForEach(units.prefix(8)) { unit in
                         Text("\(unit.name) | \(unit.role) | \(unit.totalWoundsRemaining) wounds")
@@ -2734,7 +2843,7 @@ public struct DZWPlayableBattleView: View {
 
     private func aiTurnSection() -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("German AI")
+            Text(model.aiTurnSectionTitle)
                 .font(.headline)
             ForEach(Array(model.aiTurnEvents.enumerated()), id: \.offset) { _, event in
                 Text(event)
@@ -2909,7 +3018,7 @@ public struct DZWPlayableBattleView: View {
                     model.moveUnit(id: unit.id, to: point)
                 }
         )
-        .accessibilityLabel("\(unit.name), \(unit.owner.rawValue)")
+        .accessibilityLabel("\(unit.name), \(model.sideTitle(for: unit.owner))")
     }
 
     private func boardRect(_ zone: NativeBoardZoneSnapshot, in size: CGSize) -> CGRect {

@@ -481,10 +481,10 @@ public enum GuderianTutorialCatalog {
             ),
             FirstBattleButtonCoachTip(
                 id: .germanTurn,
-                title: "German Turn",
-                body: "Lets the German AI act until control returns to you or the safety cap is reached. Watch where it applies pressure before setting your next defense.",
+                title: "AI Turn",
+                body: "Lets the automated opposing side act until control returns to your selected side or the safety cap is reached. Watch where the AI applies pressure before setting your next plan.",
                 accessibilityIdentifier: "first-battle-button-coach-german-turn",
-                requiredTopics: ["German AI", "pressure"]
+                requiredTopics: ["opposing side", "AI", "pressure"]
             ),
             FirstBattleButtonCoachTip(
                 id: .playToEnd,
@@ -538,9 +538,9 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .clearSelection,
                 title: "Clear",
-                body: "Returns selection to the first active friendly unit. It gives you a reliable reset when the current selection is confusing.",
+                body: "Returns selection to the selected side's first active unit. It gives you a reliable reset when the current selection is confusing.",
                 accessibilityIdentifier: "first-battle-button-coach-clear-selection",
-                requiredTopics: ["selection", "friendly unit"]
+                requiredTopics: ["selection", "selected side"]
             ),
             FirstBattleButtonCoachTip(
                 id: .rotateLeft,
@@ -629,7 +629,7 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .forcesPanel,
                 title: "Forces Panel",
-                body: "Shows or hides the force matchup and recent German AI events. It helps you compare remaining units and pressure.",
+                body: "Shows or hides the force matchup and recent opposing-side AI events. It helps you compare remaining units and pressure.",
                 accessibilityIdentifier: "first-battle-button-coach-forces-panel",
                 requiredTopics: ["force matchup", "pressure"]
             ),
@@ -658,10 +658,10 @@ public enum GuderianTutorialCatalog {
             ),
             TutorialPage(
                 id: "firstRunHistory-opposition",
-                title: "Why You Oppose Him",
-                body: "The player commands the opposing forces resisting Guderian's formations, not the formations themselves. That choice matters. It keeps attention on soldiers, staffs, cities, bridges, roads, and civilians caught under the pressure of mechanized attack. The battles are built as problems of defense, delay, withdrawal, counterattack, and survival. You are asked to read terrain, protect objectives, accept hard tradeoffs, and limit the damage of an offensive machine. This perspective lets the game examine Guderian's operational influence without asking the player to celebrate conquest.",
+                title: "Choose A Side, Keep Context",
+                body: "Field-command battles now include a side selector. The default opposing-force side keeps attention on soldiers, staffs, cities, bridges, roads, and civilians caught under mechanized attack. Choosing Guderian's command is also playable as a sober command-study lens for comparison, not celebratory role-play. Whichever side you choose, the game should ask you to read terrain, protect or pressure objectives, accept hard tradeoffs, and understand the cost of operational speed without celebrating conquest. This keeps both choices tied to evidence, consequences, and visible non-celebratory context.",
                 accessibilityIdentifier: "first-run-history-page-opposition",
-                requiredTopics: ["opposing", "defense", "without asking the player to celebrate"]
+                requiredTopics: ["side selector", "opposing-force", "Guderian's command", "not celebratory"]
             ),
             TutorialPage(
                 id: "firstRunHistory-battles",
@@ -686,28 +686,28 @@ public enum GuderianTutorialCatalog {
                 id: FirstBattleGuidanceHintID.orientation.rawValue,
                 trigger: .battleOpened,
                 order: 1,
-                title: "You Are The Blocking Force",
-                body: "This first battle is Tuchola Forest. You command the Polish units trying to slow Guderian's XIX Corps, protect crossings, and preserve withdrawal routes. Think like a delaying commander: force the attack to spend time, keep defenders mutually supporting, and do not chase every German unit.",
+                title: "Choose The Tuchola Lens",
+                body: "This first battle is Tuchola Forest. The default side is the Polish opposing force trying to slow Guderian's XIX Corps, protect crossings, and preserve withdrawal routes. If you choose Guderian's command, treat it as a command-study lens: the same controls apply, but the framing remains historical and not celebratory.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-orientation",
-                requiredTopics: ["Tuchola Forest", "Polish", "delaying"]
+                requiredTopics: ["Tuchola Forest", "Polish", "Guderian's command", "not celebratory"]
             ),
             TutorialHint(
                 id: FirstBattleGuidanceHintID.board.rawValue,
                 trigger: .boardVisible,
                 order: 2,
                 title: "Read The Board Before Acting",
-                body: "The map is the main strategy tool. Blue counters are your force, red counters are Guderian's pressure, and numbered markers are objectives. Roads and crossings matter because speed is the German advantage. Use terrain and distance to make each German phase less efficient.",
+                body: "The map is the main strategy tool. Blue counters are the opposing force, red counters are Guderian's command, and numbered markers are objectives. Your selected side determines which counters you command. Roads and crossings matter because speed, delay, and pressure all depend on terrain.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-board",
-                requiredTopics: ["strategy", "objectives", "terrain"]
+                requiredTopics: ["opposing force", "Guderian's command", "selected side"]
             ),
             TutorialHint(
                 id: FirstBattleGuidanceHintID.selection.rawValue,
                 trigger: .unitSelection,
                 order: 3,
                 title: "Select A Ready Unit",
-                body: "Click a blue unit to inspect it. The inspector shows role, remaining wounds, cover state, hull-down state, and historical notes. The selected unit is outlined on the board. Use Next Ready when you want to cycle through units that can still matter this phase.",
+                body: "Click a unit to inspect it. The inspector shows side, role, remaining wounds, cover state, hull-down state, and historical notes. The selected unit is outlined on the board. Use Next Ready when you want to cycle through your selected side's units that can still matter this phase.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-selection",
-                requiredTopics: ["Click", "inspector", "Next Ready"]
+                requiredTopics: ["Click", "inspector", "selected side"]
             ),
             TutorialHint(
                 id: FirstBattleGuidanceHintID.objectives.rawValue,
@@ -723,9 +723,9 @@ public enum GuderianTutorialCatalog {
                 trigger: .movementDrag,
                 order: 5,
                 title: "Drag To Move, Then Anchor",
-                body: "During movement, drag a selected blue unit to a useful position. Short moves are often better than dramatic lunges: keep fields of fire, stay near cover, and leave routes open for later withdrawal. If a move is refused, read the feedback line before trying again.",
+                body: "During movement, drag one of your selected side's units to a useful position. Short moves are often better than dramatic lunges: keep fields of fire, stay near cover, and leave routes open for later choices. If a move is refused, read the feedback line before trying again.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-movement",
-                requiredTopics: ["movement", "drag", "feedback"]
+                requiredTopics: ["movement", "selected side", "feedback"]
             ),
             TutorialHint(
                 id: FirstBattleGuidanceHintID.phase.rawValue,
@@ -741,9 +741,9 @@ public enum GuderianTutorialCatalog {
                 trigger: .shooting,
                 order: 7,
                 title: "Shoot To Disrupt, Not To Duel",
-                body: "In the shooting phase, pick a target that affects German tempo. Fire at units threatening bridges, roads, or exposed defenders. Damage helps, but pinning and forcing caution also matter. When a weapon or hit allocation choice appears, Resolve Pending keeps play moving.",
+                body: "In the shooting phase, pick a target that affects tempo. Fire at units threatening bridges, roads, exposed defenders, or your chosen operational path. Damage helps, but pinning and forcing caution also matter. When a weapon or hit allocation choice appears, Resolve Pending keeps play moving.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-shooting",
-                requiredTopics: ["shooting", "German tempo", "Resolve Pending"]
+                requiredTopics: ["shooting", "tempo", "Resolve Pending"]
             ),
             TutorialHint(
                 id: FirstBattleGuidanceHintID.assault.rawValue,
@@ -767,10 +767,10 @@ public enum GuderianTutorialCatalog {
                 id: FirstBattleGuidanceHintID.germanAI.rawValue,
                 trigger: .germanAITurn,
                 order: 10,
-                title: "Let The German AI Reveal Pressure",
-                body: "German Turn advances Guderian's side through its rules-backed actions. Watch which objective the AI pressures, then plan your next defense around delay and preservation. The aim is not to stop every attack; it is to make speed costly and keep the campaign goals alive.",
+                title: "Let The AI Reveal Pressure",
+                body: "AI Turn advances the automated opposing side through its rules-backed actions. Watch which objective the AI pressures, then plan your selected side's next phase around delay, tempo, preservation, or breakthrough. The aim is not to stop every attack; it is to make the scenario goal legible.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-german-ai",
-                requiredTopics: ["German Turn", "AI", "delay"]
+                requiredTopics: ["AI Turn", "selected side", "scenario goal"]
             ),
             TutorialHint(
                 id: FirstBattleGuidanceHintID.debrief.rawValue,

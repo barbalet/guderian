@@ -380,10 +380,10 @@ public final class GuderianTestFirstBattleRunController {
         }
         let automatedSides = Set(steps.map(\.activePlayer))
         if !automatedSides.contains(.player) {
-            appendBlocker("Anti-Guderian AI did not receive an active phase.")
+            appendBlocker("Default-side automation did not receive an active phase.")
         }
         if !automatedSides.contains(.guderianAI) {
-            appendBlocker("Guderian AI did not receive an active phase.")
+            appendBlocker("Guderian-command automation did not receive an active phase.")
         }
 
         do {

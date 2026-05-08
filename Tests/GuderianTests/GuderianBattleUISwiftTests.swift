@@ -205,6 +205,49 @@ struct GuderianBattleUISwiftTests {
         #expect(rowSource.contains("battle-selection-side-picker-\\(row.id.rawValue)"))
     }
 
+    @Test("Either-side gameplay copy does not claim the player always opposes Guderian")
+    func guderianEitherSideCopyReplacesOldOppositionOnlyParadigm() throws {
+        let readme = try String(contentsOfFile: "README.md", encoding: .utf8)
+        let tutorial = try String(
+            contentsOfFile: "Sources/GuderianCore/TutorialOnboarding.swift",
+            encoding: .utf8
+        )
+        let campaignData = try String(
+            contentsOfFile: "dzw/Sources/DerZweiteWeltkriegGuderian/GuderianCampaign.swift",
+            encoding: .utf8
+        )
+        let campaignView = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+        let combined = "\(readme)\n\(tutorial)\n\(campaignData)\n\(campaignView)"
+
+        #expect(combined.contains("playable-side selector"))
+        #expect(combined.contains("side selector"))
+        #expect(combined.contains("Guderian's command"))
+        #expect(combined.contains("selected side"))
+        #expect(!combined.localizedCaseInsensitiveContains("player is always"))
+        #expect(!combined.localizedCaseInsensitiveContains("The player commands the opposing forces resisting Guderian's formations, not the formations themselves"))
+        #expect(!combined.contains("force(\"Player\""))
+        #expect(!combined.contains("force(\"Guderian AI\""))
+        #expect(!campaignView.contains(".side.rawValue"))
+    }
+
+    @Test("Selected-side battle controls are gated to the human side")
+    func guderianPlayableBattleCommandsAreSelectedSideAware() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("var canIssueHumanOrders"))
+        #expect(source.contains("snapshot.activePlayer == humanPlayer"))
+        #expect(source.contains("unit.owner == humanPlayer"))
+        #expect(source.contains("selectedUnit.owner == humanPlayer"))
+        #expect(source.contains("selected-side study mode"))
+        #expect(!source.contains("You command the force resisting Guderian's formation"))
+    }
+
     @Test("Cycles 931-940 GuderianTest first-battle controller reaches a real debrief")
     func guderianTestFirstBattleAutoplayControllerCompletesTuchola() throws {
         let controller = try GuderianTestFirstBattleRunController()
