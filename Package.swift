@@ -35,7 +35,10 @@ let package = Package(
         ),
         .target(
             name: "GuderianAppUI",
-            dependencies: ["GuderianCore"],
+            dependencies: [
+                "GuderianCore",
+                .product(name: "DerZweiteWeltkriegHistorical", package: "dzw"),
+            ],
             path: "Sources/GuderianApp",
             linkerSettings: [
                 .linkedFramework("SwiftUI"),
@@ -55,7 +58,10 @@ let package = Package(
         ),
         .testTarget(
             name: "GuderianTests",
-            dependencies: ["GuderianCore"],
+            dependencies: [
+                "GuderianCore",
+                .product(name: "DerZweiteWeltkriegHistorical", package: "dzw"),
+            ],
             path: "Tests/GuderianTests"
         ),
     ]

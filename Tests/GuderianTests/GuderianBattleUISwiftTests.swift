@@ -1,4 +1,6 @@
+import DerZweiteWeltkriegHistorical
 import GuderianCore
+import SwiftUI
 import Testing
 
 @Suite("Guderian five-battle UI flow")
@@ -162,6 +164,27 @@ struct GuderianBattleUISwiftTests {
         #expect(session.humanPlayer == .guderianAI)
         #expect(session.aiPlayer == .player)
         #expect(GuderianHistoricalSideSelectionResolver.sideTitle(for: session.humanPlayer, in: scenario) == "Guderian's command")
+    }
+
+    @Test("Guderian battle selection can render the shared dropdown for either playable side")
+    @MainActor
+    func guderianBattleSelectionUsesSharedSidePickerDropdown() throws {
+        let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let historicalScenario = GuderianHistoricalScenarioAdapter.scenario(for: scenario)
+        let picker = HistoricalBattleSidePicker(
+            scenario: historicalScenario,
+            selectedSideID: .constant(GuderianHistoricalSideID.guderianCommand),
+            accessibilityIdentifier: HistoricalBattleSidePickerDefaults.accessibilityIdentifier,
+            optionAccessibilityIDPrefix: "guderian-side-option"
+        )
+
+        #expect(historicalScenario.sideOptions.map(\.id) == [
+            GuderianHistoricalSideID.guderianCommand,
+            GuderianHistoricalSideID.opposingForce,
+        ])
+        #expect(historicalScenario.sideOption(id: GuderianHistoricalSideID.guderianCommand)?.title == "Guderian's command")
+        #expect(historicalScenario.sideOption(id: GuderianHistoricalSideID.opposingForce)?.title == "Opposing army")
+        #expect(String(describing: type(of: picker)).contains("HistoricalBattleSidePicker"))
     }
 
     @Test("Cycles 931-940 GuderianTest first-battle controller reaches a real debrief")

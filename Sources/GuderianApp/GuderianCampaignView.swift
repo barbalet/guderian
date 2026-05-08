@@ -1,4 +1,5 @@
 import GuderianCore
+import DerZweiteWeltkriegHistorical
 import Foundation
 import Metal
 import OSLog
@@ -10,6 +11,8 @@ private enum GuderianCampaignStorageKeys {
     static let legacyCampaignSave = UnifiedCampaignSaveCodec.migratedCampaignStorageKey
     static let lateCareerProgress = UnifiedCampaignSaveCodec.migratedLateCareerStorageKey
     static let unifiedCampaignSave = UnifiedCampaignSaveCodec.appStorageKey
+    static let selectedPlayableSide = "guderian.campaign.selected-side.v1"
+    static let selectedPlayableSideByBattle = "guderian.campaign.selected-side-by-battle.v1"
 }
 
 private enum LateCareerScopeFilter: String, CaseIterable, Identifiable {
@@ -59,6 +62,8 @@ public struct GuderianCampaignView: View {
     @State private var showsFirstRunTutorial = false
     @AppStorage(GuderianCampaignStorageKeys.lateCareerProgress) private var savedLateCareerProgressData = Data()
     @AppStorage(GuderianCampaignStorageKeys.unifiedCampaignSave) private var savedUnifiedCampaignStateData = Data()
+    @AppStorage(GuderianCampaignStorageKeys.selectedPlayableSide) private var selectedSideID = GuderianHistoricalSideSelectionResolver.defaultHumanSideID
+    @AppStorage(GuderianCampaignStorageKeys.selectedPlayableSideByBattle) private var selectedSideIDsByBattle = ""
     @AppStorage("guderian.tutorial.firstRunHistory.v1.dismissed") private var firstRunHistoryDismissed = false
 
     private var selectedScenario: GuderianScenario {
@@ -275,7 +280,7 @@ public struct GuderianCampaignView: View {
         Section(UnifiedCampaignListCatalog.sectionTitle) {
             ForEach(unifiedRows) { row in
                 NavigationLink(value: row.id) {
-                    UnifiedCampaignBattleRow(row: row)
+                    unifiedBattleSelectionLabel(for: row)
                 }
                 .disabled(!row.isAvailable)
                 .simultaneousGesture(TapGesture().onEnded {
@@ -290,6 +295,50 @@ public struct GuderianCampaignView: View {
                 .accessibilityIdentifier(row.navigationAccessibilityIdentifier)
             }
         }
+    }
+
+    @ViewBuilder
+    private func unifiedBattleSelectionLabel(for row: UnifiedCampaignListRow) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            UnifiedCampaignBattleRow(row: row)
+
+            if let scenario = fieldCommandScenario(for: row) {
+                HistoricalBattleSidePicker(
+                    scenario: GuderianHistoricalScenarioAdapter.scenario(for: scenario),
+                    selectedSideID: sideSelectionBinding(for: scenario),
+                    accessibilityIdentifier: "battle-selection-side-picker-\(row.id.rawValue)",
+                    optionAccessibilityIDPrefix: "guderian-battle-selection-side-option",
+                    isEnabled: row.isAvailable,
+                    showsBriefing: false
+                )
+            }
+        }
+    }
+
+    private func fieldCommandScenario(for row: UnifiedCampaignListRow) -> GuderianScenario? {
+        guard let battleID = row.id.fieldCommandID else {
+            return nil
+        }
+        return scenarios.first { $0.id == battleID }
+    }
+
+    private func sideSelectionBinding(for scenario: GuderianScenario) -> Binding<String> {
+        Binding(
+            get: {
+                GuderianHistoricalSideSelectionMemory.selectedSideID(
+                    for: scenario,
+                    encodedSelections: selectedSideIDsByBattle,
+                    fallbackSideID: selectedSideID
+                )
+            },
+            set: { newSideID in
+                selectedSideIDsByBattle = GuderianHistoricalSideSelectionMemory.encodedSelections(
+                    selectedSideIDsByBattle,
+                    selecting: newSideID,
+                    for: scenario
+                )
+            }
+        )
     }
 
     private var scenarioListSection: some View {
@@ -1591,7 +1640,8 @@ struct ScenarioBriefingView: View {
     let shipReport: FullCampaignShipReport
     let onCompletion: (CampaignCompletionRecord) -> Void
     @State private var logCategory: ScenarioLogCategory? = nil
-    @AppStorage("guderian.campaign.selected-side.v1") private var selectedSideID = GuderianHistoricalSideSelectionResolver.defaultHumanSideID
+    @AppStorage(GuderianCampaignStorageKeys.selectedPlayableSide) private var selectedSideID = GuderianHistoricalSideSelectionResolver.defaultHumanSideID
+    @AppStorage(GuderianCampaignStorageKeys.selectedPlayableSideByBattle) private var selectedSideIDsByBattle = ""
 
     var loadout: DZWScenarioLoadout? {
         DZWScenarioLoader.load(scenario.id)
@@ -1626,9 +1676,24 @@ struct ScenarioBriefingView: View {
     }
 
     var effectiveSelectedSideID: String {
-        historicalScenario.sideOption(id: selectedSideID) == nil
-            ? GuderianHistoricalSideSelectionResolver.defaultHumanSideID
-            : selectedSideID
+        GuderianHistoricalSideSelectionMemory.selectedSideID(
+            for: scenario,
+            encodedSelections: selectedSideIDsByBattle,
+            fallbackSideID: selectedSideID
+        )
+    }
+
+    var sideSelectionBinding: Binding<String> {
+        Binding(
+            get: { effectiveSelectedSideID },
+            set: { newSideID in
+                selectedSideIDsByBattle = GuderianHistoricalSideSelectionMemory.encodedSelections(
+                    selectedSideIDsByBattle,
+                    selecting: newSideID,
+                    for: scenario
+                )
+            }
+        )
     }
 
     var aiSnapshot: GermanAISnapshot {
@@ -1690,37 +1755,13 @@ struct ScenarioBriefingView: View {
     }
 
     private var fieldCommandSideSelector: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Label("Playable Side", systemImage: "person.crop.circle.badge.checkmark")
-                    .font(.headline)
-                Text("\(historicalScenario.sideOption(id: effectiveSelectedSideID)?.title ?? "Selected side") under human control")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(minWidth: 240, alignment: .leading)
-
-            ForEach(historicalScenario.sideOptions) { side in
-                Button {
-                    selectedSideID = side.id
-                } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Label(side.title, systemImage: side.role == .protagonist ? "bolt.horizontal" : "shield.lefthalf.filled")
-                            .font(.callout.weight(.semibold))
-                        Text(side.playerBriefing)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.bordered)
-                .tint(effectiveSelectedSideID == side.id ? Color.accentColor : Color.secondary)
-                .accessibilityIdentifier("guderian-side-option-\(side.id)")
-                .help(side.playerBriefing)
-            }
-        }
-        .accessibilityIdentifier("battle-side-selector")
+        HistoricalBattleSidePicker(
+            scenario: historicalScenario,
+            selectedSideID: sideSelectionBinding,
+            title: "Playable Side",
+            accessibilityIdentifier: HistoricalBattleSidePickerDefaults.accessibilityIdentifier,
+            optionAccessibilityIDPrefix: "guderian-side-option"
+        )
     }
 
     private var briefingWorkspace: some View {
