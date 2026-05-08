@@ -57,7 +57,7 @@ Wikipedia was used as the initial open research shelf for [Heinz Guderian](https
 
 The game should avoid celebratory framing. Guderian was a senior Nazi German commander; the default player-facing fantasy is resistance against his offensives. When the player chooses Guderian's command, that side is presented as historical command study and comparison, not admiration or role-play. Historical notes should acknowledge the wider criminal context of the Wehrmacht where relevant.
 
-The chronology below names the primary opposing or alternate force for each battle. Scenario design notes describe the default opposing-force lens unless they explicitly mention command-study play; field-command battles can be launched from either side through the `Playable Side` selector.
+The chronology below names the primary opposing or alternate force for each battle. Scenario design notes describe the default opposing-force lens unless they explicitly mention command-study play; field-command battles can be launched from either side through the `Playable Side` selector. Automated opposition is authored in both directions: Guderian-command study now faces phase-aware opposing armies with distinct Polish, French, Allied port-defense, Soviet 1941, and Soviet winter behavior, while late-career battles keep their caveated playable-force AI treatment.
 
 ## Battle Chronology
 

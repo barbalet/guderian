@@ -243,6 +243,10 @@ public final class GuderianTestFirstBattleRunController {
         steps.filter { $0.controller == .guderian }.count
     }
 
+    public var opposingForcePlan: OpposingForceAIPlan {
+        antiGuderianPlan
+    }
+
     public var canRun: Bool {
         !runState.isTerminal && lastReport == nil
     }
@@ -262,7 +266,7 @@ public final class GuderianTestFirstBattleRunController {
         self.session = session
         openingSnapshot = session.snapshot()
         latestSnapshot = openingSnapshot
-        antiGuderianPlan = AntiGuderianAIPlanCatalog.plan(for: scenario)
+        antiGuderianPlan = OpposingForceAIPlanCatalog.plan(for: scenario)
         germanPlan = GermanAIPlanCatalog.plan(for: scenario)
     }
 
@@ -277,7 +281,7 @@ public final class GuderianTestFirstBattleRunController {
         openingSnapshot = session.snapshot()
         latestSnapshot = openingSnapshot
         runState = .ready
-        antiGuderianPlan = AntiGuderianAIPlanCatalog.plan(for: scenario)
+        antiGuderianPlan = OpposingForceAIPlanCatalog.plan(for: scenario)
         germanPlan = GermanAIPlanCatalog.plan(for: scenario)
         steps = []
         phaseAdvances = 0
@@ -430,27 +434,37 @@ public final class GuderianTestFirstBattleRunController {
         switch snapshot.phase {
         case .movement:
             let moved = moveActiveUnits(snapshot: snapshot)
+            let target = priorityTarget(for: snapshot)
+            let reason = priorityInstruction(for: snapshot)
             status = moved == 0 ? .blocked : .succeeded
             title = "\(controller.rawValue) movement"
-            detail = moved == 0 ? "No legal movement was available." : "\(moved) active units moved toward priority objectives."
+            detail = moved == 0 ?
+                "No legal movement was available for priority target \(target); fallback to nearest legal objective also failed. Reason: \(reason)" :
+                "\(moved) active units moved toward priority target \(target), with nearest legal objective as fallback. Reason: \(reason)"
         case .shooting:
             let shots = shootActiveUnits(snapshot: snapshot)
+            let target = priorityTarget(for: snapshot)
+            let reason = priorityInstruction(for: snapshot)
             status = shots == 0 ? .blocked : .succeeded
             title = "\(controller.rawValue) shooting"
-            detail = shots == 0 ? "No legal shots were available." : "\(shots) active units fired at nearest enemies."
+            detail = shots == 0 ?
+                "No legal shots were available while protecting priority target \(target). Reason: \(reason)" :
+                "\(shots) active units fired at nearest enemies to protect priority target \(target). Reason: \(reason)"
         case .assault:
             let assaults = assaultActiveUnits(snapshot: snapshot)
             let resolved = session.resolveFirstPendingChoice()
+            let target = priorityTarget(for: snapshot)
+            let reason = priorityInstruction(for: snapshot)
             title = "\(controller.rawValue) assault"
             if assaults > 0 {
                 status = .succeeded
-                detail = "\(assaults) active units assaulted nearest enemies."
+                detail = "\(assaults) active units assaulted nearest enemies around priority target \(target). Reason: \(reason)"
             } else if resolved {
                 status = .succeeded
-                detail = "Resolved a pending assault or damage choice."
+                detail = "Resolved a pending assault or damage choice around priority target \(target). Reason: \(reason)"
             } else {
                 status = .blocked
-                detail = "No legal assaults or pending choices were available."
+                detail = "No legal assaults or pending choices were available around priority target \(target). Reason: \(reason)"
             }
         }
 
@@ -547,21 +561,42 @@ public final class GuderianTestFirstBattleRunController {
     }
 
     private func movementPriorityNames(for activePlayer: NativeBoardPlayer) -> [String] {
+        phasePriorityNames(for: activePlayer, phase: .movement)
+    }
+
+    private func phasePriorityNames(
+        for activePlayer: NativeBoardPlayer,
+        phase: NativeBoardPhase
+    ) -> [String] {
         if activePlayer == .guderianAI {
-            return germanPlan.targetPriorities(for: .movement)
+            return germanPlan.targetPriorities(for: phase)
         }
 
-        if scenario.id == .tucholaForest {
+        if scenario.id == .tucholaForest && phase == .movement {
             return uniqueNonEmpty([
                 "Bydgoszcz withdrawal",
                 "Tuchola",
                 "Chojnice",
                 "Pila-Mlyn bridge",
                 "Pruszcz bridge",
-            ] + antiGuderianPlan.targetPriorities)
+            ] + antiGuderianPlan.targetPriorities(for: phase))
         }
 
-        return antiGuderianPlan.targetPriorities
+        return antiGuderianPlan.targetPriorities(for: phase)
+    }
+
+    private func priorityTarget(for snapshot: NativeBoardSnapshot) -> String {
+        phasePriorityNames(for: snapshot.activePlayer, phase: snapshot.phase).first ?? "nearest legal objective"
+    }
+
+    private func priorityInstruction(for snapshot: NativeBoardSnapshot) -> String {
+        if snapshot.activePlayer == .guderianAI {
+            return germanPlan.orders.first { $0.kind.nativeBoardPhase == snapshot.phase }?.instruction ??
+                germanPlan.strategicGoal
+        }
+
+        return antiGuderianPlan.orders.first { $0.kind.nativeBoardPhase == snapshot.phase }?.instruction ??
+            antiGuderianPlan.strategicGoal
     }
 
     private func aiController(for activePlayer: NativeBoardPlayer) -> PlayableTestAIController {

@@ -171,15 +171,18 @@ private enum DZWPlayableBattleSource {
         }
     }
 
-    func aiTargetPriorities(for player: NativeBoardPlayer) -> [String] {
+    func aiTargetPriorities(
+        for player: NativeBoardPlayer,
+        phase: NativeBoardPhase = .movement
+    ) -> [String] {
         switch self {
         case .fieldCommand(let scenario, _):
             if player == .guderianAI {
-                return ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities(for: .movement)
+                return ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities(for: phase)
             }
-            return AntiGuderianAIPlanCatalog.plan(for: scenario).targetPriorities
+            return OpposingForceAIPlanCatalog.plan(for: scenario).targetPriorities(for: phase)
         case .lateCareer(let entry):
-            return LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)?.priorities.map(\.targetName) ?? []
+            return LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)?.priorityNames(for: phase) ?? []
         }
     }
 
@@ -189,7 +192,7 @@ private enum DZWPlayableBattleSource {
             if player == .guderianAI {
                 return ScenarioContentCatalog.bundle(for: scenario).aiPlan.postureName
             }
-            return AntiGuderianAIPlanCatalog.plan(for: scenario).postureName
+            return OpposingForceAIPlanCatalog.plan(for: scenario).postureName
         case .lateCareer:
             return "Unified German AI"
         }
@@ -542,7 +545,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         let actionSucceeded: Bool
         switch snapshot.phase {
         case .movement:
-            let priorities = source.aiTargetPriorities(for: snapshot.activePlayer)
+            let priorities = source.aiTargetPriorities(for: snapshot.activePlayer, phase: snapshot.phase)
             if !priorities.isEmpty {
                 let distance = snapshot.activePlayer == .guderianAI ? 6.0 : 5.0
                 actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: distance) ?? false

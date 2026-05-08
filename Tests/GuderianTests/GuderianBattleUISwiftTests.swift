@@ -98,8 +98,79 @@ struct GuderianBattleUISwiftTests {
         #expect(suite.summary.completedScenarios == GuderianCampaignCatalog.all.count)
         #expect(suite.results.allSatisfy { $0.automatedSides.isSuperset(of: [.player, .guderianAI]) })
         #expect(suite.results.allSatisfy { $0.antiGuderianStepCount > 0 && $0.germanStepCount > 0 })
-        #expect(suite.results.allSatisfy { !$0.antiGuderianPlan.targetPriorities.isEmpty })
+        #expect(suite.results.allSatisfy { !$0.opposingForcePlan.targetPriorities(for: .movement).isEmpty })
         #expect(suite.results.allSatisfy { $0.completion.completionRecord.scenarioID == $0.id })
+    }
+
+    @Test("Cycles 1081-1100 opposing-force AI has phase-aware army identities")
+    func opposingForceAIPlansHavePhaseAwareArmyIdentities() throws {
+        let tuchola = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let sedan = try #require(GuderianCampaignCatalog.scenario(id: .sedan))
+        let calais = try #require(GuderianCampaignCatalog.scenario(id: .calais))
+        let moscow = try #require(GuderianCampaignCatalog.scenario(id: .moscowTulaKashira))
+        let tucholaPlan = OpposingForceAIPlanCatalog.plan(for: tuchola)
+        let sedanPlan = OpposingForceAIPlanCatalog.plan(for: sedan)
+        let calaisPlan = OpposingForceAIPlanCatalog.plan(for: calais)
+        let moscowPlan = OpposingForceAIPlanCatalog.plan(for: moscow)
+        let plans = [tucholaPlan, sedanPlan, calaisPlan, moscowPlan]
+
+        #expect(tucholaPlan.armyFamily == .polish)
+        #expect(sedanPlan.armyFamily == .french)
+        #expect(calaisPlan.armyFamily == .alliedPortDefense)
+        #expect(moscowPlan.armyFamily == .sovietWinter)
+        #expect(Set(plans.map(\.armyFamily)).count == plans.count)
+        #expect(plans.allSatisfy { $0.isExecutableByNativeAutoplay })
+        #expect(plans.allSatisfy { !$0.targetPriorities(for: .movement).isEmpty })
+        #expect(plans.allSatisfy { !$0.targetPriorities(for: .shooting).isEmpty })
+        #expect(plans.allSatisfy { !$0.targetPriorities(for: .assault).isEmpty })
+        #expect(tucholaPlan.targetPriorities(for: .movement).first == "Bydgoszcz withdrawal")
+        #expect(tucholaPlan.targetPriorities(for: .shooting).first == "Chojnice-Tuchola road net")
+        #expect(sedanPlan.targetPriorities(for: .movement).contains("Meuse crossings"))
+        #expect(calaisPlan.targetPriorities(for: .movement).contains("Protect Dunkirk time"))
+        #expect(moscowPlan.targetPriorities(for: .movement).contains("Guard Tula axis"))
+        #expect(tucholaPlan.targetPriorities(for: .movement) != sedanPlan.targetPriorities(for: .movement))
+        #expect(tucholaPlan.orders.map(\.kind) == [.movement, .shooting, .assault])
+    }
+
+    @Test("Cycles 1101-1120 opposing-force AI acceptance covers Soviet, late-war, and Guderian-side regression")
+    func opposingForceAIAcceptanceCoversSovietLateWarAndGuderianSideRegression() throws {
+        let report = OpposingForceAIAcceptanceCatalog.report
+
+        #expect(report.blockers.isEmpty)
+        #expect(report.isReady)
+        #expect(report.cycleStart == 1101)
+        #expect(report.cycleEnd == 1120)
+        #expect(report.fieldCommandBattleCount == 19)
+        #expect(report.lateCareerBattleCount == 16)
+        #expect(report.requiredArmyFamiliesCovered)
+        #expect(report.allFieldCommandGuderianSideRunsReachDebrief)
+        #expect(report.visibleReasoningReady)
+        #expect(report.uniqueFieldCommandBehaviorSignatureCount == 19)
+        #expect(report.uniqueLateCareerBehaviorSignatureCount >= 8)
+
+        let soviet1941 = report.fieldCommandAudits.filter { $0.armyFamily == .soviet1941 }
+        #expect(soviet1941.count == 6)
+        #expect(soviet1941.allSatisfy { $0.hasPhaseAwarePriorities })
+        #expect(soviet1941.allSatisfy { $0.hasVisibleReasoning })
+
+        let bialystok = try #require(report.fieldCommandAudits.first { $0.id == .bialystokMinsk })
+        let smolensk = try #require(report.fieldCommandAudits.first { $0.id == .smolensk })
+        let roslavl = try #require(report.fieldCommandAudits.first { $0.id == .roslavlNovozybkov })
+        let kiev = try #require(report.fieldCommandAudits.first { $0.id == .kiev })
+        let bryansk = try #require(report.fieldCommandAudits.first { $0.id == .bryansk })
+        let mtsensk = try #require(report.fieldCommandAudits.first { $0.id == .mtsensk })
+
+        #expect(bialystok.movementPriorityNames.first == "Open breakout lanes")
+        #expect(smolensk.movementPriorityNames.first == "Yartsevo escape lane")
+        #expect(roslavl.behaviorProfile == .counterattack)
+        #expect(roslavl.shootingPriorityNames.first == "Soviet tank raid point")
+        #expect(kiev.movementPriorityNames.contains("Evacuate command assets"))
+        #expect(bryansk.shootingPriorityNames.first == "Autumn road friction")
+        #expect(mtsensk.shootingPriorityNames.first == "Katukov tank ambush")
+
+        #expect(report.lateCareerAudits.allSatisfy { $0.armyFamily == .lateWarSovietAllied })
+        #expect(Set(report.lateCareerAudits.map(\.behaviorProfile)).count >= 3)
+        #expect(report.lateCareerAudits.allSatisfy { $0.isReady })
     }
 
     @Test("Cycles 931-940 GuderianTest launches the first-battle autoplay contract")

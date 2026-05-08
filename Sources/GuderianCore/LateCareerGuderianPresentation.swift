@@ -295,6 +295,31 @@ public struct LateCareerAIPlan: Identifiable, Codable, Hashable, Sendable {
         self.priorities = priorities
         self.blockedActionExpectations = blockedActionExpectations
     }
+
+    public func priorityNames(for phase: NativeBoardPhase) -> [String] {
+        let orderedPriorities: [LateCareerAIPriority]
+        switch phase {
+        case .movement:
+            orderedPriorities = priorities
+        case .shooting:
+            orderedPriorities = priorities.filter { $0.side == .player } + priorities.filter { $0.side != .player }
+        case .assault:
+            orderedPriorities = priorities.reversed()
+        }
+
+        var seen: Set<String> = []
+        var result: [String] = []
+        for name in orderedPriorities.map(\.targetName) {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = trimmed.lowercased()
+            guard !trimmed.isEmpty, !seen.contains(key) else {
+                continue
+            }
+            seen.insert(key)
+            result.append(trimmed)
+        }
+        return result
+    }
 }
 
 public enum LateCareerRuleFamily: String, CaseIterable, Codable, Hashable, Sendable {

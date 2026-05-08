@@ -4,7 +4,7 @@
 
 The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira; those field-command battles now include a playable-side selector with the opposing-force lens as the default and Guderian command play framed as sober command study. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19. Cycle 930 completes the tutorial onboarding block with first-run historical context and first-battle contextual hints. Cycle 1080 closes the local `REVIEW.md` hardening pass.
 
-Remaining playable-screen estimate: battles 1-35 are complete through cycle 890, tutorial onboarding is complete through cycle 930, and the local review hardening plan is complete through cycle 1080. There are no cycles remaining in the current unified 35-battle playable-campaign, tutorial-onboarding, or `REVIEW.md` local-hardening plans.
+Remaining playable-screen estimate: battles 1-35 are complete through cycle 890, tutorial onboarding is complete through cycle 930, and the local review hardening plan is complete through cycle 1080. The opposing-army AI distinction block is complete through cycle 1120. There are no cycles remaining in the current unified 35-battle playable-campaign, tutorial-onboarding, `REVIEW.md` local-hardening, or opposing-army AI distinction plans.
 
 ## Cycle Range Summary
 
@@ -21,6 +21,7 @@ Remaining playable-screen estimate: battles 1-35 are complete through cycle 890,
 - Cycles 891-930: tutorial onboarding and reusable guidance, adding a four-screen first-run historical tutorial plus first-battle contextual hints with versioned `Do not show again` persistence.
 - Cycles 931-960: `GuderianTest` first-battle autoplay replacement, making the test app visibly play Tuchola Forest through the same DZW-style battle surface as the main app.
 - Cycles 961-1080: `REVIEW.md` local hardening, implementing the review cleanup inside this checkout and embedded `dzw` without changing the sibling `derZweiteWeltkrieg` checkout.
+- Cycles 1081-1120: opposing-army AI distinction and parity, turning the default-side automation into phase-aware, army-specific opponents for Guderian-command play.
 
 Cycle 0 update: README and this plan were created from a review of the root project, the included `dzw` engine directory, and Wikipedia research on Guderian's World War II field-command battles.
 
@@ -203,6 +204,8 @@ Cycle plan 831-890: repair the cycle 830 overclaim by routing battles 20-35 thro
 Cycle plan 891-930: add two tutorial interfaces and the reusable tutorial architecture they need. The first is a four-screen first-run historical tutorial about Heinz Guderian, the purpose of the battles, and why sober memorialization matters. The second is a first-battle contextual tutorial for the opening game, with movement, phase, objective, combat, AI-turn, and debrief hints. Both tutorials need versioned "Do not show again" persistence and should be structured so the tutorial model, trigger system, and storage contract can be reused by future `gzw` games.
 
 Cycle plan 931-960: completely replace `GuderianTest` with a first-battle autoplay app based on the real `Guderian` battle implementation. The new test target should launch directly into Tuchola Forest, use the same `DZWPlayableBattleView`/native board session path as the player-facing app, drive the default human side with an automated player, hand turns to the existing German AI automation, and run to a real debriefable victory or loss.
+
+Cycle plan 1081-1120: upgrade the automated opposing armies so Guderian-command play is as intentionally authored as the original opposing-force-vs-Guderian experience. Replace the generic `AntiGuderianAIPlan` concept with a neutral opposing-army AI model, add phase-aware priorities, give Polish, French, British/Belgian/Dutch, Soviet, and late-war playable-force opponents distinct tactical behavior, and prove through tests that every field-command battle can be played as Guderian against a meaningful automated opponent.
 
 ## Planning Rules
 
@@ -639,7 +642,7 @@ Status through cycle 810: completed. The unified acceptance bar, 35-battle ident
 
 Status through cycle 815: completed. `UnifiedBalancePacingAuditCatalog` checks the 16 added battles for readable board starts, objective spacing, terrain density, mobility variety, victory bands, and live German AI pressure against the first-19 playable baseline.
 
-Status through cycle 820: completed. The README Battle Chronology lists all 35 selectable battles with historical links, dates, command-scope caveats, opposing-force notes, results, and scenario design notes, and the app progress/status controls describe one unified 35-battle campaign rather than an added-battles tier.
+Status through cycle 820: completed. The README Battle Chronology lists all 35 selectable battles with historical links, dates, command-scope caveats, opposing-force notes, results, and scenario design notes, and the app progress/status controls describe one unified 35-battle campaign rather than an added-battles tier. There are no cycles remaining in the cycle 731-830 unification block.
 
 Status through cycle 825: completed. `UnifiedBuildRegressionHardeningCatalog` captures the SwiftPM, GuderianTest, Xcode, 35-battle harness, save/load migration, UI parity, documentation, and balance/pacing regression gates.
 
@@ -794,6 +797,41 @@ Status through cycle 1060: completed. `GameController` now groups setup army/for
 Status through cycle 1080: completed. `ScenarioMapRenderable` is now a public `GuderianCore` protocol with co-located conformances for field-command and late-career map models, while `ScenarioMapView` only renders that contract. `GuderianCore.swift` now documents its deliberate re-export role, and `BattlefieldWorkspace.swift` has been renamed to `BattlefieldViewport.swift` with the Xcode project reference updated. `logDZWWindowSnapshot` is compiled only for debug builds, and both battle panel coordinators now use stable `NSUserInterfaceItemIdentifier` values plus the existing panel-to-window map instead of a parallel `ObjectIdentifier` lookup table. The final review-local tests verify file hygiene, public map renderability, debug-only diagnostics, hardened panel routing, README/PLAN closure notes, and all 30 checklist items. The `REVIEW.md` local hardening block is complete through cycle 1080; future work is limited to optional upstream/back-port planning for the sibling `derZweiteWeltkrieg` repository.
 
 Acceptance for cycle 1080: every numbered item in `REVIEW.md` has either been implemented locally in `guderian`/embedded `dzw` or closed with an explicit code comment/test-backed rationale inside this block. The sibling `derZweiteWeltkrieg` checkout remains untouched by the implementation work, the 35-battle playable campaign and `GuderianTest` autoplay behavior still pass their gates, and the local `dzw` version is cleaner, more typed, and easier to maintain.
+
+## Cycles 1081-1120: Opposing-Army AI Distinction
+
+This block makes Guderian-command play enjoyable on its own terms. The current system can flip the human side and run automated opposing-force turns, but the opposing automation is derived mostly from objectives, score channels, and denial targets. That is mechanically playable, not yet characterful. The goal of this block is to make each opposing army feel like a different opponent with readable habits, strengths, anxieties, and historical constraints.
+
+The work should preserve the sober command-study framing: playing Guderian's command must remain a systems comparison mode, not an admiration fantasy. The fun target is distinct tactical opposition: Polish fortified delay should feel different from French armored counterattack, port evacuation defense, Soviet breakout operations, winter defense, or late-war operational encirclement pressure.
+
+Technical requirements:
+
+- Rename or replace `AntiGuderianAIPlan` with a neutral `OpposingForceAIPlan` or equivalent model while preserving Codable/source compatibility where tests or reports still reference the old shape.
+- Give opposing armies phase-aware priorities for movement, shooting, and assault, matching the executable shape already available to `GermanAIPlan`.
+- Add posture-specific behavior for fortified delay, mobile delay, evacuation defense, breakout, counterattack, and urban defense.
+- Add force-family behavior so Polish, French, British/Belgian/Dutch, Soviet 1941, Soviet winter, and late-war Soviet/Allied-style forces do not all select targets the same way.
+- Ensure Guderian-command human play never commands the opposing army by mistake, and that the AI turn runner selects opposing-force priorities whenever `.player` is automated.
+- Keep AI decisions explainable in the visible log: target, reason, fallback, and blocked-action cause should be surfaced in player-facing terms.
+- Add regression coverage that launches each field-command battle as Guderian's command and verifies the opposing army moves, fires or assaults where legal, advances phases, and can reach debrief.
+- Add tuning reports that compare German-command automation and opposing-army automation without assuming symmetrical goals.
+- Update README/PLAN/tutorial copy only where needed to explain that side selection now has authored opposition in both directions.
+
+| Cycles | Focus | Output |
+| --- | --- | --- |
+| 1081-1085 | AI model rename and compatibility | Introduce `OpposingForceAIPlan`/`OpposingForceAIOrder`, bridge existing `AntiGuderianAIPlan` callers, preserve old test/report names where migration is safer, and document the new selected-side AI contract. |
+| 1086-1090 | Phase-aware opposing priorities | Add movement, shooting, and assault priority APIs for opposing-force AI; update `DZWPlayableBattleViewModel`, `GuderianTestFirstBattleRunController`, and `PlayableTestGameRunner` to consume the phase-aware plan. |
+| 1091-1095 | Posture behavior layer | Add reusable behavior profiles for fortified delay, mobile delay, evacuation defense, breakout, counterattack, and urban defense, including fallback priorities and blocked-action explanations. |
+| 1096-1100 | Polish and France 1940 AI identities | Give Polish forces delay/withdrawal/fortress habits, French forces armor-counterattack/bridgehead-defense habits, and port defenders evacuation/denial habits. Add scenario-specific tests for Tuchola, Wizna, Sedan, Stonne, Boulogne, Calais, and Dunkirk. |
+| 1101-1105 | Soviet 1941 AI identities | Give Bialystok-Minsk, Smolensk, Roslavl-Novozybkov, Kiev, Bryansk, Mtsensk, and Moscow/Tula/Kashira distinct breakout, spoiling-attack, ambush, winter-defense, and counteroffensive behaviors. |
+| 1106-1110 | Late-war and 35-battle consistency | Extend the opposing-force AI language and behavior hooks across late-career playable-force battles where Guderian-command or German-force study creates an automated playable-force opponent. Keep caveat labels visible. |
+| 1111-1115 | Full campaign Guderian-command regression | Add an all-field-command Guderian-side harness proving the automated opposing army takes meaningful turns, records readable decisions, reaches debrief, and preserves selected-side command boundaries. |
+| 1116-1120 | Tuning, documentation, and acceptance | Balance target selection, update player-facing copy, add AI comparison reports, run full SwiftPM/Xcode gates, and record final acceptance for distinct opposing-army AI parity. |
+
+Status through cycle 1100: completed. The generic `AntiGuderianAIPlan` implementation now has a neutral `OpposingForceAIPlan` model underneath it, with compatibility aliases for existing reports and callers. Opposing-force AI plans now expose executable movement, shooting, and assault priority lists, plus army-family and behavior-profile metadata. The visible battle view, first-battle autoplay controller, historical autoplay configuration, and full playable-test runner consume phase-aware opposing-force priorities when `.player` is automated. Polish, French, Allied port-defense, and Soviet winter families now have distinct target preferences, with explicit early identities for Tuchola Forest, Wizna, Sedan, Stonne, Montcornet, Boulogne, Calais, Dunkirk, and Moscow/Tula/Kashira. Regression coverage verifies the new phase-aware identities and keeps the old compatibility surface alive while the remaining cycles finish Soviet 1941, late-war, full-campaign Guderian-side regression, and tuning.
+
+Status through cycle 1120: completed. Soviet 1941 opposing-force AI now has explicit phase-aware target identities for Bialystok-Minsk, Smolensk, Roslavl-Novozybkov, Kiev, Bryansk, and Mtsensk, covering breakout, spoiling-attack, command-evacuation, autumn-friction, and armored-ambush behaviors. The full field-command harness can now run with Guderian's command selected as the human side, so the automated `.player` side is verified as the opposing army across all 19 field-command battles from launch through debrief. Late-career playable-force AI is included in the same acceptance surface through 16 late-war audits with the `Late-war Soviet/Allied` family signature, caveat checks, blocked-action reasons, and distinct behavior profiles. `OpposingForceAIAcceptanceCatalog` records the cycle 1101-1120 acceptance gate, including family coverage, visible AI reasoning, battle-distinct behavior signatures, Guderian-side debrief completion, and late-career consistency.
+
+Acceptance for cycle 1120: selecting Guderian's command in every field-command battle produces an automated opposing army with phase-aware priorities, posture-specific behavior, visible reasoning, and regression proof from launch through debrief. The opposing armies should not feel interchangeable: Polish, French, Allied port-defense, Soviet breakout/counterattack, winter-defense, and late-war playable-force opponents each need at least one distinct behavior signature that changes how the player experiences the battle.
 
 ## Acceptance Criteria
 
