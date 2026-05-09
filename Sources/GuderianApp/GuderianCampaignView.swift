@@ -363,6 +363,9 @@ public struct GuderianCampaignView: View {
                 )
             },
             set: { newSideID in
+                selectedSideID = newSideID
+                selectedBattleID = .fieldCommand(scenario.id)
+                selectedID = scenario.id
                 selectedSideIDsByBattle = GuderianHistoricalSideSelectionMemory.encodedSelections(
                     selectedSideIDsByBattle,
                     selecting: newSideID,
@@ -1718,6 +1721,7 @@ struct ScenarioBriefingView: View {
         Binding(
             get: { effectiveSelectedSideID },
             set: { newSideID in
+                selectedSideID = newSideID
                 selectedSideIDsByBattle = GuderianHistoricalSideSelectionMemory.encodedSelections(
                     selectedSideIDsByBattle,
                     selecting: newSideID,

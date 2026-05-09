@@ -238,9 +238,9 @@ struct GuderianBattleUISwiftTests {
         #expect(GuderianHistoricalSideSelectionResolver.sideTitle(for: session.humanPlayer, in: scenario) == "Guderian's command")
     }
 
-    @Test("Guderian battle selection can render the shared dropdown for either playable side")
+    @Test("Guderian battle selection can render the shared side control for either playable side")
     @MainActor
-    func guderianBattleSelectionUsesSharedSidePickerDropdown() throws {
+    func guderianBattleSelectionUsesSharedSidePickerControl() throws {
         let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
         let historicalScenario = GuderianHistoricalScenarioAdapter.scenario(for: scenario)
         let picker = HistoricalBattleSidePicker(
@@ -259,8 +259,8 @@ struct GuderianBattleUISwiftTests {
         #expect(String(describing: type(of: picker)).contains("HistoricalBattleSidePicker"))
     }
 
-    @Test("Guderian battle selection keeps the side dropdown outside the navigation link")
-    func guderianBattleSelectionDropdownIsSeparateFromNavigationLink() throws {
+    @Test("Guderian battle selection keeps the side control outside the navigation link")
+    func guderianBattleSelectionSideControlIsSeparateFromNavigationLink() throws {
         let source = try String(
             contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
             encoding: .utf8
@@ -274,6 +274,22 @@ struct GuderianBattleUISwiftTests {
         #expect(navigationLink.upperBound < sidePicker.lowerBound)
         #expect(rowSource.contains("UnifiedCampaignBattleRow(row: row)"))
         #expect(rowSource.contains("battle-selection-side-picker-\\(row.id.rawValue)"))
+    }
+
+    @Test("Guderian side selection keeps completed battle rows launchable")
+    func guderianBattleSelectionUpdatesActiveBattleState() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+        let bindingFunction = try #require(source.range(of: "private func sideSelectionBinding"))
+        let nextFunction = try #require(source.range(of: "private var scenarioListSection"))
+        let bindingSource = String(source[bindingFunction.lowerBound..<nextFunction.lowerBound])
+
+        #expect(bindingSource.contains("selectedSideID = newSideID"))
+        #expect(bindingSource.contains("selectedBattleID = .fieldCommand(scenario.id)"))
+        #expect(bindingSource.contains("selectedID = scenario.id"))
+        #expect(bindingSource.contains("selectedSideIDsByBattle = GuderianHistoricalSideSelectionMemory.encodedSelections"))
     }
 
     @Test("Either-side gameplay copy does not claim the player always opposes Guderian")
