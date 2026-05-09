@@ -6,18 +6,18 @@ import XCTest
 final class GuderianCampaignTests: XCTestCase {
     func testAboutCatalogUsesCurrentReleaseVersionAndDevelopmentText() {
         XCTAssertEqual(GuderianAppAboutCatalog.appName, "Guderian")
-        XCTAssertEqual(GuderianAppAboutCatalog.releaseVersion, "1.02")
+        XCTAssertEqual(GuderianAppAboutCatalog.releaseVersion, "1.03")
         XCTAssertEqual(
             GuderianAppAboutCatalog.displayVersion(
                 bundleInfo: ["CFBundleShortVersionString": "$(MARKETING_VERSION)"]
             ),
-            "1.02"
+            "1.03"
         )
         XCTAssertEqual(
             GuderianAppAboutCatalog.displayVersion(
                 bundleInfo: ["CFBundleShortVersionString": "1.0"]
             ),
-            "1.02"
+            "1.03"
         )
         XCTAssertGreaterThanOrEqual(GuderianAppAboutCatalog.developmentParagraphs.count, 4)
 
