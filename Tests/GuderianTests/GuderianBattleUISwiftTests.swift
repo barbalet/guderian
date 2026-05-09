@@ -452,6 +452,10 @@ struct GuderianBattleUISwiftTests {
         #expect(battleView.contains(".boardTerrain"))
         #expect(battleView.contains(".actionFeedback"))
         #expect(battleView.contains("unit.owner == model.humanPlayer ? .boardUnitMovement : .boardEnemyTargeting"))
+        #expect(battleView.contains("first-battle-movement-ghost"))
+        #expect(battleView.contains("first-battle-targeting-ghost"))
+        #expect(tutorial.contains("low-alpha ghost"))
+        #expect(tutorial.contains("low-alpha reticle"))
     }
 
     @Test("Guderian-side replay opens on a controllable human turn after the AI handoff")

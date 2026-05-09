@@ -67,18 +67,19 @@ final class GuderianMainScreenNavigationUITests: XCTestCase {
 
         let movementCoach = app.descendants(matching: .any)["first-battle-button-coach-board-unit-movement"].firstMatch
         XCTAssertTrue(movementCoach.waitForExistence(timeout: 5), app.debugDescription)
+        let movementGhost = app.descendants(matching: .any)["first-battle-movement-ghost"].firstMatch
+        XCTAssertTrue(movementGhost.waitForExistence(timeout: 5), app.debugDescription)
 
-        let selectedTargetSummary = app.descendants(matching: .any)["battle-selected-target-summary"].firstMatch
-        if !selectedTargetSummary.waitForExistence(timeout: 2) {
-            let nearestEnemy = app.buttons["nearest-enemy-button"].firstMatch
-            XCTAssertTrue(nearestEnemy.waitForExistence(timeout: 5), app.debugDescription)
-            nearestEnemy.click()
-        }
-        XCTAssertTrue(selectedTargetSummary.waitForExistence(timeout: 10), app.debugDescription)
-        selectedTargetSummary.hover()
+        let enemyUnit = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "battle-board-enemy-unit-"))
+            .firstMatch
+        XCTAssertTrue(waitUntilHittable(enemyUnit, timeout: 10), app.debugDescription)
+        enemyUnit.hover()
 
         let targetingCoach = app.descendants(matching: .any)["first-battle-button-coach-board-enemy-targeting"].firstMatch
         XCTAssertTrue(targetingCoach.waitForExistence(timeout: 5), app.debugDescription)
+        let targetingGhost = app.descendants(matching: .any)["first-battle-targeting-ghost"].firstMatch
+        XCTAssertTrue(targetingGhost.waitForExistence(timeout: 5), app.debugDescription)
     }
 
     @MainActor

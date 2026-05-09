@@ -656,14 +656,14 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .boardUnitMovement,
                 title: "Movement",
-                body: "Hover a friendly counter to identify what you command, then drag it during movement to reposition. Short moves that protect roads, cover, or objectives often matter more than maximum distance.",
+                body: "Hover a friendly counter to identify what you command, then drag it during movement to reposition; the low-alpha ghost shows an example move toward an objective. Short moves that protect roads, cover, or objectives often matter more than maximum distance.",
                 accessibilityIdentifier: "first-battle-button-coach-board-unit-movement",
                 requiredTopics: ["drag", "movement", "objectives"]
             ),
             FirstBattleButtonCoachTip(
                 id: .boardEnemyTargeting,
                 title: "Targeting",
-                body: "Hover an enemy counter to read it as a target, then click it or use Nearest Enemy before shooting or assault. Targeting is about tempo: pin, block, or clear the unit that changes the next phase.",
+                body: "Hover an enemy counter to read it as a target, then click it or use Nearest Enemy before shooting or assault; the low-alpha reticle links your selected unit to the target. Targeting is about tempo: pin, block, or clear the unit that changes the next phase.",
                 accessibilityIdentifier: "first-battle-button-coach-board-enemy-targeting",
                 requiredTopics: ["target", "shooting", "assault"]
             ),

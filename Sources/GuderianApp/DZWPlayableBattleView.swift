@@ -2288,6 +2288,10 @@ public struct DZWPlayableBattleView: View {
             (!Self.isRunningUnderTests || Self.enablesButtonCoachUnderUITests)
     }
 
+    private var showsFirstBattleTutorialGhosts: Bool {
+        showsFirstBattleButtonCoach && model.isFirstBattleTutorialEligible
+    }
+
     private var activeFirstBattleHint: TutorialHint? {
         guard showsTutorials,
               !Self.disablesFirstBattleGuidanceHintsUnderUITests,
@@ -2683,6 +2687,11 @@ public struct DZWPlayableBattleView: View {
 
                 ForEach(snapshot.units) { unit in
                     unitToken(unit, in: geometry.size)
+                }
+
+                if showsFirstBattleTutorialGhosts {
+                    firstBattleMovementGhost(snapshot, in: geometry.size)
+                    firstBattleTargetingGhost(snapshot, in: geometry.size)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 24))
@@ -3099,6 +3108,85 @@ public struct DZWPlayableBattleView: View {
         return path
     }
 
+    @ViewBuilder
+    private func firstBattleMovementGhost(_ snapshot: NativeBoardSnapshot, in size: CGSize) -> some View {
+        if let unit = tutorialMovementUnit(in: snapshot) {
+            let start = boardPoint(CGPoint(x: unit.x, y: unit.y), in: size)
+            let destination = tutorialMovementDestination(for: unit, in: snapshot)
+            let end = boardPoint(destination, in: size)
+            let radius = tokenRadius(for: unit, in: size)
+            let ownerColor = boardOwnerColor(for: unit.owner)
+
+            TimelineView(.animation) { timeline in
+                let progress = tutorialCycleProgress(at: timeline.date, period: 2.4)
+                let ghostPosition = interpolate(from: start, to: end, progress: progress)
+
+                ZStack {
+                    Path { path in
+                        path.move(to: start)
+                        path.addLine(to: end)
+                    }
+                    .stroke(Color.white.opacity(0.34), style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [10, 7]))
+
+                    tutorialArrowHead(from: start, to: end, size: 13)
+                        .stroke(Color.white.opacity(0.38), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+
+                    tutorialGhostUnitToken(unit, radius: radius, ownerColor: ownerColor, systemImage: "arrow.up.right")
+                        .position(ghostPosition)
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .ignore)
+            .accessibilityIdentifier("first-battle-movement-ghost")
+            .accessibilityLabel("Low alpha movement ghost")
+        }
+    }
+
+    @ViewBuilder
+    private func firstBattleTargetingGhost(_ snapshot: NativeBoardSnapshot, in size: CGSize) -> some View {
+        if let attacker = tutorialMovementUnit(in: snapshot),
+           let target = tutorialTargetUnit(in: snapshot, from: attacker) {
+            let start = boardPoint(CGPoint(x: attacker.x, y: attacker.y), in: size)
+            let end = boardPoint(CGPoint(x: target.x, y: target.y), in: size)
+            let radius = tokenRadius(for: target, in: size)
+            let targetColor = boardOwnerColor(for: target.owner)
+
+            TimelineView(.animation) { timeline in
+                let pulse = tutorialPulse(at: timeline.date, period: 1.8)
+                let ringScale = 1.05 + pulse * 0.28
+
+                ZStack {
+                    Path { path in
+                        path.move(to: start)
+                        path.addLine(to: end)
+                    }
+                    .stroke(Color.yellow.opacity(0.32 + pulse * 0.18), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [6, 5]))
+
+                    Circle()
+                        .stroke(Color.yellow.opacity(0.54), style: StrokeStyle(lineWidth: 3, dash: [5, 5]))
+                        .frame(width: radius * 3.2 * ringScale, height: radius * 3.2 * ringScale)
+                        .position(end)
+
+                    Circle()
+                        .fill(targetColor.opacity(0.18))
+                        .frame(width: radius * 2.4, height: radius * 2.4)
+                        .overlay(
+                            Image(systemName: "scope")
+                                .font(.system(size: max(CGFloat(16), radius * 0.9), weight: .heavy))
+                                .foregroundStyle(Color.white.opacity(0.72))
+                        )
+                        .position(end)
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .ignore)
+            .accessibilityIdentifier("first-battle-targeting-ghost")
+            .accessibilityLabel("Low alpha targeting ghost")
+        }
+    }
+
     private func terrainShape(for zone: NativeBoardZoneSnapshot, in size: CGSize) -> some View {
         let rect = boardRect(zone, in: size)
         let fill = terrainFill(for: zone)
@@ -3174,7 +3262,7 @@ public struct DZWPlayableBattleView: View {
         let position = boardPoint(gamePoint, in: size)
         let radius = tokenRadius(for: unit, in: size)
         let isSelected = unit.selected || unit.targeted
-        let ownerColor = unit.owner == .player ? Color(red: 0.13, green: 0.32, blue: 0.67) : Color(red: 0.63, green: 0.23, blue: 0.16)
+        let ownerColor = boardOwnerColor(for: unit.owner)
         let selectionStroke = isSelected ? Color.white.opacity(0.98) : Color.white.opacity(0.35)
 
         ZStack {
@@ -3275,6 +3363,135 @@ public struct DZWPlayableBattleView: View {
         )
     }
 
+    private func tutorialMovementUnit(in snapshot: NativeBoardSnapshot) -> NativeBoardUnitSnapshot? {
+        if let selected = snapshot.selectedUnit,
+           selected.owner == model.humanPlayer,
+           !selected.destroyed {
+            return selected
+        }
+
+        return snapshot.units
+            .filter { $0.owner == model.humanPlayer && !$0.destroyed }
+            .sorted { $0.id < $1.id }
+            .first
+    }
+
+    private func tutorialTargetUnit(in snapshot: NativeBoardSnapshot, from attacker: NativeBoardUnitSnapshot) -> NativeBoardUnitSnapshot? {
+        if let target = snapshot.selectedTarget,
+           target.owner != model.humanPlayer,
+           !target.destroyed {
+            return target
+        }
+
+        let attackerPoint = CGPoint(x: attacker.x, y: attacker.y)
+        return snapshot.units
+            .filter { $0.owner != model.humanPlayer && $0.owner != .none && !$0.destroyed }
+            .min {
+                distanceSquared(from: attackerPoint, to: CGPoint(x: $0.x, y: $0.y)) <
+                    distanceSquared(from: attackerPoint, to: CGPoint(x: $1.x, y: $1.y))
+            }
+    }
+
+    private func tutorialMovementDestination(for unit: NativeBoardUnitSnapshot, in snapshot: NativeBoardSnapshot) -> CGPoint {
+        let origin = CGPoint(x: unit.x, y: unit.y)
+        let objective = snapshot.objectives.min {
+            distanceSquared(from: origin, to: CGPoint(x: $0.x, y: $0.y)) <
+                distanceSquared(from: origin, to: CGPoint(x: $1.x, y: $1.y))
+        }
+        let target = objective.map { CGPoint(x: $0.x, y: $0.y) } ?? CGPoint(x: origin.x + 6, y: origin.y)
+        let dx = target.x - origin.x
+        let dy = target.y - origin.y
+        let distance = max(sqrt(dx * dx + dy * dy), 0.001)
+        let step = min(max(distance * 0.36, 3), 7)
+
+        return clampedBoardPoint(CGPoint(
+            x: origin.x + dx / distance * step,
+            y: origin.y + dy / distance * step
+        ))
+    }
+
+    private func clampedBoardPoint(_ point: CGPoint) -> CGPoint {
+        CGPoint(
+            x: min(max(0, point.x), DZWPlayableBattleViewModel.boardWidth),
+            y: min(max(0, point.y), DZWPlayableBattleViewModel.boardHeight)
+        )
+    }
+
+    private func distanceSquared(from lhs: CGPoint, to rhs: CGPoint) -> CGFloat {
+        let dx = lhs.x - rhs.x
+        let dy = lhs.y - rhs.y
+        return dx * dx + dy * dy
+    }
+
+    private func interpolate(from start: CGPoint, to end: CGPoint, progress: CGFloat) -> CGPoint {
+        CGPoint(
+            x: start.x + (end.x - start.x) * progress,
+            y: start.y + (end.y - start.y) * progress
+        )
+    }
+
+    private func tutorialCycleProgress(at date: Date, period: TimeInterval) -> CGFloat {
+        let rawProgress = date.timeIntervalSinceReferenceDate
+            .truncatingRemainder(dividingBy: period) / period
+        return max(0, min(1, CGFloat(rawProgress)))
+    }
+
+    private func tutorialPulse(at date: Date, period: TimeInterval) -> CGFloat {
+        let progress = tutorialCycleProgress(at: date, period: period)
+        return CGFloat((sin(Double(progress) * 2 * Double.pi) + 1) / 2)
+    }
+
+    private func tutorialArrowHead(from start: CGPoint, to end: CGPoint, size: CGFloat) -> Path {
+        var path = Path()
+        let angle = atan2(end.y - start.y, end.x - start.x)
+        let left = CGPoint(
+            x: end.x - cos(angle - .pi / 6) * size,
+            y: end.y - sin(angle - .pi / 6) * size
+        )
+        let right = CGPoint(
+            x: end.x - cos(angle + .pi / 6) * size,
+            y: end.y - sin(angle + .pi / 6) * size
+        )
+
+        path.move(to: end)
+        path.addLine(to: left)
+        path.move(to: end)
+        path.addLine(to: right)
+        return path
+    }
+
+    private func tutorialGhostUnitToken(
+        _ unit: NativeBoardUnitSnapshot,
+        radius: CGFloat,
+        ownerColor: Color,
+        systemImage: String
+    ) -> some View {
+        ZStack {
+            if unit.kind == "Vehicle" || unit.kind == "Assault gun" {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(ownerColor.opacity(0.24))
+                    .frame(width: radius * 2.4, height: radius * 1.6)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.white.opacity(0.48), style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
+                    )
+            } else {
+                Circle()
+                    .fill(ownerColor.opacity(0.22))
+                    .frame(width: radius * 2, height: radius * 2)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.48), style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
+                    )
+            }
+
+            Image(systemName: systemImage)
+                .font(.system(size: max(CGFloat(14), radius * 0.75), weight: .heavy))
+                .foregroundStyle(Color.white.opacity(0.7))
+        }
+        .opacity(0.82)
+    }
+
     private func tokenRadius(for unit: NativeBoardUnitSnapshot, in size: CGSize) -> CGFloat {
         let base: CGFloat = unit.kind == "Vehicle" || unit.kind == "Assault gun" ? 20 : 18
         return max(base, size.width / 46)
@@ -3286,6 +3503,17 @@ public struct DZWPlayableBattleView: View {
             .replacingOccurrences(of: "British ", with: "")
             .replacingOccurrences(of: "Polish ", with: "")
         return cleaned.split(separator: " ").prefix(2).joined(separator: " ")
+    }
+
+    private func boardOwnerColor(for owner: NativeBoardPlayer) -> Color {
+        switch owner {
+        case .player:
+            return Color(red: 0.13, green: 0.32, blue: 0.67)
+        case .guderianAI:
+            return Color(red: 0.63, green: 0.23, blue: 0.16)
+        case .none:
+            return Color(red: 0.55, green: 0.56, blue: 0.46)
+        }
     }
 
     private func terrainFill(for zone: NativeBoardZoneSnapshot) -> Color {
