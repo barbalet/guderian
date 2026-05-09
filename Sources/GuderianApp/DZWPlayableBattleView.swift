@@ -240,11 +240,14 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     @Published private(set) var playableTestGameResult: PlayableTestGameBattleResult?
     @Published private(set) var latestTutorialTrigger: TutorialTrigger?
     @Published private(set) var tutorialEventCount = 0
+    @Published private(set) var isPreparingHumanTurn = false
+    @Published private(set) var openingTurnPreparationGeneration = 0
 
     let source: DZWPlayableBattleSource
     private var session: DZWPlayableBoardSession?
     private let guderianTestController: GuderianTestFirstBattleRunController?
     private var restartCount = 0
+    private var didPrepareOpeningHumanTurn = false
 
     init(
         scenario: GuderianScenario,
@@ -530,6 +533,36 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         }
     }
 
+    func prepareOpeningHumanTurnIfNeeded() async {
+        guard guderianTestController == nil else {
+            return
+        }
+        guard !didPrepareOpeningHumanTurn else {
+            return
+        }
+        guard let snapshot, !isBattleOver else {
+            didPrepareOpeningHumanTurn = true
+            return
+        }
+        guard snapshot.activePlayer != humanPlayer else {
+            didPrepareOpeningHumanTurn = true
+            return
+        }
+
+        didPrepareOpeningHumanTurn = true
+        isPreparingHumanTurn = true
+        dzwPlayableLog.info("Opening AI handoff scheduled humanPlayer=\(self.humanPlayer.rawValue, privacy: .public) activePlayer=\(snapshot.activePlayer.rawValue, privacy: .public)")
+        await Task.yield()
+
+        guard !Task.isCancelled else {
+            isPreparingHumanTurn = false
+            return
+        }
+
+        runAITurnToHumanControl(context: "opening-handoff")
+        isPreparingHumanTurn = false
+    }
+
     func runAutomatedActiveStep() {
         if runGuderianTestControllerStep(context: "visible-auto-step") {
             return
@@ -580,15 +613,19 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             return
         }
 
+        recordTutorialTrigger(.germanAITurn)
+        runAITurnToHumanControl(context: "manual-ai-turn")
+    }
+
+    private func runAITurnToHumanControl(context: String) {
         guard !isBattleOver else {
-            dzwPlayableLog.info("AI turn ignored because battle is over.")
+            dzwPlayableLog.info("AI turn ignored because battle is over context=\(context, privacy: .public)")
             return
         }
 
         let aiPlayer = source.aiPlayer
         let aiLabel = source.sideTitle(for: aiPlayer)
-        dzwPlayableLog.info("AI turn runner started aiPlayer=\(aiPlayer.rawValue, privacy: .public)")
-        recordTutorialTrigger(.germanAITurn)
+        dzwPlayableLog.info("AI turn runner started context=\(context, privacy: .public) aiPlayer=\(aiPlayer.rawValue, privacy: .public)")
         recordAIEvent("\(aiLabel) AI turn runner started.")
         var safety = 0
         while snapshot?.activePlayer != aiPlayer && isBattleOver == false && safety < 4 {
@@ -604,10 +641,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
         if snapshot?.activePlayer == aiPlayer {
             recordAIEvent("\(aiLabel) AI turn paused: action loop hit its safety cap.")
-            dzwPlayableLog.info("AI turn paused at safety cap activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
+            dzwPlayableLog.info("AI turn paused at safety cap context=\(context, privacy: .public) activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         } else {
             recordAIEvent("\(aiLabel) AI turn complete: control returned to \(snapshot.map { self.source.sideTitle(for: $0.activePlayer) } ?? "the player").")
-            dzwPlayableLog.info("AI turn complete activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
+            dzwPlayableLog.info("AI turn complete context=\(context, privacy: .public) activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         }
     }
 
@@ -625,6 +662,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         }
 
         restartCount += 1
+        didPrepareOpeningHumanTurn = false
         session = source.makeSession(restartCount: restartCount)
         completion = nil
         debriefError = nil
@@ -633,6 +671,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             "Battle restarted: \(source.sideTitle(for: source.aiPlayer)) AI ready for \(source.battleTitle)."
         ]
         refresh()
+        openingTurnPreparationGeneration += 1
         dzwPlayableLog.info("Battle restarted title=\(self.source.battleTitle, privacy: .public) restartCount=\(self.restartCount, privacy: .public) session=\(self.session == nil ? "missing" : "ready", privacy: .public)")
     }
 
@@ -2092,6 +2131,19 @@ public struct DZWPlayableBattleView: View {
                 .padding(18)
                 .zIndex(10)
 
+                if model.isPreparingHumanTurn {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            openingTurnPreparationBadge
+                        }
+                        Spacer()
+                    }
+                    .padding(18)
+                    .transition(.opacity)
+                    .zIndex(15)
+                }
+
                 if let hint = activeFirstBattleHint {
                     VStack {
                         Spacer()
@@ -2135,6 +2187,9 @@ public struct DZWPlayableBattleView: View {
                 recordFirstBattleTutorialTrigger(.battleOpened)
                 recordFirstBattleTutorialTrigger(.boardVisible)
                 logDZWWindowSnapshot("dzw-battle-on-appear-after-panels")
+            }
+            .task(id: model.openingTurnPreparationGeneration) {
+                await model.prepareOpeningHumanTurnIfNeeded()
             }
             .onChange(of: model.tutorialEventCount) { _, _ in
                 if let trigger = model.latestTutorialTrigger {
@@ -2337,6 +2392,20 @@ public struct DZWPlayableBattleView: View {
                 )
         )
         .shadow(color: .black.opacity(0.24), radius: 18, x: 0, y: 10)
+    }
+
+    private var openingTurnPreparationBadge: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Preparing \(model.humanSideTitle)")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityIdentifier("battle-opening-turn-preparing")
     }
 
     private var zoomBinding: Binding<CGFloat> {

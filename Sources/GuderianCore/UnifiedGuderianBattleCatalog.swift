@@ -339,9 +339,9 @@ public enum UnifiedCampaignListCatalog {
         switch entry.id.kind {
         case .fieldCommand:
             if let battleID = entry.id.fieldCommandID,
-               let scenario = GuderianCampaignCatalog.scenario(id: battleID) {
+               GuderianCampaignCatalog.scenario(id: battleID) != nil {
                 completionState = progress.isCompleted(battleID) ? .complete : .open
-                availability = progress.isAvailable(scenario, in: playMode) ? .available : .locked
+                availability = .available
             } else {
                 completionState = .open
                 availability = .locked

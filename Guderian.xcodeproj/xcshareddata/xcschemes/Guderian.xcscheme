@@ -29,9 +29,9 @@
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A20000000000000000000001"
-               BuildableName = "GuderianUITests.xctest"
-               BlueprintName = "GuderianUITests"
+               BlueprintIdentifier = "A40000000000000000000001"
+               BuildableName = "GuderianAppUITests.xctest"
+               BlueprintName = "GuderianAppUITests"
                ReferencedContainer = "container:Guderian.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -47,13 +47,22 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A20000000000000000000001"
-               BuildableName = "GuderianUITests.xctest"
-               BlueprintName = "GuderianUITests"
+               BlueprintIdentifier = "A40000000000000000000001"
+               BuildableName = "GuderianAppUITests.xctest"
+               BlueprintName = "GuderianAppUITests"
                ReferencedContainer = "container:Guderian.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "A10000000000000000000001"
+            BuildableName = "Guderian.app"
+            BlueprintName = "Guderian"
+            ReferencedContainer = "container:Guderian.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Release"

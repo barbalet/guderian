@@ -23,6 +23,7 @@
 		A30000000000000000000012 /* GuderianCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000071 /* GuderianCore */; };
 		A30000000000000000000018 /* GuderianAppUI in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000072 /* GuderianAppUI */; };
 		A30000000000000000000013 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* Assets.xcassets */; };
+		A40000000000000000000011 /* GuderianMainScreenNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000021 /* GuderianMainScreenNavigationUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,8 @@
 		A20000000000000000000024 /* GuderianUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GuderianUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A30000000000000000000021 /* GuderianTestApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianTest/GuderianTestApp.swift; sourceTree = SOURCE_ROOT; };
 		A30000000000000000000024 /* GuderianTest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GuderianTest.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A40000000000000000000021 /* GuderianMainScreenNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/GuderianAppUITests/GuderianMainScreenNavigationUITests.swift; sourceTree = SOURCE_ROOT; };
+		A40000000000000000000024 /* GuderianAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GuderianAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,6 +68,13 @@
 			files = (
 				A30000000000000000000012 /* GuderianCore in Frameworks */,
 				A30000000000000000000018 /* GuderianAppUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A40000000000000000000031 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,6 +120,7 @@
 				A10000000000000000000024 /* Guderian.app */,
 				A30000000000000000000024 /* GuderianTest.app */,
 				A20000000000000000000024 /* GuderianUITests.xctest */,
+				A40000000000000000000024 /* GuderianAppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -127,6 +138,7 @@
 			children = (
 				A20000000000000000000021 /* GuderianBattleUISwiftTests.swift */,
 				A20000000000000000000022 /* GuderianCampaignTests.swift */,
+				A40000000000000000000021 /* GuderianMainScreenNavigationUITests.swift */,
 			);
 			name = Tests;
 			sourceTree = "<group>";
@@ -174,6 +186,26 @@
 			productReference = A20000000000000000000024 /* GuderianUITests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A40000000000000000000001 /* GuderianAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A40000000000000000000081 /* Build configuration list for PBXNativeTarget "GuderianAppUITests" */;
+			buildPhases = (
+				A40000000000000000000032 /* Sources */,
+				A40000000000000000000031 /* Frameworks */,
+				A40000000000000000000033 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A40000000000000000000052 /* PBXTargetDependency */,
+			);
+			name = GuderianAppUITests;
+			packageProductDependencies = (
+			);
+			productName = GuderianAppUITests;
+			productReference = A40000000000000000000024 /* GuderianAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		A30000000000000000000001 /* GuderianTest */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A30000000000000000000081 /* Build configuration list for PBXNativeTarget "GuderianTest" */;
@@ -214,6 +246,10 @@
 					A30000000000000000000001 = {
 						CreatedOnToolsVersion = 16.0;
 					};
+					A40000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A10000000000000000000001;
+					};
 				};
 			};
 			buildConfigurationList = A10000000000000000000080 /* Build configuration list for PBXProject "Guderian" */;
@@ -235,6 +271,7 @@
 				A10000000000000000000001 /* Guderian */,
 				A20000000000000000000001 /* GuderianUITests */,
 				A30000000000000000000001 /* GuderianTest */,
+				A40000000000000000000001 /* GuderianAppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -260,6 +297,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A30000000000000000000013 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A40000000000000000000033 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -297,7 +341,33 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A40000000000000000000032 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A40000000000000000000011 /* GuderianMainScreenNavigationUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXContainerItemProxy section */
+		A40000000000000000000051 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000002 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000001;
+			remoteInfo = Guderian;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		A40000000000000000000052 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000001 /* Guderian */;
+			targetProxy = A40000000000000000000051 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A10000000000000000000082 /* Debug */ = {
@@ -501,6 +571,44 @@
 			};
 			name = Release;
 		};
+		A40000000000000000000084 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.barbalet.guderian.app-ui-tests";
+				PRODUCT_NAME = GuderianAppUITests;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = Guderian;
+			};
+			name = Debug;
+		};
+		A40000000000000000000085 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@loader_path/../Frameworks",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.barbalet.guderian.app-ui-tests";
+				PRODUCT_NAME = GuderianAppUITests;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = Guderian;
+			};
+			name = Release;
+		};
 		A30000000000000000000084 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -586,6 +694,15 @@
 			buildConfigurations = (
 				A30000000000000000000084 /* Debug */,
 				A30000000000000000000085 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A40000000000000000000081 /* Build configuration list for PBXNativeTarget "GuderianAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A40000000000000000000084 /* Debug */,
+				A40000000000000000000085 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

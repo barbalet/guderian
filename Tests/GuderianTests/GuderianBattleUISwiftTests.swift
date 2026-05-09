@@ -259,7 +259,7 @@ struct GuderianBattleUISwiftTests {
         #expect(String(describing: type(of: picker)).contains("HistoricalBattleSidePicker"))
     }
 
-    @Test("Guderian battle selection keeps the side control outside the navigation link")
+    @Test("Guderian battle selection keeps the side control outside the launch button")
     func guderianBattleSelectionSideControlIsSeparateFromNavigationLink() throws {
         let source = try String(
             contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
@@ -268,11 +268,13 @@ struct GuderianBattleUISwiftTests {
         let rowFunction = try #require(source.range(of: "private func unifiedBattleSelectionRow"))
         let nextFunction = try #require(source.range(of: "private func fieldCommandScenario"))
         let rowSource = String(source[rowFunction.lowerBound..<nextFunction.lowerBound])
-        let navigationLink = try #require(rowSource.range(of: "NavigationLink(value: row.id)"))
+        let launchButton = try #require(rowSource.range(of: "Button {"))
         let sidePicker = try #require(rowSource.range(of: "HistoricalBattleSidePicker"))
 
-        #expect(navigationLink.upperBound < sidePicker.lowerBound)
+        #expect(launchButton.upperBound < sidePicker.lowerBound)
+        #expect(rowSource.contains("launchBattle(row)"))
         #expect(rowSource.contains("UnifiedCampaignBattleRow(row: row)"))
+        #expect(!rowSource.contains("simultaneousGesture"))
         #expect(rowSource.contains("battle-selection-side-picker-\\(row.id.rawValue)"))
     }
 
@@ -286,10 +288,101 @@ struct GuderianBattleUISwiftTests {
         let nextFunction = try #require(source.range(of: "private var scenarioListSection"))
         let bindingSource = String(source[bindingFunction.lowerBound..<nextFunction.lowerBound])
 
-        #expect(bindingSource.contains("selectedSideID = newSideID"))
+        #expect(!bindingSource.contains("selectedSideID = newSideID"))
+        #expect(bindingSource.contains("selectedSideID(for: scenario)"))
+        #expect(source.contains("historicalScenario.sideOptions.first?.id ?? GuderianHistoricalSideSelectionResolver.defaultHumanSideID"))
         #expect(bindingSource.contains("selectedBattleID = .fieldCommand(scenario.id)"))
         #expect(bindingSource.contains("selectedID = scenario.id"))
-        #expect(bindingSource.contains("selectedSideIDsByBattle = GuderianHistoricalSideSelectionMemory.encodedSelections"))
+        #expect(bindingSource.contains("selectedSideIDsByBattle[scenario.id] = newSideID"))
+        #expect(!bindingSource.contains("GuderianHistoricalSideSelectionMemory.encodedSelections"))
+    }
+
+    @Test("Guderian list-side controls do not share one global selected-side fallback")
+    func guderianBattleSelectionSideControlIsPerBattleOnly() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+
+        #expect(!source.contains("guderian.campaign.selected-side.v1"))
+        #expect(!source.contains("selectedSideID = newSideID"))
+        #expect(!source.contains("fallbackSideID: selectedSideID"))
+        #expect(!source.contains("selectedPlayableSideByBattle"))
+        #expect(!source.contains("@AppStorage(GuderianCampaignStorageKeys.selectedPlayableSide"))
+        #expect(source.contains("@State private var selectedSideIDsByBattle: [GuderianBattleID: String] = [:]"))
+    }
+
+    @Test("Guderian campaign treats every battle as playable")
+    func guderianCampaignTreatsEveryBattleAsPlayable() throws {
+        let appSource = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+        let coreSource = try String(
+            contentsOfFile: "Sources/GuderianCore/UnifiedGuderianBattleCatalog.swift",
+            encoding: .utf8
+        )
+
+        #expect(appSource.contains("Text(\"\\(unifiedRows.count) open battles | choose either side\")"))
+        #expect(!appSource.contains(".disabled(!row.isAvailable)"))
+        #expect(!appSource.contains("guard row.isAvailable else"))
+        #expect(!appSource.contains("Picker(\"Play mode\""))
+        #expect(coreSource.contains("availability = .available"))
+        #expect(!coreSource.contains("progress.isAvailable(scenario, in: playMode) ? .available : .locked"))
+    }
+
+    @Test("Guderian row launch includes selected side so same-battle side swaps reopen")
+    func guderianBattleLaunchIncludesSelectedSide() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("private struct UnifiedCampaignBattleLaunch"))
+        #expect(source.contains("NavigationStack(path: $navigationPath)"))
+        #expect(source.contains("@State private var navigationPath = NavigationPath()"))
+        #expect(source.contains("@State private var launchSequence = 0"))
+        #expect(source.contains("launchBattle(row)"))
+        #expect(source.contains("private func battleLaunch(for row: UnifiedCampaignListRow) -> UnifiedCampaignBattleLaunch"))
+        #expect(source.contains("selectedSideID: selectedSideID(for: row)"))
+        #expect(source.contains("launchSequence: launchSequence"))
+        #expect(source.contains("navigationPath.append(battleLaunch(for: row))"))
+        #expect(source.contains("launchSideID: selectedSideID"))
+        #expect(source.contains(".id(\"\\(scenario.id.rawValue)-\\(activePlayableSideID)\")"))
+    }
+
+    @Test("Guderian main screen exposes executable row navigation from row to playable battle")
+    func guderianMainScreenSelectionHasExecutableNavigationContract() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains(".accessibilityIdentifier(\"campaign-screen\")"))
+        #expect(source.contains(".navigationDestination(for: UnifiedCampaignBattleLaunch.self)"))
+        #expect(source.contains("Button {"))
+        #expect(source.contains("launchBattle(row)"))
+        #expect(source.contains(".accessibilityIdentifier(row.navigationAccessibilityIdentifier)"))
+        #expect(source.contains(".accessibilityIdentifier(\"battle-back-to-campaign-button\")"))
+        #expect(source.contains("DZWPlayableBattleView("))
+        #expect(source.contains("--guderian-ui-test-disable-tutorials"))
+    }
+
+    @Test("Guderian side changes defer the heavy battle reload behind the fast picker update")
+    func guderianSideSelectionDefersPlayableBattleReload() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("@State private var displayedSideID"))
+        #expect(source.contains("@State private var activeBattleSideID"))
+        #expect(source.contains("displayedSideID = newSideID"))
+        #expect(source.contains("schedulePlayableSideReload(newSideID)"))
+        #expect(source.contains("await Task.yield()"))
+        #expect(source.contains("chosenSideID: activePlayableSideID"))
+        #expect(source.contains(".allowsHitTesting(!isPreparingSideSwitch)"))
+        #expect(source.contains("battle-side-switch-preparing"))
     }
 
     @Test("Either-side gameplay copy does not claim the player always opposes Guderian")
@@ -333,6 +426,21 @@ struct GuderianBattleUISwiftTests {
         #expect(source.contains("selectedUnit.owner == humanPlayer"))
         #expect(source.contains("selected-side study mode"))
         #expect(!source.contains("You command the force resisting Guderian's formation"))
+    }
+
+    @Test("Guderian-side replay opens on a controllable human turn after the AI handoff")
+    func guderianPlayableBattlePreparesSelectedHumanOpeningTurn() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("func prepareOpeningHumanTurnIfNeeded() async"))
+        #expect(source.contains("snapshot.activePlayer != humanPlayer"))
+        #expect(source.contains("runAITurnToHumanControl(context: \"opening-handoff\")"))
+        #expect(source.contains(".task(id: model.openingTurnPreparationGeneration)"))
+        #expect(source.contains("openingTurnPreparationGeneration += 1"))
+        #expect(source.contains("battle-opening-turn-preparing"))
     }
 
     @Test("Cycles 931-940 GuderianTest first-battle controller reaches a real debrief")
