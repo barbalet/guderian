@@ -312,6 +312,21 @@ final class ReviewLocalHardeningTests: XCTestCase {
         XCTAssertTrue(tips.allSatisfy { tip in
             tip.body.filter { ".!?".contains($0) }.count <= 2
         })
+        let gameplayTipIDs = Set([
+            FirstBattleButtonCoachID.phaseStatus,
+            .boardUnitMovement,
+            .boardEnemyTargeting,
+            .boardObjective,
+            .boardTerrain,
+            .actionFeedback,
+        ])
+        XCTAssertTrue(Set(tips.map(\.id)).isSuperset(of: gameplayTipIDs))
+        let movementTip = try XCTUnwrap(GuderianTutorialCatalog.firstBattleButtonCoachTip(for: .boardUnitMovement))
+        XCTAssertTrue(movementTip.body.localizedCaseInsensitiveContains("drag"))
+        XCTAssertTrue(movementTip.body.localizedCaseInsensitiveContains("movement"))
+        let targetingTip = try XCTUnwrap(GuderianTutorialCatalog.firstBattleButtonCoachTip(for: .boardEnemyTargeting))
+        XCTAssertTrue(targetingTip.body.localizedCaseInsensitiveContains("target"))
+        XCTAssertTrue(targetingTip.body.localizedCaseInsensitiveContains("shooting"))
 
         var progress = FirstBattleButtonCoachProgress()
         XCTAssertTrue(progress.shouldPresent(.autoStep))

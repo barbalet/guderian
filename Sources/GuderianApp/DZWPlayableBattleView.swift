@@ -1533,6 +1533,12 @@ private struct DZWPlayableBattlePanelWindow: View {
                 Text("Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
                     .font(.headline)
                     .accessibilityIdentifier("battle-phase-label")
+                    .firstBattleButtonCoach(
+                        .phaseStatus,
+                        showsCoach: buttonCoachShows,
+                        progress: firstBattleButtonCoachProgress,
+                        completedFirstGame: firstBattleButtonCoachCompleted
+                    )
                 Text("\(snapshot.mission.name) | \(model.sideTitle(for: .player)) \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) \(model.sideTitle(for: .guderianAI))")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color(red: 0.55, green: 0.39, blue: 0.12))
@@ -1645,18 +1651,62 @@ private struct DZWPlayableBattlePanelWindow: View {
             Text("Selection")
                 .font(.headline)
             if let selected = snapshot.selectedUnit {
-                Text(selected.name)
-                    .font(.title3.weight(.bold))
-                Text("\(model.sideTitle(for: selected.owner)) | \(selected.roleLine)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text("Wounds \(selected.totalWoundsRemaining) | \(selected.inCover ? "Cover" : "Open") | \(selected.hullDown ? "Hull-down" : "Exposed")")
-                    .font(.caption.monospaced())
-                Text(selected.historicalNote.isEmpty ? "Engine unit: \(selected.engineName)" : selected.historicalNote)
-                    .font(.caption.monospaced())
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(selected.name)
+                        .font(.title3.weight(.bold))
+                    Text("\(model.sideTitle(for: selected.owner)) | \(selected.roleLine)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Wounds \(selected.totalWoundsRemaining) | \(selected.inCover ? "Cover" : "Open") | \(selected.hullDown ? "Hull-down" : "Exposed")")
+                        .font(.caption.monospaced())
+                    Text(selected.historicalNote.isEmpty ? "Engine unit: \(selected.engineName)" : selected.historicalNote)
+                        .font(.caption.monospaced())
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("battle-selected-unit-summary")
+                .firstBattleButtonCoach(
+                    selected.owner == model.humanPlayer ? .boardUnitMovement : .boardEnemyTargeting,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             } else {
                 Text("No unit selected")
                     .foregroundStyle(.secondary)
+            }
+
+            if let target = snapshot.selectedTarget {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Target", systemImage: "scope")
+                        .font(.caption.weight(.bold))
+                    Text(target.name)
+                        .font(.subheadline.weight(.bold))
+                    Text("\(model.sideTitle(for: target.owner)) | \(target.roleLine)")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.35)))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("battle-selected-target-summary")
+                .firstBattleButtonCoach(
+                    .boardEnemyTargeting,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
+            } else {
+                Text("No target selected")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("battle-selected-target-summary")
+                    .firstBattleButtonCoach(
+                        .boardEnemyTargeting,
+                        showsCoach: buttonCoachShows,
+                        progress: firstBattleButtonCoachProgress,
+                        completedFirstGame: firstBattleButtonCoachCompleted
+                    )
             }
 
             HStack {
@@ -1844,6 +1894,12 @@ private struct DZWPlayableBattlePanelWindow: View {
                 .font(.caption)
                 .foregroundStyle(snapshot.lastAction.status == .blocked ? .orange : .secondary)
                 .accessibilityIdentifier("battle-action-feedback")
+                .firstBattleButtonCoach(
+                    .actionFeedback,
+                    showsCoach: buttonCoachShows,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
         }
         .buttonStyle(.bordered)
     }
@@ -2168,6 +2224,7 @@ public struct DZWPlayableBattleView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("battle-screen")
             .onAppear {
+                resetFirstBattleButtonCoachForUITestingIfNeeded()
                 model.syncFromGuderianTestController(context: "on-appear")
                 dzwPlayableLog.info("Battle view appeared title=\(model.title, privacy: .public) tutorialEligible=\(model.isFirstBattleTutorialEligible, privacy: .public) firstBattleDismissed=\(firstBattleGuidanceDismissed, privacy: .public) showsDefaultPanels=\(showsDefaultPanels, privacy: .public) showsTutorials=\(showsTutorials, privacy: .public)")
                 logDZWWindowSnapshot("dzw-battle-on-appear-before-panels")
@@ -2228,11 +2285,12 @@ public struct DZWPlayableBattleView: View {
         showsTutorials &&
             !isGuderianTestBacked &&
             !firstBattleButtonCoachCompleted &&
-            !Self.isRunningUnderTests
+            (!Self.isRunningUnderTests || Self.enablesButtonCoachUnderUITests)
     }
 
     private var activeFirstBattleHint: TutorialHint? {
         guard showsTutorials,
+              !Self.disablesFirstBattleGuidanceHintsUnderUITests,
               model.isFirstBattleTutorialEligible,
               !firstBattleGuidanceDismissed else {
             return nil
@@ -2243,6 +2301,11 @@ public struct DZWPlayableBattleView: View {
     private func recordFirstBattleTutorialTrigger(_ trigger: TutorialTrigger) {
         guard showsTutorials else {
             dzwPlayableLog.info("First-battle tutorial trigger suppressed by automation presentation options trigger=\(trigger.rawValue, privacy: .public)")
+            return
+        }
+
+        guard !Self.disablesFirstBattleGuidanceHintsUnderUITests else {
+            dzwPlayableLog.info("First-battle tutorial trigger suppressed by UI test launch argument trigger=\(trigger.rawValue, privacy: .public)")
             return
         }
 
@@ -2293,6 +2356,15 @@ public struct DZWPlayableBattleView: View {
         firstBattleButtonCoachProgress.recordUse(id)
     }
 
+    private func resetFirstBattleButtonCoachForUITestingIfNeeded() {
+        guard Self.resetsFirstBattleButtonCoachUnderUITests else {
+            return
+        }
+        UserDefaults.standard.removeObject(forKey: GuderianTutorialCatalog.firstBattleButtonCoachStorageKey.rawValue)
+        firstBattleButtonCoachProgress = FirstBattleButtonCoachProgress()
+        firstBattleButtonCoachCompleted = false
+    }
+
     private func completeFirstBattleButtonCoach() {
         guard showsFirstBattleButtonCoach else {
             return
@@ -2315,6 +2387,18 @@ public struct DZWPlayableBattleView: View {
         return environment["XCTestConfigurationFilePath"] != nil ||
             environment["GUDERIAN_TEST_MODE"] != nil ||
             environment["GUDERIAN_UI_TESTING"] != nil
+    }
+
+    private static var enablesButtonCoachUnderUITests: Bool {
+        ProcessInfo.processInfo.arguments.contains("--guderian-ui-test-enable-button-coach")
+    }
+
+    private static var resetsFirstBattleButtonCoachUnderUITests: Bool {
+        ProcessInfo.processInfo.arguments.contains("--guderian-ui-test-reset-button-coach")
+    }
+
+    private static var disablesFirstBattleGuidanceHintsUnderUITests: Bool {
+        ProcessInfo.processInfo.arguments.contains("--guderian-ui-test-disable-first-battle-hints")
     }
 
     private var battlefieldToolbar: some View {
@@ -2449,6 +2533,12 @@ public struct DZWPlayableBattleView: View {
                     .font(.headline)
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("battle-phase-label")
+                    .firstBattleButtonCoach(
+                        .phaseStatus,
+                        showsCoach: showsFirstBattleButtonCoach,
+                        progress: firstBattleButtonCoachProgress,
+                        completedFirstGame: firstBattleButtonCoachCompleted
+                    )
                 Text("\(snapshot.mission.name) | \(model.sideTitle(for: .player)) \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) \(model.sideTitle(for: .guderianAI))")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color(red: 0.92, green: 0.78, blue: 0.42))
@@ -2612,18 +2702,62 @@ public struct DZWPlayableBattleView: View {
             Text("Selection")
                 .font(.headline)
             if let selected = snapshot.selectedUnit {
-                Text(selected.name)
-                    .font(.title3.weight(.bold))
-                Text("\(model.sideTitle(for: selected.owner)) | \(selected.roleLine)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text("Wounds \(selected.totalWoundsRemaining) | \(selected.inCover ? "Cover" : "Open") | \(selected.hullDown ? "Hull-down" : "Exposed")")
-                    .font(.caption.monospaced())
-                Text(selected.historicalNote.isEmpty ? "Engine unit: \(selected.engineName)" : selected.historicalNote)
-                    .font(.caption.monospaced())
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(selected.name)
+                        .font(.title3.weight(.bold))
+                    Text("\(model.sideTitle(for: selected.owner)) | \(selected.roleLine)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Wounds \(selected.totalWoundsRemaining) | \(selected.inCover ? "Cover" : "Open") | \(selected.hullDown ? "Hull-down" : "Exposed")")
+                        .font(.caption.monospaced())
+                    Text(selected.historicalNote.isEmpty ? "Engine unit: \(selected.engineName)" : selected.historicalNote)
+                        .font(.caption.monospaced())
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("battle-selected-unit-summary")
+                .firstBattleButtonCoach(
+                    selected.owner == model.humanPlayer ? .boardUnitMovement : .boardEnemyTargeting,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
             } else {
                 Text("No unit selected")
                     .foregroundStyle(.secondary)
+            }
+
+            if let target = snapshot.selectedTarget {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Target", systemImage: "scope")
+                        .font(.caption.weight(.bold))
+                    Text(target.name)
+                        .font(.subheadline.weight(.bold))
+                    Text("\(model.sideTitle(for: target.owner)) | \(target.roleLine)")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.35)))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("battle-selected-target-summary")
+                .firstBattleButtonCoach(
+                    .boardEnemyTargeting,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
+            } else {
+                Text("No target selected")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("battle-selected-target-summary")
+                    .firstBattleButtonCoach(
+                        .boardEnemyTargeting,
+                        showsCoach: showsFirstBattleButtonCoach,
+                        progress: firstBattleButtonCoachProgress,
+                        completedFirstGame: firstBattleButtonCoachCompleted
+                    )
             }
 
             HStack {
@@ -2811,6 +2945,12 @@ public struct DZWPlayableBattleView: View {
                 .font(.caption)
                 .foregroundStyle(snapshot.lastAction.status == .blocked ? .orange : .secondary)
                 .accessibilityIdentifier("battle-action-feedback")
+                .firstBattleButtonCoach(
+                    .actionFeedback,
+                    showsCoach: showsFirstBattleButtonCoach,
+                    progress: firstBattleButtonCoachProgress,
+                    completedFirstGame: firstBattleButtonCoachCompleted
+                )
         }
         .buttonStyle(.bordered)
     }
@@ -2983,6 +3123,12 @@ public struct DZWPlayableBattleView: View {
                     .frame(width: rect.width, height: rect.height)
                     .position(x: rect.midX, y: rect.midY)
             )
+            .firstBattleButtonCoach(
+                .boardTerrain,
+                showsCoach: showsFirstBattleButtonCoach,
+                progress: firstBattleButtonCoachProgress,
+                completedFirstGame: firstBattleButtonCoachCompleted
+            )
     }
 
     private func objectiveMarker(_ objective: NativeBoardObjectiveSnapshot, in size: CGSize) -> some View {
@@ -3014,6 +3160,12 @@ public struct DZWPlayableBattleView: View {
                 .offset(y: radius + 14)
         }
         .position(position)
+        .firstBattleButtonCoach(
+            .boardObjective,
+            showsCoach: showsFirstBattleButtonCoach,
+            progress: firstBattleButtonCoachProgress,
+            completedFirstGame: firstBattleButtonCoachCompleted
+        )
     }
 
     @ViewBuilder
@@ -3051,6 +3203,7 @@ public struct DZWPlayableBattleView: View {
                     .foregroundStyle(.white)
                     .frame(width: radius * 2.2)
                     .lineLimit(2)
+                    .accessibilityIdentifier(unit.owner == model.humanPlayer ? "battle-board-friendly-unit-\(unit.id)" : "battle-board-enemy-unit-\(unit.id)")
                 Text("\(unit.totalWoundsRemaining)")
                     .font(.system(size: 11, weight: .heavy, design: .monospaced))
                     .foregroundStyle(.white)
@@ -3090,7 +3243,15 @@ public struct DZWPlayableBattleView: View {
                     model.moveUnit(id: unit.id, to: point)
                 }
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier(unit.owner == model.humanPlayer ? "battle-board-friendly-unit-\(unit.id)" : "battle-board-enemy-unit-\(unit.id)")
         .accessibilityLabel("\(unit.name), \(model.sideTitle(for: unit.owner))")
+        .firstBattleButtonCoach(
+            unit.owner == model.humanPlayer ? .boardUnitMovement : .boardEnemyTargeting,
+            showsCoach: showsFirstBattleButtonCoach,
+            progress: firstBattleButtonCoachProgress,
+            completedFirstGame: firstBattleButtonCoachCompleted
+        )
     }
 
     private func boardRect(_ zone: NativeBoardZoneSnapshot, in size: CGSize) -> CGRect {

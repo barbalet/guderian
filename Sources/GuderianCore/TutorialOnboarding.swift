@@ -64,6 +64,12 @@ public enum FirstBattleButtonCoachID: String, Codable, CaseIterable, Hashable, S
     case inspectorPanel = "firstBattleButtonCoach-inspectorPanel"
     case forcesPanel = "firstBattleButtonCoach-forcesPanel"
     case logPanel = "firstBattleButtonCoach-logPanel"
+    case phaseStatus = "firstBattleButtonCoach-phaseStatus"
+    case boardUnitMovement = "firstBattleButtonCoach-boardUnitMovement"
+    case boardEnemyTargeting = "firstBattleButtonCoach-boardEnemyTargeting"
+    case boardObjective = "firstBattleButtonCoach-boardObjective"
+    case boardTerrain = "firstBattleButtonCoach-boardTerrain"
+    case actionFeedback = "firstBattleButtonCoach-actionFeedback"
 }
 
 public struct TutorialStorageKey: Codable, Hashable, Sendable {
@@ -639,6 +645,48 @@ public enum GuderianTutorialCatalog {
                 body: "Shows or hides the recent battle log. Open it when you need to review what the engine just resolved.",
                 accessibilityIdentifier: "first-battle-button-coach-log-panel",
                 requiredTopics: ["battle log", "engine"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .phaseStatus,
+                title: "Phase And Side",
+                body: "Shows the active side, turn, and phase. Movement, shooting, and assault each allow different orders, so check this line before blaming a disabled control.",
+                accessibilityIdentifier: "first-battle-button-coach-phase-status",
+                requiredTopics: ["phase", "orders"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .boardUnitMovement,
+                title: "Movement",
+                body: "Hover a friendly counter to identify what you command, then drag it during movement to reposition. Short moves that protect roads, cover, or objectives often matter more than maximum distance.",
+                accessibilityIdentifier: "first-battle-button-coach-board-unit-movement",
+                requiredTopics: ["drag", "movement", "objectives"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .boardEnemyTargeting,
+                title: "Targeting",
+                body: "Hover an enemy counter to read it as a target, then click it or use Nearest Enemy before shooting or assault. Targeting is about tempo: pin, block, or clear the unit that changes the next phase.",
+                accessibilityIdentifier: "first-battle-button-coach-board-enemy-targeting",
+                requiredTopics: ["target", "shooting", "assault"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .boardObjective,
+                title: "Objectives",
+                body: "Objectives are the score and route anchors, not decoration. Hover them to connect the label to presence, control, crossings, road hubs, and the reason a move matters.",
+                accessibilityIdentifier: "first-battle-button-coach-board-objective",
+                requiredTopics: ["Objectives", "control", "move"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .boardTerrain,
+                title: "Terrain",
+                body: "Terrain shapes movement and line of sight. Difficult or blocked ground can slow routes, protect units, or explain why an order succeeds from one position but fails from another.",
+                accessibilityIdentifier: "first-battle-button-coach-board-terrain",
+                requiredTopics: ["movement", "line of sight", "order"]
+            ),
+            FirstBattleButtonCoachTip(
+                id: .actionFeedback,
+                title: "Action Feedback",
+                body: "The feedback line explains the last order. When an action is blocked, read it as the rules tutor for phase, target, movement limit, line of sight, or unit state.",
+                accessibilityIdentifier: "first-battle-button-coach-action-feedback",
+                requiredTopics: ["blocked", "phase", "target"]
             ),
         ]
     }

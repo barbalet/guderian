@@ -48,6 +48,40 @@ final class GuderianMainScreenNavigationUITests: XCTestCase {
     }
 
     @MainActor
+    func testFirstBattleHoverCoachAssistsMovementAndTargeting() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "--guderian-ui-test-disable-tutorials",
+            "--guderian-ui-test-disable-first-battle-hints",
+            "--guderian-ui-test-enable-button-coach",
+            "--guderian-ui-test-reset-button-coach",
+        ]
+        app.launchEnvironment["GUDERIAN_UI_TESTING"] = "1"
+        app.launch()
+
+        openTucholaBattle(from: app)
+
+        let selectedUnitSummary = app.descendants(matching: .any)["battle-selected-unit-summary"].firstMatch
+        XCTAssertTrue(selectedUnitSummary.waitForExistence(timeout: 10), app.debugDescription)
+        selectedUnitSummary.hover()
+
+        let movementCoach = app.descendants(matching: .any)["first-battle-button-coach-board-unit-movement"].firstMatch
+        XCTAssertTrue(movementCoach.waitForExistence(timeout: 5), app.debugDescription)
+
+        let selectedTargetSummary = app.descendants(matching: .any)["battle-selected-target-summary"].firstMatch
+        if !selectedTargetSummary.waitForExistence(timeout: 2) {
+            let nearestEnemy = app.buttons["nearest-enemy-button"].firstMatch
+            XCTAssertTrue(nearestEnemy.waitForExistence(timeout: 5), app.debugDescription)
+            nearestEnemy.click()
+        }
+        XCTAssertTrue(selectedTargetSummary.waitForExistence(timeout: 10), app.debugDescription)
+        selectedTargetSummary.hover()
+
+        let targetingCoach = app.descendants(matching: .any)["first-battle-button-coach-board-enemy-targeting"].firstMatch
+        XCTAssertTrue(targetingCoach.waitForExistence(timeout: 5), app.debugDescription)
+    }
+
+    @MainActor
     private func openTucholaBattle(from app: XCUIApplication) {
         let campaignScreen = app.descendants(matching: .any)["campaign-screen"].firstMatch
         XCTAssertTrue(campaignScreen.waitForExistence(timeout: 10), app.debugDescription)

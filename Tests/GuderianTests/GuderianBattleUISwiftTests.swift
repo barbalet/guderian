@@ -428,6 +428,32 @@ struct GuderianBattleUISwiftTests {
         #expect(!source.contains("You command the force resisting Guderian's formation"))
     }
 
+    @Test("First battle tutorial explains gameplay elements through hover coach dialogs")
+    func guderianFirstBattleTutorialCoversGameplayElementHoverAnchors() throws {
+        let battleView = try String(
+            contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift",
+            encoding: .utf8
+        )
+        let tutorial = try String(
+            contentsOfFile: "Sources/GuderianCore/TutorialOnboarding.swift",
+            encoding: .utf8
+        )
+
+        #expect(tutorial.contains("firstBattleButtonCoach-boardUnitMovement"))
+        #expect(tutorial.contains("firstBattleButtonCoach-boardEnemyTargeting"))
+        #expect(tutorial.contains("firstBattleButtonCoach-boardObjective"))
+        #expect(tutorial.contains("firstBattleButtonCoach-boardTerrain"))
+        #expect(tutorial.contains("firstBattleButtonCoach-actionFeedback"))
+        #expect(battleView.contains(".onHover"))
+        #expect(battleView.contains(".phaseStatus"))
+        #expect(battleView.contains(".boardUnitMovement"))
+        #expect(battleView.contains(".boardEnemyTargeting"))
+        #expect(battleView.contains(".boardObjective"))
+        #expect(battleView.contains(".boardTerrain"))
+        #expect(battleView.contains(".actionFeedback"))
+        #expect(battleView.contains("unit.owner == model.humanPlayer ? .boardUnitMovement : .boardEnemyTargeting"))
+    }
+
     @Test("Guderian-side replay opens on a controllable human turn after the AI handoff")
     func guderianPlayableBattlePreparesSelectedHumanOpeningTurn() throws {
         let source = try String(
