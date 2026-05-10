@@ -255,8 +255,36 @@ struct GuderianBattleUISwiftTests {
             GuderianHistoricalSideID.opposingForce,
         ])
         #expect(historicalScenario.sideOption(id: GuderianHistoricalSideID.guderianCommand)?.title == "Guderian's command")
-        #expect(historicalScenario.sideOption(id: GuderianHistoricalSideID.opposingForce)?.title == "Opposing army")
+        #expect(historicalScenario.sideOption(id: GuderianHistoricalSideID.opposingForce)?.title == "Polish corridor defenders")
         #expect(String(describing: type(of: picker)).contains("HistoricalBattleSidePicker"))
+    }
+
+    @Test("Late-career campaign rows expose the same two playable army choices")
+    func guderianLateCareerRowsExposeEitherArmySelection() throws {
+        let entry = try #require(LateCareerGuderianPresentationCatalog.allEntries.first)
+        let sideOptions = UnifiedGuderianBattleSideSelectionCatalog.sideOptions(for: entry)
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/GuderianCampaignView.swift",
+            encoding: .utf8
+        )
+        let battleView = try String(
+            contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift",
+            encoding: .utf8
+        )
+
+        #expect(sideOptions.map(\.id) == [
+            GuderianHistoricalSideID.guderianCommand,
+            GuderianHistoricalSideID.opposingForce,
+        ])
+        #expect(sideOptions.first?.title == "Guderian's command")
+        #expect(sideOptions.last?.title != "Opposing army")
+        #expect(sideOptions.last?.title == UnifiedGuderianBattleSideSelectionCatalog.opposingForceName(for: entry))
+        #expect(source.contains("selectedLateCareerSideIDsByBattle"))
+        #expect(source.contains("lateCareerSideSelectionBinding(for: entry)"))
+        #expect(source.contains("DZWPlayableBattleView("))
+        #expect(source.contains("chosenSideID: effectiveSelectedSideID"))
+        #expect(battleView.contains("case lateCareer(LateCareerGuderianPresentation, chosenSideID: String)"))
+        #expect(battleView.contains("UnifiedGuderianBattleSideSelectionCatalog.nativePlayer(for: chosenSideID)"))
     }
 
     @Test("Guderian battle selection keeps the side control outside the launch button")

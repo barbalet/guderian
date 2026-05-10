@@ -96,6 +96,7 @@ public struct GuderianCampaignView: View {
     @State private var hasEvaluatedFirstRunTutorial = false
     @State private var showsFirstRunTutorial = false
     @State private var selectedSideIDsByBattle: [GuderianBattleID: String] = [:]
+    @State private var selectedLateCareerSideIDsByBattle: [String: String] = [:]
     @State private var navigationPath = NavigationPath()
     @State private var launchSequence = 0
     @AppStorage(GuderianCampaignStorageKeys.lateCareerProgress) private var savedLateCareerProgressData = Data()
@@ -320,6 +321,7 @@ public struct GuderianCampaignView: View {
             if let entry = LateCareerGuderianPresentationCatalog.entry(for: id.rawValue) {
                 UnifiedLateCareerBattleDestinationView(
                     entry: entry,
+                    selectedSideID: selectedSideID,
                     completionRecord: lateCareerProgress.completionRecord(for: entry.id)
                 ) { record in
                     lateCareerProgress.recordCompletion(record)
@@ -350,6 +352,16 @@ public struct GuderianCampaignView: View {
                     isEnabled: true,
                     showsBriefing: false
                 )
+            } else if let entry = lateCareerEntry(for: row) {
+                GuderianCampaignSidePicker(
+                    sideOptions: UnifiedGuderianBattleSideSelectionCatalog.sideOptions(for: entry),
+                    selectedSideID: lateCareerSideSelectionBinding(for: entry),
+                    title: "Playable Side",
+                    accessibilityIdentifier: "battle-selection-side-picker-\(row.id.rawValue)",
+                    optionAccessibilityIDPrefix: "guderian-battle-selection-side-option-\(row.id.rawValue)",
+                    isEnabled: true,
+                    showsBriefing: false
+                )
             }
         }
     }
@@ -372,11 +384,19 @@ public struct GuderianCampaignView: View {
     }
 
     private func selectedSideID(for row: UnifiedCampaignListRow) -> String? {
-        guard let battleID = row.id.fieldCommandID,
-              let scenario = scenarios.first(where: { $0.id == battleID }) else {
-            return nil
+        switch row.id.kind {
+        case .fieldCommand:
+            guard let battleID = row.id.fieldCommandID,
+                  let scenario = scenarios.first(where: { $0.id == battleID }) else {
+                return nil
+            }
+            return selectedSideID(for: scenario)
+        case .lateCareer:
+            guard let entry = lateCareerEntry(for: row) else {
+                return nil
+            }
+            return selectedLateCareerSideID(for: entry)
         }
-        return selectedSideID(for: scenario)
     }
 
     private func fieldCommandScenario(for row: UnifiedCampaignListRow) -> GuderianScenario? {
@@ -384,6 +404,13 @@ public struct GuderianCampaignView: View {
             return nil
         }
         return scenarios.first { $0.id == battleID }
+    }
+
+    private func lateCareerEntry(for row: UnifiedCampaignListRow) -> LateCareerGuderianPresentation? {
+        guard row.id.kind == .lateCareer else {
+            return nil
+        }
+        return LateCareerGuderianPresentationCatalog.entry(for: row.id.rawValue)
     }
 
     private func selectedSideID(for scenario: GuderianScenario) -> String {
@@ -398,6 +425,18 @@ public struct GuderianCampaignView: View {
         return historicalScenario.sideOptions.first?.id ?? GuderianHistoricalSideSelectionResolver.defaultHumanSideID
     }
 
+    private func selectedLateCareerSideID(for entry: LateCareerGuderianPresentation) -> String {
+        let sideOptions = UnifiedGuderianBattleSideSelectionCatalog.sideOptions(for: entry)
+        if let selectedSideID = selectedLateCareerSideIDsByBattle[entry.id],
+           sideOptions.contains(where: { $0.id == selectedSideID }) {
+            return selectedSideID
+        }
+        if sideOptions.contains(where: { $0.id == GuderianHistoricalSideSelectionResolver.defaultHumanSideID }) {
+            return GuderianHistoricalSideSelectionResolver.defaultHumanSideID
+        }
+        return sideOptions.first?.id ?? GuderianHistoricalSideSelectionResolver.defaultHumanSideID
+    }
+
     private func sideSelectionBinding(for scenario: GuderianScenario) -> Binding<String> {
         Binding(
             get: {
@@ -410,6 +449,21 @@ public struct GuderianCampaignView: View {
                 selectedBattleID = .fieldCommand(scenario.id)
                 selectedID = scenario.id
                 selectedSideIDsByBattle[scenario.id] = newSideID
+            }
+        )
+    }
+
+    private func lateCareerSideSelectionBinding(for entry: LateCareerGuderianPresentation) -> Binding<String> {
+        Binding(
+            get: {
+                selectedLateCareerSideID(for: entry)
+            },
+            set: { newSideID in
+                guard UnifiedGuderianBattleSideSelectionCatalog.sideOption(id: newSideID, for: entry) != nil else {
+                    return
+                }
+                selectedBattleID = .lateCareer(entry.id)
+                selectedLateCareerSideIDsByBattle[entry.id] = newSideID
             }
         )
     }
@@ -802,15 +856,65 @@ struct UnifiedCampaignBattleRow: View {
     }
 }
 
+private struct GuderianCampaignSidePicker: View {
+    let sideOptions: [HistoricalSideOption]
+    @Binding var selectedSideID: String
+    let title: String
+    let accessibilityIdentifier: String
+    let optionAccessibilityIDPrefix: String
+    let isEnabled: Bool
+    let showsBriefing: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Picker(title, selection: $selectedSideID) {
+                ForEach(sideOptions) { side in
+                    Text(side.title)
+                        .tag(side.id)
+                        .accessibilityIdentifier("\(optionAccessibilityIDPrefix)-\(side.id)")
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .controlSize(showsBriefing ? .regular : .small)
+            .frame(maxWidth: showsBriefing ? 420 : 360, alignment: .leading)
+            .transaction { transaction in
+                transaction.animation = nil
+            }
+            .accessibilityLabel(title)
+
+            if showsBriefing, let selectedSide {
+                Text(selectedSide.playerBriefing)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .disabled(!isEnabled)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var selectedSide: HistoricalSideOption? {
+        sideOptions.first { $0.id == selectedSideID }
+    }
+}
+
 struct UnifiedLateCareerBattleDestinationView: View {
     let entry: LateCareerGuderianPresentation
+    let selectedSideID: String?
     let completionRecord: LateCareerCompletionRecord?
     let onCompletion: (LateCareerCompletionRecord) -> Void
 
     var body: some View {
         if UnifiedPlayableBoardRouteCatalog.isRoutedToPlayableBattleView(.lateCareer(entry.id)) {
-            DZWPlayableBattleView(lateCareerEntry: entry, onCompletion: onCompletion)
-                .id(entry.id)
+            DZWPlayableBattleView(
+                lateCareerEntry: entry,
+                chosenSideID: effectiveSelectedSideID,
+                onCompletion: onCompletion
+            )
+            .id("\(entry.id)-\(effectiveSelectedSideID)")
         } else {
             LateCareerSharedBriefingView(
                 entry: entry,
@@ -818,6 +922,14 @@ struct UnifiedLateCareerBattleDestinationView: View {
                 onCompletion: onCompletion
             )
         }
+    }
+
+    private var effectiveSelectedSideID: String {
+        if let selectedSideID,
+           UnifiedGuderianBattleSideSelectionCatalog.sideOption(id: selectedSideID, for: entry) != nil {
+            return selectedSideID
+        }
+        return GuderianHistoricalSideSelectionResolver.defaultHumanSideID
     }
 }
 

@@ -1,5 +1,6 @@
 import DerZweiteWeltkriegCore
 import DerZweiteWeltkriegGuderian
+import DerZweiteWeltkriegHistorical
 import Foundation
 
 public enum UnifiedGuderianBattleKind: String, Codable, Hashable, Sendable {
@@ -170,6 +171,123 @@ public enum UnifiedGuderianBattleCatalog {
         allEntries.first { $0.id == id }
     }
 
+}
+
+public enum UnifiedGuderianBattleSideSelectionCatalog {
+    public static let defaultHumanSideID = GuderianHistoricalSideSelectionResolver.defaultHumanSideID
+
+    public static func sideOptions(for entry: LateCareerGuderianPresentation) -> [HistoricalSideOption] {
+        [
+            HistoricalSideOption(
+                id: GuderianHistoricalSideID.guderianCommand,
+                role: .protagonist,
+                title: "Guderian's command",
+                historicalForce: germanForceName(for: entry),
+                commander: "Heinz Guderian",
+                armyListName: "German",
+                playerBriefing: entry.visibleCommandCaveatLabel,
+                aiBriefing: entry.germanContext
+            ),
+            HistoricalSideOption(
+                id: GuderianHistoricalSideID.opposingForce,
+                role: .opponent,
+                title: opposingForceName(for: entry),
+                historicalForce: entry.playerRole,
+                commander: nil,
+                armyListName: opposingArmyListName(for: entry),
+                playerBriefing: entry.playerRole,
+                aiBriefing: "Use late-war opposing-force priorities to contest the German context objectives."
+            ),
+        ]
+    }
+
+    public static func sideOption(id sideID: String, for entry: LateCareerGuderianPresentation) -> HistoricalSideOption? {
+        sideOptions(for: entry).first { $0.id == sideID }
+    }
+
+    public static func opposingSideOption(to sideID: String, for entry: LateCareerGuderianPresentation) -> HistoricalSideOption? {
+        sideOptions(for: entry).first { $0.id != sideID }
+    }
+
+    public static func selectedSideTitle(for sideID: String, in entry: LateCareerGuderianPresentation) -> String {
+        sideOption(id: sideID, for: entry)?.title ??
+            sideOption(id: defaultHumanSideID, for: entry)?.title ??
+            opposingForceName(for: entry)
+    }
+
+    public static func opposingSideTitle(to sideID: String, in entry: LateCareerGuderianPresentation) -> String {
+        opposingSideOption(to: sideID, for: entry)?.title ??
+            sideOptions(for: entry).first?.title ??
+            "Opposing force"
+    }
+
+    public static func nativePlayer(for sideID: String) -> NativeBoardPlayer? {
+        GuderianHistoricalSideSelectionResolver.nativePlayer(for: sideID)
+    }
+
+    public static func sideTitle(for player: NativeBoardPlayer, in entry: LateCareerGuderianPresentation) -> String {
+        switch player {
+        case .player:
+            return opposingForceName(for: entry)
+        case .guderianAI:
+            return "Guderian's command"
+        case .none:
+            return "No side"
+        }
+    }
+
+    public static func objectivePriorityNames(
+        for player: NativeBoardPlayer,
+        in entry: LateCareerGuderianPresentation
+    ) -> [String] {
+        let side: ScenarioSide
+        switch player {
+        case .player:
+            side = .player
+        case .guderianAI:
+            side = .guderianAI
+        case .none:
+            return []
+        }
+
+        let sideObjectives = entry.battlefield.objectives
+            .filter { $0.side == side }
+            .map(\.name)
+        if !sideObjectives.isEmpty {
+            return sideObjectives
+        }
+        return entry.battlefield.objectives.map(\.name)
+    }
+
+    public static func opposingForceName(for entry: LateCareerGuderianPresentation) -> String {
+        forceName(for: .player, in: entry) ?? entry.playerRole.nonEmptyTrimmed ?? "Opposing force"
+    }
+
+    public static func germanForceName(for entry: LateCareerGuderianPresentation) -> String {
+        forceName(for: .guderianAI, in: entry) ?? entry.germanContext.nonEmptyTrimmed ?? "German force"
+    }
+
+    private static func forceName(for side: ScenarioSide, in entry: LateCareerGuderianPresentation) -> String? {
+        entry.battlefield.forces.first { $0.side == side }?.name.nonEmptyTrimmed
+    }
+
+    private static func opposingArmyListName(for entry: LateCareerGuderianPresentation) -> String {
+        let title = opposingForceName(for: entry).lowercased()
+        if title.contains("polish") {
+            return "Polish"
+        }
+        if title.contains("allied") {
+            return "Allied"
+        }
+        return "Soviet"
+    }
+}
+
+private extension String {
+    var nonEmptyTrimmed: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 public struct UnifiedPlayableAcceptanceReport: Codable, Hashable, Sendable {

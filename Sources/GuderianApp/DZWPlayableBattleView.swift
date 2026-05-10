@@ -88,11 +88,24 @@ private struct DZWPlayableBattleCompletionDisplay {
         debriefSummary = summary.debriefSummary
         record = .lateCareer(summary.completionRecord)
     }
+
+    init(
+        sourceName: String,
+        completionRecord: LateCareerCompletionRecord,
+        debriefSummary: String
+    ) {
+        self.sourceName = sourceName
+        score = completionRecord.score
+        victoryBandLabel = completionRecord.victoryBand.rawValue
+        completedTurn = completionRecord.completedTurn
+        self.debriefSummary = debriefSummary
+        record = .lateCareer(completionRecord)
+    }
 }
 
 private enum DZWPlayableBattleSource {
     case fieldCommand(GuderianScenario, chosenSideID: String)
-    case lateCareer(LateCareerGuderianPresentation)
+    case lateCareer(LateCareerGuderianPresentation, chosenSideID: String)
 
     var boardTitle: String {
         "\(battleTitle) Operations Map"
@@ -102,7 +115,7 @@ private enum DZWPlayableBattleSource {
         switch self {
         case .fieldCommand(let scenario, _):
             return scenario.title
-        case .lateCareer(let entry):
+        case .lateCareer(let entry, _):
             return entry.title
         }
     }
@@ -111,7 +124,7 @@ private enum DZWPlayableBattleSource {
         switch self {
         case .fieldCommand:
             return "\(battleTitle) native scenario"
-        case .lateCareer:
+        case .lateCareer(_, _):
             return "\(battleTitle) unified native scenario"
         }
     }
@@ -128,8 +141,8 @@ private enum DZWPlayableBattleSource {
                 return "\(selection.selectedSideTitle) vs \(selection.opposingSideTitle)"
             }
             return "\(scenario.playerForceSummary) vs \(scenario.guderianCommand)"
-        case .lateCareer(let entry):
-            return "\(entry.playerRole) vs \(entry.germanContext)"
+        case .lateCareer(let entry, let chosenSideID):
+            return "\(UnifiedGuderianBattleSideSelectionCatalog.selectedSideTitle(for: chosenSideID, in: entry)) vs \(UnifiedGuderianBattleSideSelectionCatalog.opposingSideTitle(to: chosenSideID, in: entry))"
         }
     }
 
@@ -137,8 +150,8 @@ private enum DZWPlayableBattleSource {
         switch self {
         case .fieldCommand(_, let chosenSideID):
             return GuderianHistoricalSideSelectionResolver.nativePlayer(for: chosenSideID) ?? .player
-        case .lateCareer:
-            return .player
+        case .lateCareer(_, let chosenSideID):
+            return UnifiedGuderianBattleSideSelectionCatalog.nativePlayer(for: chosenSideID) ?? .player
         }
     }
 
@@ -159,15 +172,8 @@ private enum DZWPlayableBattleSource {
         switch self {
         case .fieldCommand(let scenario, _):
             return GuderianHistoricalSideSelectionResolver.sideTitle(for: player, in: scenario)
-        case .lateCareer:
-            switch player {
-            case .player:
-                return "Playable force"
-            case .guderianAI:
-                return "German force"
-            case .none:
-                return "No side"
-            }
+        case .lateCareer(let entry, _):
+            return UnifiedGuderianBattleSideSelectionCatalog.sideTitle(for: player, in: entry)
         }
     }
 
@@ -181,8 +187,11 @@ private enum DZWPlayableBattleSource {
                 return ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities(for: phase)
             }
             return OpposingForceAIPlanCatalog.plan(for: scenario).targetPriorities(for: phase)
-        case .lateCareer(let entry):
-            return LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)?.priorityNames(for: phase) ?? []
+        case .lateCareer(let entry, _):
+            if player == .guderianAI {
+                return LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)?.priorityNames(for: phase) ?? []
+            }
+            return UnifiedGuderianBattleSideSelectionCatalog.objectivePriorityNames(for: player, in: entry)
         }
     }
 
@@ -193,8 +202,11 @@ private enum DZWPlayableBattleSource {
                 return ScenarioContentCatalog.bundle(for: scenario).aiPlan.postureName
             }
             return OpposingForceAIPlanCatalog.plan(for: scenario).postureName
-        case .lateCareer:
-            return "Unified German AI"
+        case .lateCareer(let entry, _):
+            if player == .guderianAI {
+                return "Unified German AI"
+            }
+            return "\(UnifiedGuderianBattleSideSelectionCatalog.opposingForceName(for: entry)) AI"
         }
     }
 
@@ -202,7 +214,7 @@ private enum DZWPlayableBattleSource {
         switch self {
         case .fieldCommand(let scenario, _):
             return ScenarioBalanceCatalog.profile(for: scenario).targetTurns.upperBound
-        case .lateCareer(let entry):
+        case .lateCareer(let entry, _):
             return LateCareerPlayableSurfaceCatalog.report(for: entry.id)?.scoringProfile.targetTurnUpperBound ?? 8
         }
     }
@@ -217,7 +229,7 @@ private enum DZWPlayableBattleSource {
                 seed: seed
             )
             return NativeBoardSession(scenario: scenario, seed: seed, launch: launch)
-        case .lateCareer(let entry):
+        case .lateCareer(let entry, _):
             return LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(890_000 + entry.order + restartCount * 97))
         }
     }
@@ -270,8 +282,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         dzwPlayableLog.info("Battle model initialized source=fieldCommand battle=\(scenario.id.rawValue, privacy: .public) title=\(scenario.title, privacy: .public) session=\(self.session == nil ? "missing" : "ready", privacy: .public) externalGuderianTestController=\(guderianTestController != nil, privacy: .public)")
     }
 
-    init(lateCareerEntry: LateCareerGuderianPresentation) {
-        self.source = .lateCareer(lateCareerEntry)
+    init(
+        lateCareerEntry: LateCareerGuderianPresentation,
+        chosenSideID: String = GuderianHistoricalSideSelectionResolver.defaultHumanSideID
+    ) {
+        self.source = .lateCareer(lateCareerEntry, chosenSideID: chosenSideID)
         guderianTestController = nil
         aiTurnEvents = [
             "\(source.sideTitle(for: source.aiPlayer)) AI ready: \(source.aiPostureName(for: source.aiPlayer)) will pressure \(Self.prioritySummary(source.aiTargetPriorities(for: source.aiPlayer)))."
@@ -328,7 +343,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         switch source {
         case .fieldCommand(let scenario, _):
             return scenario.id == .tucholaForest
-        case .lateCareer:
+        case .lateCareer(_, _):
             return false
         }
     }
@@ -729,7 +744,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 dzwPlayableLog.error("Play-to-end failed error=\(String(describing: error), privacy: .public)")
                 return nil
             }
-        case .lateCareer:
+        case .lateCareer(_, _):
             playableTestGameResult = nil
             runSharedAutoplayToDebrief()
             let record = completeBattle()
@@ -782,7 +797,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 dzwPlayableLog.error("Complete battle failed error=\(String(describing: error), privacy: .public)")
                 return nil
             }
-        case .lateCareer:
+        case .lateCareer(_, _):
             guard let lateCareerSession = session as? LateCareerNativeBoardSession,
                   let result = UnifiedLateCareerCompletionResolver.completeBattle(from: lateCareerSession) else {
                 completion = nil
@@ -791,7 +806,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 dzwPlayableLog.error("Complete battle failed because late-career debrief is unavailable title=\(self.source.battleTitle, privacy: .public)")
                 return nil
             }
-            let display = DZWPlayableBattleCompletionDisplay(lateCareer: result)
+            let display = lateCareerDisplay(from: result)
             completion = display
             playableTestGameResult = nil
             debriefError = nil
@@ -801,6 +816,38 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             dzwPlayableLog.info("Late-career complete battle recorded score=\(display.score, privacy: .public) band=\(display.victoryBandLabel, privacy: .public)")
             return display.record
         }
+    }
+
+    private func lateCareerDisplay(
+        from summary: UnifiedLateCareerPlayableCompletionSummary
+    ) -> DZWPlayableBattleCompletionDisplay {
+        guard humanPlayer == .guderianAI,
+              let report = LateCareerPlayableSurfaceCatalog.report(for: summary.completionRecord.battlefieldID) else {
+            return DZWPlayableBattleCompletionDisplay(lateCareer: summary)
+        }
+
+        let maxScore = report.scoringProfile.maxPlayerScore
+        let opposingScore = summary.completionRecord.score
+        let selectedScore = min(maxScore, max(0, maxScore - opposingScore))
+        let selectedBand = summary.scoreBands
+            .sorted { $0.minimumScore > $1.minimumScore }
+            .first { selectedScore >= $0.minimumScore }?.victoryBand ??
+            summary.completionRecord.victoryBand
+        let note = "Completed as \(humanSideTitle) in selected-side study mode. Opposing-force campaign score was \(opposingScore)/\(maxScore); this debrief inverts it so the saved result matches the side you chose."
+        let record = LateCareerCompletionRecord(
+            battlefieldID: summary.completionRecord.battlefieldID,
+            score: selectedScore,
+            victoryBand: selectedBand,
+            completedTurn: summary.completionRecord.completedTurn,
+            persistenceKey: summary.completionRecord.persistenceKey,
+            note: note
+        )
+        let debrief = "\(humanSideTitle) completed \(source.battleTitle) on turn \(record.completedTurn) with \(selectedScore)/\(maxScore) VP. This is a sober command-study result, not celebratory framing; the original opposing-force score was \(opposingScore)."
+        return DZWPlayableBattleCompletionDisplay(
+            sourceName: "\(summary.sourceName) | \(humanSideTitle) study mode",
+            completionRecord: record,
+            debriefSummary: debrief
+        )
     }
 
     private func fieldCommandDisplay(
@@ -2153,11 +2200,15 @@ public struct DZWPlayableBattleView: View {
 
     public init(
         lateCareerEntry: LateCareerGuderianPresentation,
+        chosenSideID: String = GuderianHistoricalSideSelectionResolver.defaultHumanSideID,
         showsDefaultPanels: Bool = true,
         showsTutorials: Bool = true,
         onCompletion: @escaping (LateCareerCompletionRecord) -> Void = { _ in }
     ) {
-        _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(lateCareerEntry: lateCareerEntry))
+        _model = StateObject(wrappedValue: DZWPlayableBattleViewModel(
+            lateCareerEntry: lateCareerEntry,
+            chosenSideID: chosenSideID
+        ))
         self.showsDefaultPanels = showsDefaultPanels
         self.showsTutorials = showsTutorials
         isGuderianTestBacked = false
