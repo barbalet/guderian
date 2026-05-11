@@ -395,11 +395,16 @@ When implementation begins, keep fun-related analysis code here:
 ```text
 fun/
   FUN.md
-  FunModel.swift
-  FunMetric.swift
-  FunScenarioAudit.swift
-  FunTelemetrySchema.swift
-  FunOptimizationReport.swift
+  Sources/
+    GuderianFun/
+      FunModel.swift
+      FunMetric.swift
+      FunDT.swift
+      FunScenarioAudit.swift
+      FunTelemetrySchema.swift
+      FunOptimizationReport.swift
+    GuderianFunReport/
+      main.swift
   fixtures/
     fun-thresholds.json
     scenario-fun-baselines.json
@@ -409,11 +414,13 @@ Potential responsibilities:
 
 - `FunModel.swift`: definitions for fun dimensions, weights, and acceptance gates.
 - `FunMetric.swift`: measurable values and scoring helpers.
+- `FunDT.swift`: a perpendicular temporal-difference model for how each battle changes novelty, texture, and motif continuity over campaign time.
 - `FunScenarioAudit.swift`: scenario-level checks against the conditions above.
 - `FunTelemetrySchema.swift`: optional schema for player/session observations.
 - `FunOptimizationReport.swift`: aggregate reports for release readiness.
+- `GuderianFunReport/main.swift`: command-line report runner. Use `swift run GuderianFunReport --compare` to compare static catalog scoring with live unified scenario harness scoring.
 
-If SwiftPM should compile these later, `Package.swift` must explicitly include `fun/` as a target or move compiled pieces into `Sources/` while keeping this directory as the conceptual owner.
+SwiftPM compiles these through `Package.swift` as `GuderianFun` and `GuderianFunReport` while this directory remains the conceptual owner.
 
 ## Fun Score Model
 
@@ -433,6 +440,25 @@ Suggested dimensions:
 | Ethical Frame | 10 | The game remains historically sober and anti-celebratory. |
 
 An acceptable battle should score at least 75 overall, with no dimension below 60. A battle below 60 in Ethical Frame is a release blocker regardless of total score.
+
+## funDT Model
+
+`funDT` means fun difference over time. It is not a ninth fun dimension and should not be averaged into the core fun score. It is a perpendicular campaign-shape metric: the player is more likely to stay curious when each battle changes enough of the tactical grammar to feel fresh while preserving enough motif continuity to remain learnable.
+
+The metric reconstructs every battle as a feature vector across eight temporal axes:
+
+| Axis | Meaning |
+| --- | --- |
+| Chronology | Date, theater, and late-career placement. |
+| Command Scope | Direct command, adjacent caveat, staff influence, or post-dismissal context. |
+| Player Posture | Delay, defense, withdrawal, counterattack, breakout, evacuation, ambush, or staff-pressure pattern. |
+| Terrain System | Roads, rivers, railways, crossings, settlements, fortifications, pressure markers, and ground terrain. |
+| Objective System | The verbs and objects of score pressure: hold, withdraw, preserve, evacuate, bridge, port, pocket, command, supply, etc. |
+| Pressure System | AI, pacing, artillery, air, pincer, engineer, supply, winter, mine, or blocked-action pressure. |
+| Force System | The armies and force textures the player reads. |
+| Tempo | Short, medium, or long target-turn cadence. |
+
+`funDT` combines immediate difference from the previous battle, cumulative novelty against earlier battles, rolling difference across the recent campaign window, and motif continuity. High `funDT` means the battle changes the campaign's texture; low `funDT` means it risks feeling like a repeated pattern unless the core fun score compensates with exceptional execution.
 
 ## Guderian-Specific Fun Pillars
 

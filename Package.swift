@@ -15,9 +15,17 @@ let package = Package(
             name: "GuderianAppUI",
             targets: ["GuderianAppUI"]
         ),
+        .library(
+            name: "GuderianFun",
+            targets: ["GuderianFun"]
+        ),
         .executable(
             name: "GuderianApp",
             targets: ["GuderianApp"]
+        ),
+        .executable(
+            name: "GuderianFunReport",
+            targets: ["GuderianFunReport"]
         ),
     ],
     dependencies: [
@@ -56,6 +64,16 @@ let package = Package(
                 .linkedFramework("AppKit"),
             ]
         ),
+        .target(
+            name: "GuderianFun",
+            dependencies: ["GuderianCore"],
+            path: "fun/Sources/GuderianFun"
+        ),
+        .executableTarget(
+            name: "GuderianFunReport",
+            dependencies: ["GuderianFun"],
+            path: "fun/Sources/GuderianFunReport"
+        ),
         .testTarget(
             name: "GuderianTests",
             dependencies: [
@@ -63,6 +81,11 @@ let package = Package(
                 .product(name: "DerZweiteWeltkriegHistorical", package: "dzw"),
             ],
             path: "Tests/GuderianTests"
+        ),
+        .testTarget(
+            name: "GuderianFunTests",
+            dependencies: ["GuderianFun"],
+            path: "Tests/GuderianFunTests"
         ),
     ]
 )
