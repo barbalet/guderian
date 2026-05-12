@@ -4,9 +4,13 @@ import GuderianFun
 let args = Set(CommandLine.arguments.dropFirst())
 let shouldCompare = args.contains("--compare")
 let shouldRunScenarios = shouldCompare || args.contains("--run-scenarios")
+let shouldPrintSideData = args.contains("--side-data")
 
 do {
-    if shouldCompare {
+    if shouldPrintSideData {
+        let report = try FunBattleSideReportCatalog.generate(runUnifiedHarness: shouldRunScenarios)
+        print(report.markdownAppendix())
+    } else if shouldCompare {
         let staticReport = try FunOptimizationReport.generate(runUnifiedHarness: false)
         let liveReport = try FunOptimizationReport.generate(runUnifiedHarness: true)
         let comparison = FunOptimizationReport.compare(baseline: staticReport, candidate: liveReport)

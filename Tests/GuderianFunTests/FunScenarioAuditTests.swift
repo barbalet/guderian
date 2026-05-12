@@ -84,4 +84,19 @@ final class FunScenarioAuditTests: XCTestCase {
         XCTAssertGreaterThan(report.averageFunDTScore, 40)
         XCTAssertTrue(report.markdownSummary().contains("## funDT Timeline"))
     }
+
+    func testBattleSideReportCoversEveryBattleAndBothSides() throws {
+        let report = try FunBattleSideReportCatalog.generate(runUnifiedHarness: false)
+
+        XCTAssertEqual(report.rows.count, 70)
+        XCTAssertEqual(Set(report.rows.map(\.battleID)).count, 35)
+        for battleID in Set(report.rows.map(\.battleID)) {
+            let sideIDs = Set(report.rows.filter { $0.battleID == battleID }.map(\.sideID))
+            XCTAssertEqual(sideIDs, Set([GuderianHistoricalSideID.opposingForce, GuderianHistoricalSideID.guderianCommand]))
+        }
+        XCTAssertTrue(report.rows.allSatisfy { 0...100 ~= $0.funScore })
+        XCTAssertTrue(report.rows.allSatisfy { 0...100 ~= $0.funDTScore })
+        XCTAssertTrue(report.rows.allSatisfy { !$0.strongestDTAxes.isEmpty })
+        XCTAssertTrue(report.markdownAppendix().contains("## Battle Fun And funDT Appendix"))
+    }
 }
