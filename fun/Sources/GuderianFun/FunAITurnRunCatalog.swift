@@ -8,7 +8,11 @@ public struct FunBattleTurnRunSummary: Identifiable, Codable, Hashable, Sendable
     public let title: String
     public let runCount: Int
     public let completedTurns: [Int]
+    public let movedDistances: [Double]
+    public let blockedMovementPhases: [Int]
     public let averageTurns: Double
+    public let averageMovedDistance: Double
+    public let averageBlockedMovementPhases: Double
     public let blockers: [String]
 
     public init(
@@ -18,7 +22,11 @@ public struct FunBattleTurnRunSummary: Identifiable, Codable, Hashable, Sendable
         title: String,
         runCount: Int,
         completedTurns: [Int],
+        movedDistances: [Double],
+        blockedMovementPhases: [Int],
         averageTurns: Double,
+        averageMovedDistance: Double,
+        averageBlockedMovementPhases: Double,
         blockers: [String]
     ) {
         self.id = id
@@ -27,7 +35,11 @@ public struct FunBattleTurnRunSummary: Identifiable, Codable, Hashable, Sendable
         self.title = title
         self.runCount = runCount
         self.completedTurns = completedTurns
+        self.movedDistances = movedDistances
+        self.blockedMovementPhases = blockedMovementPhases
         self.averageTurns = averageTurns
+        self.averageMovedDistance = averageMovedDistance
+        self.averageBlockedMovementPhases = averageBlockedMovementPhases
         self.blockers = blockers
     }
 }
@@ -49,6 +61,8 @@ public enum FunAITurnRunCatalog {
         runCount: Int
     ) throws -> FunBattleTurnRunSummary {
         var completedTurns: [Int] = []
+        var movedDistances: [Double] = []
+        var blockedMovementPhases: [Int] = []
         var blockers: [String] = []
 
         for runIndex in 0..<runCount {
@@ -67,10 +81,14 @@ public enum FunAITurnRunCatalog {
             }
 
             completedTurns.append(sample.completedTurns)
+            movedDistances.append(sample.movedDistance)
+            blockedMovementPhases.append(sample.blockedMovementPhases)
             blockers.append(contentsOf: sample.blockers.map { "run \(runIndex + 1): \($0)" })
         }
 
-        let average = completedTurns.isEmpty ? 0 : Double(completedTurns.reduce(0, +)) / Double(completedTurns.count)
+        let averageTurns = average(completedTurns.map(Double.init))
+        let averageMovedDistance = average(movedDistances)
+        let averageBlockedMovementPhases = average(blockedMovementPhases.map(Double.init))
         let battleID = reportBattleID(for: entry)
         return FunBattleTurnRunSummary(
             id: "\(battleID)-ai-turns-\(runCount)",
@@ -79,7 +97,11 @@ public enum FunAITurnRunCatalog {
             title: entry.title,
             runCount: runCount,
             completedTurns: completedTurns,
-            averageTurns: average,
+            movedDistances: movedDistances,
+            blockedMovementPhases: blockedMovementPhases,
+            averageTurns: averageTurns,
+            averageMovedDistance: averageMovedDistance,
+            averageBlockedMovementPhases: averageBlockedMovementPhases,
             blockers: blockers
         )
     }
@@ -100,6 +122,8 @@ public enum FunAITurnRunCatalog {
         let targetTurns = ScenarioBalanceCatalog.profile(for: scenario).targetTurns.upperBound
         return FunBattleTurnSample(
             completedTurns: completedTurns(from: result.finalSnapshot.turnNumber, targetUpperBound: targetTurns),
+            movedDistance: result.totalMovementDistance,
+            blockedMovementPhases: result.blockedMovementPhases,
             blockers: result.blockers
         )
     }
@@ -127,6 +151,8 @@ public enum FunAITurnRunCatalog {
         let playerPriorities = UnifiedGuderianBattleSideSelectionCatalog.objectivePriorityNames(for: .player, in: presentation)
         var phaseAdvances = 0
         var actionCount = 0
+        var movedDistance = 0.0
+        var blockedMovementPhases = 0
         var activeSides: Set<NativeBoardPlayer> = []
         var current = session.snapshot()
         var blockers: [String] = current.isScenarioBoardPlayable ? [] : ["opening board is not scenario-playable"]
@@ -136,11 +162,15 @@ public enum FunAITurnRunCatalog {
             phaseAdvances < maxPhaseAdvances {
             activeSides.insert(current.activePlayer)
             let priorities = current.activePlayer == .guderianAI ? guderianPriorities : playerPriorities
-            actionCount += runActiveLateCareerAIPhase(
+            let telemetry = runActiveLateCareerAIPhase(
+                battleID: id,
                 in: session,
                 snapshot: current,
                 priorityNames: priorities
             )
+            actionCount += telemetry.actionCount
+            movedDistance += telemetry.movedDistance
+            blockedMovementPhases += telemetry.blockedMovementPhaseCount
             drainPendingChoices(in: session)
             session.advancePhase()
             phaseAdvances += 1
@@ -162,48 +192,71 @@ public enum FunAITurnRunCatalog {
 
         return FunBattleTurnSample(
             completedTurns: completedTurns(from: current.turnNumber, targetUpperBound: targetTurns),
+            movedDistance: movedDistance,
+            blockedMovementPhases: blockedMovementPhases,
             blockers: blockers
         )
     }
 
     private static func runActiveLateCareerAIPhase(
+        battleID: String,
         in session: LateCareerNativeBoardSession,
         snapshot: NativeBoardSnapshot,
         priorityNames: [String]
-    ) -> Int {
+    ) -> FunAIPhaseTelemetry {
         switch snapshot.phase {
         case .movement:
-            return moveActiveLateCareerUnits(in: session, snapshot: snapshot, priorityNames: priorityNames)
+            return moveActiveLateCareerUnits(
+                battleID: battleID,
+                in: session,
+                snapshot: snapshot,
+                priorityNames: priorityNames
+            )
         case .shooting:
-            return shootActiveLateCareerUnits(in: session, snapshot: snapshot)
+            return FunAIPhaseTelemetry(actionCount: shootActiveLateCareerUnits(in: session, snapshot: snapshot))
         case .assault:
             let assaults = assaultActiveLateCareerUnits(in: session, snapshot: snapshot)
-            return assaults + (session.resolveFirstPendingChoice() ? 1 : 0)
+            return FunAIPhaseTelemetry(actionCount: assaults + (session.resolveFirstPendingChoice() ? 1 : 0))
         }
     }
 
     private static func moveActiveLateCareerUnits(
+        battleID: String,
         in session: LateCareerNativeBoardSession,
         snapshot: NativeBoardSnapshot,
         priorityNames: [String]
-    ) -> Int {
+    ) -> FunAIPhaseTelemetry {
         let units = activeUnits(in: snapshot).filter(\.canMoveNow)
         var moved = 0
+        var movedDistance = 0.0
 
         for unit in units {
             session.selectUnit(unit.id)
             session.selectNearestEnemyToSelectedUnit()
+            let maxDistance = movementDistance(
+                for: unit,
+                activePlayer: snapshot.activePlayer,
+                battleID: battleID,
+                turnNumber: snapshot.turnNumber
+            )
             let usedPriority = session.moveSelectedUnitTowardPriorityObjective(
                 named: priorityNames,
-                maxDistance: movementDistance(for: unit, activePlayer: snapshot.activePlayer)
+                maxDistance: maxDistance
             )
             if usedPriority ||
-                session.moveSelectedUnitTowardNearestObjective(maxDistance: movementDistance(for: unit, activePlayer: snapshot.activePlayer)) {
+                session.moveSelectedUnitTowardNearestObjective(maxDistance: maxDistance) {
                 moved += 1
+                if let after = session.snapshot().units.first(where: { $0.id == unit.id }) {
+                    movedDistance += hypot(after.x - unit.x, after.y - unit.y)
+                }
             }
         }
 
-        return moved
+        return FunAIPhaseTelemetry(
+            actionCount: moved,
+            movedDistance: movedDistance,
+            blockedMovementPhaseCount: moved == 0 ? 1 : 0
+        )
     }
 
     private static func shootActiveLateCareerUnits(
@@ -261,12 +314,32 @@ public enum FunAITurnRunCatalog {
 
     private static func movementDistance(
         for unit: NativeBoardUnitSnapshot,
-        activePlayer: NativeBoardPlayer
+        activePlayer: NativeBoardPlayer,
+        battleID: String,
+        turnNumber: Int
     ) -> Double {
+        let base: Double
         if unit.kind == "Vehicle" || unit.kind == "Assault gun" {
-            return activePlayer == .guderianAI ? 9 : 7
+            base = activePlayer == .guderianAI ? 9 : 7
+        } else {
+            base = activePlayer == .guderianAI ? 5 : 4
         }
-        return activePlayer == .guderianAI ? 5 : 4
+        return max(3, base - movementFriction(for: battleID, activePlayer: activePlayer, turnNumber: turnNumber))
+    }
+
+    private static func movementFriction(
+        for battleID: String,
+        activePlayer: NativeBoardPlayer,
+        turnNumber: Int
+    ) -> Double {
+        switch battleID {
+        case "kamenets-podolsky-pocket":
+            return turnNumber <= 4 ? 1 : 0
+        case "kursk-armored-force-pressure":
+            return activePlayer == .guderianAI && turnNumber <= 3 ? 1 : 0
+        default:
+            return 0
+        }
     }
 
     private static func completedTurns(from finalTurn: Int, targetUpperBound: Int) -> Int {
@@ -285,11 +358,29 @@ public enum FunAITurnRunCatalog {
     private static func deterministicSeed(order: Int, runIndex: Int) -> UInt32 {
         UInt32(1_040_000 + order * 100 + runIndex)
     }
+
+    private static func average(_ values: [Double]) -> Double {
+        values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+    }
 }
 
 private struct FunBattleTurnSample: Hashable, Sendable {
     let completedTurns: Int
+    let movedDistance: Double
+    let blockedMovementPhases: Int
     let blockers: [String]
+}
+
+private struct FunAIPhaseTelemetry: Hashable, Sendable {
+    let actionCount: Int
+    let movedDistance: Double
+    let blockedMovementPhaseCount: Int
+
+    init(actionCount: Int, movedDistance: Double = 0, blockedMovementPhaseCount: Int = 0) {
+        self.actionCount = actionCount
+        self.movedDistance = movedDistance
+        self.blockedMovementPhaseCount = blockedMovementPhaseCount
+    }
 }
 
 private enum FunAITurnRunError: Error, CustomStringConvertible {

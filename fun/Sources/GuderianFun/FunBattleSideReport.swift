@@ -15,6 +15,10 @@ public struct FunBattleSideScore: Identifiable, Codable, Hashable, Sendable {
     public let funDTScore: Double
     public let averageAITurns: Double?
     public let aiTurnSamples: [Int]
+    public let averageAIMovedDistance: Double?
+    public let aiMovedDistanceSamples: [Double]
+    public let averageBlockedMovementPhases: Double?
+    public let blockedMovementPhaseSamples: [Int]
     public let weakestDimension: FunDimension
     public let weakestDimensionScore: Int
     public let strongestDTAxes: [String]
@@ -55,7 +59,7 @@ public struct FunBattleSideReport: Codable, Hashable, Sendable {
 
         lines.append("## Battle Fun And funDT Appendix")
         lines.append("")
-        lines.append("This appendix is generated from `FunBattleSideReportCatalog.generate()`. `Fun` is the side-adjusted weighted score from the catalog audit. `funDT` is the side-specific temporal-difference reconstruction: it asks how much this side's posture, command lens, objectives, pressure, force texture, and continuity change over campaign time. `Avg AI turns` is an independent pacing-fun signal from AI-vs-AI autoplay; it records the average completed turns per battle\(turnRunCount > 0 ? " across \(turnRunCount) runs" : ""). Scores are signals for tuning, not final truth.")
+        lines.append("This appendix is generated from `FunBattleSideReportCatalog.generate()`. `Fun` is the side-adjusted weighted score from the catalog audit. `funDT` is the side-specific temporal-difference reconstruction: it asks how much this side's posture, command lens, objectives, pressure, force texture, and continuity change over campaign time. `Avg AI turns` is an independent pacing-fun signal from AI-vs-AI autoplay; it records the average completed turns per battle\(turnRunCount > 0 ? " across \(turnRunCount) runs" : ""). `Avg move` and `Blocked move phases` show whether the turn count is being shaped by movement reach or by the AI running out of legal movement. Scores are signals for tuning, not final truth.")
         lines.append("")
         lines.append("### Highest Fun")
         for row in highestFunRows.prefix(topLimit) {
@@ -80,12 +84,12 @@ public struct FunBattleSideReport: Codable, Hashable, Sendable {
             lines.append("")
             lines.append("### Longest AI Battles")
             for summary in longestAITurnBattles.prefix(topLimit) {
-                lines.append("- \(summary.order). \(summary.title): \(formatTurns(summary.averageTurns)) average turns; samples \(summary.completedTurns.map(String.init).joined(separator: ", ")).")
+                lines.append("- \(summary.order). \(summary.title): \(formatTurns(summary.averageTurns)) average turns; avg move \(formatDistance(summary.averageMovedDistance)); blocked move phases \(formatTurns(summary.averageBlockedMovementPhases)); samples \(summary.completedTurns.map(String.init).joined(separator: ", ")).")
             }
             lines.append("")
             lines.append("### Shortest AI Battles")
             for summary in shortestAITurnBattles.prefix(bottomLimit) {
-                lines.append("- \(summary.order). \(summary.title): \(formatTurns(summary.averageTurns)) average turns; samples \(summary.completedTurns.map(String.init).joined(separator: ", ")).")
+                lines.append("- \(summary.order). \(summary.title): \(formatTurns(summary.averageTurns)) average turns; avg move \(formatDistance(summary.averageMovedDistance)); blocked move phases \(formatTurns(summary.averageBlockedMovementPhases)); samples \(summary.completedTurns.map(String.init).joined(separator: ", ")).")
             }
             let blockedSummaries = turnSummaries.filter { !$0.blockers.isEmpty }
             if !blockedSummaries.isEmpty {
@@ -99,10 +103,10 @@ public struct FunBattleSideReport: Codable, Hashable, Sendable {
         lines.append("")
         lines.append("### Per Battle / Per Side Data")
         lines.append("")
-        lines.append("| # | Battle | Side | Fun | funDT | Avg AI turns | Weakest | Strongest funDT axes | Improvement focus |")
-        lines.append("| ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- |")
+        lines.append("| # | Battle | Side | Fun | funDT | Avg AI turns | Avg move | Blocked move phases | Weakest | Strongest funDT axes | Improvement focus |")
+        lines.append("| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |")
         for row in rows {
-            lines.append("| \(row.order) | \(row.title.markdownEscaped) | \(row.sideTitle.markdownEscaped) | \(FunScoreFormatter.percent(row.funScore)) | \(FunScoreFormatter.percent(row.funDTScore)) | \(formatTurns(row.averageAITurns)) | \(row.weakestDimension.rawValue) \(row.weakestDimensionScore) | \(row.strongestDTAxes.joined(separator: ", ").markdownEscaped) | \(row.improvementFocus.markdownEscaped) |")
+            lines.append("| \(row.order) | \(row.title.markdownEscaped) | \(row.sideTitle.markdownEscaped) | \(FunScoreFormatter.percent(row.funScore)) | \(FunScoreFormatter.percent(row.funDTScore)) | \(formatTurns(row.averageAITurns)) | \(formatDistance(row.averageAIMovedDistance)) | \(formatTurns(row.averageBlockedMovementPhases)) | \(row.weakestDimension.rawValue) \(row.weakestDimensionScore) | \(row.strongestDTAxes.joined(separator: ", ").markdownEscaped) | \(row.improvementFocus.markdownEscaped) |")
         }
         lines.append("")
         lines.append("### Improvement Themes")
@@ -110,6 +114,7 @@ public struct FunBattleSideReport: Codable, Hashable, Sendable {
         lines.append("- Raise low-fun rows by strengthening their weakest scored dimension first: for this catalog that usually means richer consequence/debrief language, more side-specific agency, or clearer command-study caveats.")
         lines.append("- Raise low-funDT rows by changing the temporal grammar rather than merely adding content: alter objective verbs, pressure triggers, force texture, or map-use rhythm compared with the previous three battles.")
         lines.append("- Raise turn-count fun by tuning the AI pressure arc toward meaningful duration: very short battles need recoverable counterplay, staged objectives, or delayed scoring reveals; very long battles need sharper victory thresholds, stronger pursuit logic, or fewer low-impact blocked phases.")
+        lines.append("- Use movement telemetry diagnostically: high average movement with low turns points to objective spacing or movement caps; high blocked movement with low turns points to scoring thresholds or objective control rather than speed.")
         lines.append("- Late-career staff-context battles need the most funDT help because many share Soviet pressure, German defensive context, medium tempo, and command-caveat structure. They benefit from sharper asymmetry: mines versus bridgeheads, fortress reduction versus pursuit, urban compression versus operational breakout, supply collapse versus relief attempts.")
         lines.append("- Guderian-command rows stay fun when they remain explicit command study. Their safest improvements are better comparative objectives, visible caveat labels, non-celebratory debriefs, and AI/player parity, not heroic copy or conquest rewards.")
         lines.append("- Opposing-force rows gain fun when partial success is more granular: preserved units, delayed crossings, denied exits, exhausted supply, and readable counterattack timing should all show up in score channels and debriefs.")
@@ -166,6 +171,17 @@ public struct FunBattleSideReport: Codable, Hashable, Sendable {
     private func formatTurns(_ turns: Double) -> String {
         String(format: "%.1f", turns)
     }
+
+    private func formatDistance(_ distance: Double?) -> String {
+        guard let distance else {
+            return "n/a"
+        }
+        return formatDistance(distance)
+    }
+
+    private func formatDistance(_ distance: Double) -> String {
+        String(format: "%.1f", distance)
+    }
 }
 
 public enum FunBattleSideReportCatalog {
@@ -207,6 +223,10 @@ public enum FunBattleSideReportCatalog {
                     funDTScore: sideDT?.funDTScore ?? 0,
                     averageAITurns: turnSummary?.averageTurns,
                     aiTurnSamples: turnSummary?.completedTurns ?? [],
+                    averageAIMovedDistance: turnSummary?.averageMovedDistance,
+                    aiMovedDistanceSamples: turnSummary?.movedDistances ?? [],
+                    averageBlockedMovementPhases: turnSummary?.averageBlockedMovementPhases,
+                    blockedMovementPhaseSamples: turnSummary?.blockedMovementPhases ?? [],
                     weakestDimension: weakest?.dimension ?? .clarity,
                     weakestDimensionScore: weakest?.score ?? 0,
                     strongestDTAxes: sideDT?.strongestDeltaAxisLabels ?? [],

@@ -507,7 +507,7 @@ That is Guderian's fun.
 
 ## Battle Fun And funDT Appendix
 
-This appendix is generated from `FunBattleSideReportCatalog.generate()`. `Fun` is the side-adjusted weighted score from the catalog audit. `funDT` is the side-specific temporal-difference reconstruction: it asks how much this side's posture, command lens, objectives, pressure, force texture, and continuity change over campaign time. `Avg AI turns` is an independent pacing-fun signal from AI-vs-AI autoplay; it records the average completed turns per battle across 4 runs. Scores are signals for tuning, not final truth.
+This appendix is generated from `FunBattleSideReportCatalog.generate()`. `Fun` is the side-adjusted weighted score from the catalog audit. `funDT` is the side-specific temporal-difference reconstruction: it asks how much this side's posture, command lens, objectives, pressure, force texture, and continuity change over campaign time. `Avg AI turns` is an independent pacing-fun signal from AI-vs-AI autoplay; it records the average completed turns per battle across 4 runs. `Avg move` and `Blocked move phases` show whether the turn count is being shaped by movement reach or by the AI running out of legal movement. Scores are signals for tuning, not final truth.
 
 ### Highest Fun
 - 1. Battle of Tuchola Forest / Polish corridor defenders: 96.3 fun; avg AI turns 8.0; weakest Pacing 93.
@@ -517,120 +517,121 @@ This appendix is generated from `FunBattleSideReportCatalog.generate()`. `Fun` i
 - 14. Battle of Smolensk / Soviet Smolensk defenders and reserve armies: 96.2 fun; avg AI turns 10.0; weakest Pacing 93.
 
 ### Lowest Fun
-- 2. Battle of Wizna / Guderian's command: 89.1 fun; avg AI turns 7.0; improve make command-study caveats and objectives more visible.
-- 2. Battle of Wizna / Polish Wizna defenders: 90.8 fun; avg AI turns 7.0; improve make first-turn objectives and feedback more explicit.
-- 7. Battle of Montcornet / Guderian's command: 92.3 fun; avg AI turns 6.0; improve tie command-study outcomes to sober tradeoffs and non-celebratory debriefs.
+- 2. Battle of Wizna / Guderian's command: 89.6 fun; avg AI turns 7.5; improve make command-study caveats and objectives more visible.
+- 2. Battle of Wizna / Polish Wizna defenders: 91.2 fun; avg AI turns 7.5; improve make first-turn objectives and feedback more explicit.
+- 7. Battle of Montcornet / Guderian's command: 92.3 fun; avg AI turns 6.8; improve tie command-study outcomes to sober tradeoffs and non-celebratory debriefs.
 - 3. Battle of Brzesc Litewski / Guderian's command: 92.8 fun; avg AI turns 8.0; improve make command-study caveats and objectives more visible.
 - 4. Battle of Kobryn / Guderian's command: 92.8 fun; avg AI turns 7.0; improve make command-study caveats and objectives more visible.
 
 ### Highest funDT
 - 1. Battle of Tuchola Forest / Guderian's command: 86.2 funDT; avg AI turns 8.0; strongest axes Chronology, Command Scope, Force System.
 - 1. Battle of Tuchola Forest / Polish corridor defenders: 86.2 funDT; avg AI turns 8.0; strongest axes Chronology, Command Scope, Force System.
-- 20. Kursk Armored Force Pressure / Soviet Central and Voronezh Front defenders: 70.8 funDT; avg AI turns 8.2; strongest axes Chronology, Objective System, Force System.
+- 20. Kursk Armored Force Pressure / Soviet Central and Voronezh Front defenders: 70.7 funDT; avg AI turns 8.2; strongest axes Chronology, Objective System, Force System.
 - 20. Kursk Armored Force Pressure / Guderian's command: 70.1 funDT; avg AI turns 8.2; strongest axes Chronology, Player Posture, Objective System.
-- 13. Battle of Bialystok-Minsk / Guderian's command: 62.8 funDT; avg AI turns 9.0; strongest axes Chronology, Tempo, Objective System.
+- 13. Battle of Bialystok-Minsk / Guderian's command: 61.8 funDT; avg AI turns 9.0; strongest axes Chronology, Tempo, Objective System.
 
 ### Lowest funDT
-- 10. Siege of Calais / Calais garrison: 32.8 funDT; avg AI turns 7.0; add/change score partial success through preservation, delay, escape, or counterattack effects.
-- 32. East Pomeranian Offensive / Guderian's command: 33.0 funDT; avg AI turns 9.0; add/change add mid-battle events or changing priorities before the outcome is obvious.
+- 32. East Pomeranian Offensive / Guderian's command: 32.9 funDT; avg AI turns 9.0; add/change add mid-battle events or changing priorities before the outcome is obvious.
 - 33. Kustrin and Oder Bridgeheads / Guderian's command: 33.0 funDT; avg AI turns 9.0; add/change add mid-battle events or changing priorities before the outcome is obvious.
 - 32. East Pomeranian Offensive / Soviet and Polish coastal clearing forces: 33.2 funDT; avg AI turns 9.0; add/change add mid-battle events or changing priorities before the outcome is obvious.
-- 33. Kustrin and Oder Bridgeheads / Soviet Oder bridgehead forces: 33.3 funDT; avg AI turns 9.0; add/change add mid-battle events or changing priorities before the outcome is obvious.
+- 33. Kustrin and Oder Bridgeheads / Soviet Oder bridgehead forces: 33.2 funDT; avg AI turns 9.0; add/change add mid-battle events or changing priorities before the outcome is obvious.
+- 30. East Prussia and Elbing Cutoff / Guderian's command: 33.4 funDT; avg AI turns 9.2; add/change add mid-battle events or changing priorities before the outcome is obvious.
 
 ### Longest AI Battles
-- 14. Battle of Smolensk: 10.0 average turns; samples 10, 10, 10, 10.
-- 16. Battle of Kiev: 9.5 average turns; samples 8, 10, 10, 10.
-- 22. Korsun-Cherkassy Pocket: 9.2 average turns; samples 9, 9, 10, 9.
-- 30. East Prussia and Elbing Cutoff: 9.2 average turns; samples 10, 9, 9, 9.
-- 13. Battle of Bialystok-Minsk: 9.0 average turns; samples 9, 9, 9, 9.
+- 14. Battle of Smolensk: 10.0 average turns; avg move 152.0; blocked move phases 0.2; samples 10, 10, 10, 10.
+- 16. Battle of Kiev: 9.5 average turns; avg move 53.2; blocked move phases 2.5; samples 8, 10, 10, 10.
+- 22. Korsun-Cherkassy Pocket: 9.2 average turns; avg move 82.1; blocked move phases 0.2; samples 9, 9, 10, 9.
+- 30. East Prussia and Elbing Cutoff: 9.2 average turns; avg move 96.9; blocked move phases 0.0; samples 10, 9, 9, 9.
+- 13. Battle of Bialystok-Minsk: 9.0 average turns; avg move 84.8; blocked move phases 1.2; samples 9, 9, 9, 9.
 
 ### Shortest AI Battles
-- 7. Battle of Montcornet: 6.0 average turns; samples 6, 6, 6, 6.
-- 2. Battle of Wizna: 7.0 average turns; samples 7, 7, 7, 7.
-- 4. Battle of Kobryn: 7.0 average turns; samples 7, 7, 7, 7.
-- 6. Stonne Heights: 7.0 average turns; samples 7, 7, 7, 7.
-- 8. Amiens-Abbeville Channel Race: 7.0 average turns; samples 7, 7, 7, 7.
+- 7. Battle of Montcornet: 6.8 average turns; avg move 66.2; blocked move phases 0.0; samples 7, 7, 6, 7.
+- 4. Battle of Kobryn: 7.0 average turns; avg move 70.8; blocked move phases 0.0; samples 7, 7, 7, 7.
+- 10. Siege of Calais: 7.0 average turns; avg move 55.4; blocked move phases 0.0; samples 7, 7, 7, 7.
+- 23. Kamenets-Podolsky Pocket: 7.0 average turns; avg move 50.5; blocked move phases 0.2; samples 7, 6, 7, 8.
+- 2. Battle of Wizna: 7.5 average turns; avg move 90.1; blocked move phases 0.0; samples 8, 7, 8, 7.
 
 ### Per Battle / Per Side Data
 
-| # | Battle | Side | Fun | funDT | Avg AI turns | Weakest | Strongest funDT axes | Improvement focus |
-| ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- |
-| 1 | Battle of Tuchola Forest | Polish corridor defenders | 96.3 | 86.2 | 8.0 | Pacing 93 | Chronology, Command Scope, Force System | add mid-battle events or changing priorities before the outcome is obvious |
-| 1 | Battle of Tuchola Forest | Guderian's command | 94.5 | 86.2 | 8.0 | Ethical Frame 88 | Chronology, Command Scope, Force System | strengthen non-celebratory framing and visible command caveats |
-| 2 | Battle of Wizna | Polish Wizna defenders | 90.8 | 43.8 | 7.0 | Clarity 86 | Objective System, Tempo, Pressure System | make first-turn objectives and feedback more explicit |
-| 2 | Battle of Wizna | Guderian's command | 89.1 | 45.6 | 7.0 | Clarity 86 | Objective System, Tempo, Pressure System | make command-study caveats and objectives more visible |
-| 3 | Battle of Brzesc Litewski | Brzesc defense group | 94.5 | 38.7 | 8.0 | Clarity 86 | Objective System, Tempo, Pressure System | make first-turn objectives and feedback more explicit |
-| 3 | Battle of Brzesc Litewski | Guderian's command | 92.8 | 45.3 | 8.0 | Clarity 86 | Objective System, Player Posture, Tempo | make command-study caveats and objectives more visible |
-| 4 | Battle of Kobryn | Operational Group Polesie | 94.5 | 44.2 | 7.0 | Clarity 86 | Objective System, Tempo, Force System | make first-turn objectives and feedback more explicit |
-| 4 | Battle of Kobryn | Guderian's command | 92.8 | 44.4 | 7.0 | Clarity 86 | Objective System, Player Posture, Tempo | make command-study caveats and objectives more visible |
-| 5 | Battle of Sedan | French Sedan sector defenders | 95.0 | 54.8 | 8.0 | Clarity 91 | Chronology, Objective System, Force System | make first-turn objectives and feedback more explicit |
-| 5 | Battle of Sedan | Guderian's command | 93.2 | 57.1 | 8.0 | Consequence 86 | Chronology, Objective System, Player Posture | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
-| 6 | Stonne Heights | French Char B1 bis counterattack force | 96.0 | 45.3 | 7.0 | Novelty 92 | Objective System, Tempo, Force System | change terrain use, objective verbs, or force mix versus nearby battles |
-| 6 | Stonne Heights | Guderian's command | 94.2 | 49.6 | 7.0 | Ethical Frame 88 | Objective System, Tempo, Player Posture | strengthen non-celebratory framing and visible command caveats |
-| 7 | Battle of Montcornet | 4e Division cuirassee | 94.0 | 42.3 | 6.0 | Clarity 90 | Objective System, Tempo, Player Posture | make first-turn objectives and feedback more explicit |
-| 7 | Battle of Montcornet | Guderian's command | 92.3 | 47.6 | 6.0 | Consequence 86 | Objective System, Tempo, Force System | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
-| 8 | Amiens-Abbeville Channel Race | Allied blocking detachments | 95.6 | 39.1 | 7.0 | Consequence 91 | Objective System, Tempo, Force System | score partial success through preservation, delay, escape, or counterattack effects |
-| 8 | Amiens-Abbeville Channel Race | Guderian's command | 93.8 | 42.0 | 7.0 | Consequence 86 | Objective System, Player Posture, Tempo | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
-| 9 | Battle of Boulogne | Boulogne garrison | 95.0 | 37.9 | 7.0 | Clarity 90 | Objective System, Pressure System, Force System | make first-turn objectives and feedback more explicit |
-| 9 | Battle of Boulogne | Guderian's command | 93.2 | 41.6 | 7.0 | Consequence 86 | Objective System, Pressure System, Force System | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
-| 10 | Siege of Calais | Calais garrison | 95.7 | 32.8 | 7.0 | Consequence 91 | Tempo, Objective System, Pressure System | score partial success through preservation, delay, escape, or counterattack effects |
-| 10 | Siege of Calais | Guderian's command | 93.9 | 34.6 | 7.0 | Consequence 86 | Tempo, Objective System, Pressure System | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
-| 11 | Dunkirk Perimeter Pressure | Dunkirk perimeter forces | 96.3 | 40.6 | 8.0 | Pacing 93 | Tempo, Command Scope, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 11 | Dunkirk Perimeter Pressure | Guderian's command | 94.4 | 43.6 | 8.0 | Ethical Frame 88 | Tempo, Command Scope, Objective System | strengthen non-celebratory framing and visible command caveats |
-| 12 | Fall Rot Swiss-Border Drive | French late-campaign defenders | 95.7 | 44.3 | 8.0 | Consequence 91 | Tempo, Objective System, Force System | score partial success through preservation, delay, escape, or counterattack effects |
-| 12 | Fall Rot Swiss-Border Drive | Guderian's command | 93.9 | 50.1 | 8.0 | Consequence 86 | Tempo, Objective System, Force System | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
-| 13 | Battle of Bialystok-Minsk | Soviet Western Front detachments | 96.2 | 60.3 | 9.0 | Pacing 93 | Chronology, Objective System, Tempo | add mid-battle events or changing priorities before the outcome is obvious |
-| 13 | Battle of Bialystok-Minsk | Guderian's command | 94.4 | 62.8 | 9.0 | Ethical Frame 88 | Chronology, Tempo, Objective System | strengthen non-celebratory framing and visible command caveats |
-| 14 | Battle of Smolensk | Soviet Smolensk defenders and reserve armies | 96.2 | 48.6 | 10.0 | Pacing 93 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 14 | Battle of Smolensk | Guderian's command | 94.4 | 49.5 | 10.0 | Ethical Frame 88 | Objective System, Tempo, Player Posture | strengthen non-celebratory framing and visible command caveats |
-| 15 | Roslavl-Novozybkov Offensive | Bryansk Front counterattack force | 96.2 | 47.8 | 8.0 | Pacing 93 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 15 | Roslavl-Novozybkov Offensive | Guderian's command | 94.4 | 51.5 | 8.0 | Ethical Frame 88 | Objective System, Tempo, Player Posture | strengthen non-celebratory framing and visible command caveats |
-| 16 | Battle of Kiev | Soviet Southwestern Front | 96.2 | 42.1 | 9.5 | Pacing 93 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 16 | Battle of Kiev | Guderian's command | 94.4 | 46.5 | 9.5 | Ethical Frame 88 | Objective System, Tempo, Player Posture | strengthen non-celebratory framing and visible command caveats |
-| 17 | Battle of Bryansk | Bryansk Front detachments | 96.2 | 35.0 | 9.0 | Pacing 93 | Objective System, Tempo, Pressure System | add mid-battle events or changing priorities before the outcome is obvious |
-| 17 | Battle of Bryansk | Guderian's command | 94.4 | 37.7 | 9.0 | Ethical Frame 88 | Tempo, Objective System, Player Posture | strengthen non-celebratory framing and visible command caveats |
-| 18 | Mtsensk Armored Ambush | Katukov's 4th Tank Brigade and 1st Guards Rifle Corps screen | 96.2 | 41.3 | 7.0 | Pacing 93 | Tempo, Force System, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 18 | Mtsensk Armored Ambush | Guderian's command | 94.4 | 43.3 | 7.0 | Ethical Frame 88 | Tempo, Player Posture, Force System | strengthen non-celebratory framing and visible command caveats |
-| 19 | Moscow Southern Approach | Soviet Tula, Kashira, Belov/Getman reserve, and winter counteroffensive defenders | 96.3 | 46.2 | 8.0 | Pacing 93 | Tempo, Objective System, Force System | add mid-battle events or changing priorities before the outcome is obvious |
-| 19 | Moscow Southern Approach | Guderian's command | 94.5 | 48.7 | 8.0 | Ethical Frame 88 | Tempo, Player Posture, Objective System | strengthen non-celebratory framing and visible command caveats |
-| 20 | Kursk Armored Force Pressure | Soviet Central and Voronezh Front defenders | 95.9 | 70.8 | 8.2 | Pacing 87 | Chronology, Objective System, Force System | add mid-battle events or changing priorities before the outcome is obvious |
-| 20 | Kursk Armored Force Pressure | Guderian's command | 94.5 | 70.1 | 8.2 | Pacing 87 | Chronology, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 21 | Dnieper Withdrawal and Bridgeheads | Soviet Front crossing detachments | 95.9 | 58.6 | 9.0 | Pacing 87 | Player Posture, Tempo, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 21 | Dnieper Withdrawal and Bridgeheads | Guderian's command | 94.5 | 57.4 | 9.0 | Pacing 87 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 22 | Korsun-Cherkassy Pocket | Soviet blocking and cavalry-mechanized groups | 95.9 | 56.6 | 9.2 | Pacing 87 | Player Posture, Objective System, Tempo | add mid-battle events or changing priorities before the outcome is obvious |
-| 22 | Korsun-Cherkassy Pocket | Guderian's command | 94.5 | 54.4 | 9.2 | Pacing 87 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 23 | Kamenets-Podolsky Pocket | Soviet mobile groups | 95.9 | 48.0 | 7.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 23 | Kamenets-Podolsky Pocket | Guderian's command | 94.5 | 45.7 | 7.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 24 | Operation Bagration Withdrawal Crisis | Soviet Front breakthrough groups | 95.9 | 52.0 | 9.0 | Pacing 87 | Force System, Tempo, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 24 | Operation Bagration Withdrawal Crisis | Guderian's command | 94.5 | 50.0 | 9.0 | Pacing 87 | Tempo, Force System, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 25 | Lvov-Sandomierz Breakthrough | Soviet breakthrough and bridgehead forces | 95.5 | 42.9 | 9.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 25 | Lvov-Sandomierz Breakthrough | Guderian's command | 94.2 | 41.7 | 9.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 26 | Narew and Vistula Bridgeheads | Soviet bridgehead defenders and engineers | 95.9 | 35.4 | 9.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 26 | Narew and Vistula Bridgeheads | Guderian's command | 94.5 | 35.0 | 9.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 27 | Warsaw-Area Defensive Arcs | Soviet and Polish-aligned Warsaw approach groups | 95.5 | 35.4 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 27 | Warsaw-Area Defensive Arcs | Guderian's command | 94.2 | 34.9 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 28 | Vistula-Oder Breakthrough | Soviet breakthrough and pursuit forces | 95.5 | 37.4 | 9.0 | Pacing 87 | Tempo, Chronology, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 28 | Vistula-Oder Breakthrough | Guderian's command | 94.2 | 37.1 | 9.0 | Pacing 87 | Tempo, Chronology, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 29 | Poznan Corridor and Encirclement | Soviet assault and bypass groups | 95.5 | 34.9 | 9.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 29 | Poznan Corridor and Encirclement | Guderian's command | 94.2 | 34.3 | 9.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 30 | East Prussia and Elbing Cutoff | Soviet northern-front and coastal cutoff forces | 95.9 | 33.7 | 9.2 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 30 | East Prussia and Elbing Cutoff | Guderian's command | 94.5 | 33.5 | 9.2 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 31 | Operation Solstice at Stargard | Soviet blocking and counterattack groups | 95.9 | 33.9 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 31 | Operation Solstice at Stargard | Guderian's command | 94.5 | 34.1 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 32 | East Pomeranian Offensive | Soviet and Polish coastal clearing forces | 95.5 | 33.2 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 32 | East Pomeranian Offensive | Guderian's command | 94.2 | 33.0 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 33 | Kustrin and Oder Bridgeheads | Soviet Oder bridgehead forces | 95.5 | 33.3 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 33 | Kustrin and Oder Bridgeheads | Guderian's command | 94.2 | 33.0 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 34 | Seelow Heights Epilogue | Soviet assault armies | 95.5 | 37.3 | 9.0 | Pacing 87 | Tempo, Chronology, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 34 | Seelow Heights Epilogue | Guderian's command | 94.2 | 36.4 | 9.0 | Pacing 87 | Tempo, Chronology, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
-| 35 | Berlin and Halbe Epilogue | Soviet, Polish, and Allied-aligned final assault groups | 95.5 | 36.3 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
-| 35 | Berlin and Halbe Epilogue | Guderian's command | 94.2 | 34.7 | 9.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| # | Battle | Side | Fun | funDT | Avg AI turns | Avg move | Blocked move phases | Weakest | Strongest funDT axes | Improvement focus |
+| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |
+| 1 | Battle of Tuchola Forest | Polish corridor defenders | 96.3 | 86.2 | 8.0 | 164.1 | 0.0 | Pacing 93 | Chronology, Command Scope, Force System | add mid-battle events or changing priorities before the outcome is obvious |
+| 1 | Battle of Tuchola Forest | Guderian's command | 94.5 | 86.2 | 8.0 | 164.1 | 0.0 | Ethical Frame 88 | Chronology, Command Scope, Force System | strengthen non-celebratory framing and visible command caveats |
+| 2 | Battle of Wizna | Polish Wizna defenders | 91.2 | 40.2 | 7.5 | 90.1 | 0.0 | Clarity 86 | Objective System, Pressure System, Player Posture | make first-turn objectives and feedback more explicit |
+| 2 | Battle of Wizna | Guderian's command | 89.6 | 42.0 | 7.5 | 90.1 | 0.0 | Clarity 86 | Objective System, Pressure System, Player Posture | make command-study caveats and objectives more visible |
+| 3 | Battle of Brzesc Litewski | Brzesc defense group | 94.5 | 36.3 | 8.0 | 123.4 | 0.0 | Clarity 86 | Objective System, Pressure System, Player Posture | make first-turn objectives and feedback more explicit |
+| 3 | Battle of Brzesc Litewski | Guderian's command | 92.8 | 42.9 | 8.0 | 123.4 | 0.0 | Clarity 86 | Objective System, Player Posture, Pressure System | make command-study caveats and objectives more visible |
+| 4 | Battle of Kobryn | Operational Group Polesie | 94.5 | 41.4 | 7.0 | 70.8 | 0.0 | Clarity 86 | Objective System, Force System, Player Posture | make first-turn objectives and feedback more explicit |
+| 4 | Battle of Kobryn | Guderian's command | 92.8 | 41.6 | 7.0 | 70.8 | 0.0 | Clarity 86 | Objective System, Player Posture, Pressure System | make command-study caveats and objectives more visible |
+| 5 | Battle of Sedan | French Sedan sector defenders | 95.0 | 52.2 | 8.0 | 127.8 | 0.0 | Clarity 91 | Chronology, Objective System, Force System | make first-turn objectives and feedback more explicit |
+| 5 | Battle of Sedan | Guderian's command | 93.2 | 54.5 | 8.0 | 127.8 | 0.0 | Consequence 86 | Chronology, Objective System, Player Posture | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
+| 6 | Stonne Heights | French Char B1 bis counterattack force | 96.0 | 42.6 | 8.0 | 91.0 | 0.2 | Novelty 92 | Objective System, Force System, Pressure System | change terrain use, objective verbs, or force mix versus nearby battles |
+| 6 | Stonne Heights | Guderian's command | 94.2 | 46.8 | 8.0 | 91.0 | 0.2 | Ethical Frame 88 | Objective System, Player Posture, Pressure System | strengthen non-celebratory framing and visible command caveats |
+| 7 | Battle of Montcornet | 4e Division cuirassee | 94.0 | 42.3 | 6.8 | 66.2 | 0.0 | Clarity 90 | Objective System, Tempo, Player Posture | make first-turn objectives and feedback more explicit |
+| 7 | Battle of Montcornet | Guderian's command | 92.3 | 47.6 | 6.8 | 66.2 | 0.0 | Consequence 86 | Objective System, Tempo, Force System | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
+| 8 | Amiens-Abbeville Channel Race | Allied blocking detachments | 95.6 | 38.2 | 8.0 | 78.6 | 0.0 | Consequence 91 | Objective System, Tempo, Force System | score partial success through preservation, delay, escape, or counterattack effects |
+| 8 | Amiens-Abbeville Channel Race | Guderian's command | 93.8 | 41.0 | 8.0 | 78.6 | 0.0 | Consequence 86 | Objective System, Player Posture, Tempo | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
+| 9 | Battle of Boulogne | Boulogne garrison | 95.0 | 37.5 | 8.0 | 98.7 | 0.0 | Clarity 90 | Objective System, Pressure System, Force System | make first-turn objectives and feedback more explicit |
+| 9 | Battle of Boulogne | Guderian's command | 93.2 | 41.1 | 8.0 | 98.7 | 0.0 | Consequence 86 | Objective System, Pressure System, Force System | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
+| 10 | Siege of Calais | Calais garrison | 95.7 | 34.8 | 7.0 | 55.4 | 0.0 | Consequence 91 | Tempo, Objective System, Pressure System | score partial success through preservation, delay, escape, or counterattack effects |
+| 10 | Siege of Calais | Guderian's command | 93.9 | 36.7 | 7.0 | 55.4 | 0.0 | Consequence 86 | Tempo, Pressure System, Objective System | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
+| 11 | Dunkirk Perimeter Pressure | Dunkirk perimeter forces | 96.3 | 38.6 | 8.0 | 76.6 | 0.0 | Pacing 93 | Command Scope, Objective System, Pressure System | add mid-battle events or changing priorities before the outcome is obvious |
+| 11 | Dunkirk Perimeter Pressure | Guderian's command | 94.4 | 41.7 | 8.0 | 76.6 | 0.0 | Ethical Frame 88 | Command Scope, Objective System, Player Posture | strengthen non-celebratory framing and visible command caveats |
+| 12 | Fall Rot Swiss-Border Drive | French late-campaign defenders | 95.7 | 44.0 | 8.0 | 96.0 | 0.0 | Consequence 91 | Tempo, Objective System, Force System | score partial success through preservation, delay, escape, or counterattack effects |
+| 12 | Fall Rot Swiss-Border Drive | Guderian's command | 93.9 | 49.7 | 8.0 | 96.0 | 0.0 | Consequence 86 | Tempo, Objective System, Force System | tie command-study outcomes to sober tradeoffs and non-celebratory debriefs |
+| 13 | Battle of Bialystok-Minsk | Soviet Western Front detachments | 96.2 | 59.3 | 9.0 | 84.8 | 1.2 | Pacing 93 | Chronology, Objective System, Tempo | add mid-battle events or changing priorities before the outcome is obvious |
+| 13 | Battle of Bialystok-Minsk | Guderian's command | 94.4 | 61.8 | 9.0 | 84.8 | 1.2 | Ethical Frame 88 | Chronology, Tempo, Objective System | strengthen non-celebratory framing and visible command caveats |
+| 14 | Battle of Smolensk | Soviet Smolensk defenders and reserve armies | 96.2 | 48.5 | 10.0 | 152.0 | 0.2 | Pacing 93 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 14 | Battle of Smolensk | Guderian's command | 94.4 | 49.4 | 10.0 | 152.0 | 0.2 | Ethical Frame 88 | Objective System, Tempo, Player Posture | strengthen non-celebratory framing and visible command caveats |
+| 15 | Roslavl-Novozybkov Offensive | Bryansk Front counterattack force | 96.2 | 47.5 | 8.0 | 77.2 | 0.8 | Pacing 93 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 15 | Roslavl-Novozybkov Offensive | Guderian's command | 94.4 | 51.1 | 8.0 | 77.2 | 0.8 | Ethical Frame 88 | Objective System, Tempo, Player Posture | strengthen non-celebratory framing and visible command caveats |
+| 16 | Battle of Kiev | Soviet Southwestern Front | 96.2 | 42.1 | 9.5 | 53.2 | 2.5 | Pacing 93 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 16 | Battle of Kiev | Guderian's command | 94.4 | 46.5 | 9.5 | 53.2 | 2.5 | Ethical Frame 88 | Objective System, Tempo, Player Posture | strengthen non-celebratory framing and visible command caveats |
+| 17 | Battle of Bryansk | Bryansk Front detachments | 96.2 | 34.8 | 9.0 | 139.2 | 0.0 | Pacing 93 | Objective System, Tempo, Pressure System | add mid-battle events or changing priorities before the outcome is obvious |
+| 17 | Battle of Bryansk | Guderian's command | 94.4 | 37.6 | 9.0 | 139.2 | 0.0 | Ethical Frame 88 | Tempo, Objective System, Player Posture | strengthen non-celebratory framing and visible command caveats |
+| 18 | Mtsensk Armored Ambush | Katukov's 4th Tank Brigade and 1st Guards Rifle Corps screen | 96.2 | 40.5 | 8.0 | 89.0 | 2.0 | Pacing 93 | Tempo, Force System, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 18 | Mtsensk Armored Ambush | Guderian's command | 94.4 | 42.5 | 8.0 | 89.0 | 2.0 | Ethical Frame 88 | Tempo, Player Posture, Force System | strengthen non-celebratory framing and visible command caveats |
+| 19 | Moscow Southern Approach | Soviet Tula, Kashira, Belov/Getman reserve, and winter counteroffensive defenders | 96.3 | 46.1 | 8.0 | 163.2 | 0.0 | Pacing 93 | Tempo, Objective System, Force System | add mid-battle events or changing priorities before the outcome is obvious |
+| 19 | Moscow Southern Approach | Guderian's command | 94.5 | 48.7 | 8.0 | 163.2 | 0.0 | Ethical Frame 88 | Tempo, Player Posture, Objective System | strengthen non-celebratory framing and visible command caveats |
+| 20 | Kursk Armored Force Pressure | Soviet Central and Voronezh Front defenders | 95.9 | 70.7 | 8.2 | 80.3 | 0.0 | Pacing 87 | Chronology, Objective System, Force System | add mid-battle events or changing priorities before the outcome is obvious |
+| 20 | Kursk Armored Force Pressure | Guderian's command | 94.5 | 70.1 | 8.2 | 80.3 | 0.0 | Pacing 87 | Chronology, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 21 | Dnieper Withdrawal and Bridgeheads | Soviet Front crossing detachments | 95.9 | 58.6 | 9.0 | 101.4 | 0.0 | Pacing 87 | Player Posture, Tempo, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 21 | Dnieper Withdrawal and Bridgeheads | Guderian's command | 94.5 | 57.3 | 9.0 | 101.4 | 0.0 | Pacing 87 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 22 | Korsun-Cherkassy Pocket | Soviet blocking and cavalry-mechanized groups | 95.9 | 56.5 | 9.2 | 82.1 | 0.2 | Pacing 87 | Player Posture, Objective System, Tempo | add mid-battle events or changing priorities before the outcome is obvious |
+| 22 | Korsun-Cherkassy Pocket | Guderian's command | 94.5 | 54.4 | 9.2 | 82.1 | 0.2 | Pacing 87 | Objective System, Tempo, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 23 | Kamenets-Podolsky Pocket | Soviet mobile groups | 95.9 | 48.0 | 7.0 | 50.5 | 0.2 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 23 | Kamenets-Podolsky Pocket | Guderian's command | 94.5 | 45.6 | 7.0 | 50.5 | 0.2 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 24 | Operation Bagration Withdrawal Crisis | Soviet Front breakthrough groups | 95.9 | 52.0 | 9.0 | 91.5 | 0.0 | Pacing 87 | Force System, Tempo, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 24 | Operation Bagration Withdrawal Crisis | Guderian's command | 94.5 | 49.9 | 9.0 | 91.5 | 0.0 | Pacing 87 | Tempo, Force System, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 25 | Lvov-Sandomierz Breakthrough | Soviet breakthrough and bridgehead forces | 95.5 | 42.9 | 9.0 | 91.9 | 0.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 25 | Lvov-Sandomierz Breakthrough | Guderian's command | 94.2 | 41.7 | 9.0 | 91.9 | 0.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 26 | Narew and Vistula Bridgeheads | Soviet bridgehead defenders and engineers | 95.9 | 35.3 | 9.0 | 91.3 | 0.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 26 | Narew and Vistula Bridgeheads | Guderian's command | 94.5 | 35.0 | 9.0 | 91.3 | 0.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 27 | Warsaw-Area Defensive Arcs | Soviet and Polish-aligned Warsaw approach groups | 95.5 | 35.4 | 9.0 | 90.9 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 27 | Warsaw-Area Defensive Arcs | Guderian's command | 94.2 | 34.8 | 9.0 | 90.9 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 28 | Vistula-Oder Breakthrough | Soviet breakthrough and pursuit forces | 95.5 | 37.4 | 9.0 | 90.7 | 0.0 | Pacing 87 | Tempo, Chronology, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 28 | Vistula-Oder Breakthrough | Guderian's command | 94.2 | 37.0 | 9.0 | 90.7 | 0.0 | Pacing 87 | Tempo, Chronology, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 29 | Poznan Corridor and Encirclement | Soviet assault and bypass groups | 95.5 | 34.9 | 9.0 | 90.4 | 0.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 29 | Poznan Corridor and Encirclement | Guderian's command | 94.2 | 34.2 | 9.0 | 90.4 | 0.0 | Pacing 87 | Tempo, Objective System, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 30 | East Prussia and Elbing Cutoff | Soviet northern-front and coastal cutoff forces | 95.9 | 33.7 | 9.2 | 96.9 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 30 | East Prussia and Elbing Cutoff | Guderian's command | 94.5 | 33.4 | 9.2 | 96.9 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 31 | Operation Solstice at Stargard | Soviet blocking and counterattack groups | 95.9 | 33.9 | 9.0 | 93.8 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 31 | Operation Solstice at Stargard | Guderian's command | 94.5 | 34.0 | 9.0 | 93.8 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 32 | East Pomeranian Offensive | Soviet and Polish coastal clearing forces | 95.5 | 33.2 | 9.0 | 92.0 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 32 | East Pomeranian Offensive | Guderian's command | 94.2 | 32.9 | 9.0 | 92.0 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 33 | Kustrin and Oder Bridgeheads | Soviet Oder bridgehead forces | 95.5 | 33.2 | 9.0 | 90.8 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 33 | Kustrin and Oder Bridgeheads | Guderian's command | 94.2 | 33.0 | 9.0 | 90.8 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 34 | Seelow Heights Epilogue | Soviet assault armies | 95.5 | 37.3 | 9.0 | 91.9 | 0.0 | Pacing 87 | Tempo, Chronology, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 34 | Seelow Heights Epilogue | Guderian's command | 94.2 | 36.4 | 9.0 | 91.9 | 0.0 | Pacing 87 | Tempo, Chronology, Player Posture | add mid-battle events or changing priorities before the outcome is obvious |
+| 35 | Berlin and Halbe Epilogue | Soviet, Polish, and Allied-aligned final assault groups | 95.5 | 36.3 | 9.0 | 92.0 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
+| 35 | Berlin and Halbe Epilogue | Guderian's command | 94.2 | 34.7 | 9.0 | 92.0 | 0.0 | Pacing 87 | Tempo, Player Posture, Objective System | add mid-battle events or changing priorities before the outcome is obvious |
 
 ### Improvement Themes
 
 - Raise low-fun rows by strengthening their weakest scored dimension first: for this catalog that usually means richer consequence/debrief language, more side-specific agency, or clearer command-study caveats.
 - Raise low-funDT rows by changing the temporal grammar rather than merely adding content: alter objective verbs, pressure triggers, force texture, or map-use rhythm compared with the previous three battles.
 - Raise turn-count fun by tuning the AI pressure arc toward meaningful duration: very short battles need recoverable counterplay, staged objectives, or delayed scoring reveals; very long battles need sharper victory thresholds, stronger pursuit logic, or fewer low-impact blocked phases.
+- Use movement telemetry diagnostically: high average movement with low turns points to objective spacing or movement caps; high blocked movement with low turns points to scoring thresholds or objective control rather than speed.
 - Late-career staff-context battles need the most funDT help because many share Soviet pressure, German defensive context, medium tempo, and command-caveat structure. They benefit from sharper asymmetry: mines versus bridgeheads, fortress reduction versus pursuit, urban compression versus operational breakout, supply collapse versus relief attempts.
 - Guderian-command rows stay fun when they remain explicit command study. Their safest improvements are better comparative objectives, visible caveat labels, non-celebratory debriefs, and AI/player parity, not heroic copy or conquest rewards.
 - Opposing-force rows gain fun when partial success is more granular: preserved units, delayed crossings, denied exits, exhausted supply, and readable counterattack timing should all show up in score channels and debriefs.
