@@ -96,6 +96,8 @@ final class FunScenarioAuditTests: XCTestCase {
         }
         XCTAssertTrue(report.rows.allSatisfy { 0...100 ~= $0.funScore })
         XCTAssertTrue(report.rows.allSatisfy { 0...100 ~= $0.funDTScore })
+        XCTAssertTrue(report.turnSummaries.isEmpty)
+        XCTAssertTrue(report.rows.allSatisfy { $0.averageAITurns == nil && $0.aiTurnSamples.isEmpty })
         XCTAssertTrue(report.rows.allSatisfy { !$0.strongestDTAxes.isEmpty })
         XCTAssertTrue(report.markdownAppendix().contains("## Battle Fun And funDT Appendix"))
     }

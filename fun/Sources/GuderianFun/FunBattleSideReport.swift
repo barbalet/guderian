@@ -13,6 +13,8 @@ public struct FunBattleSideScore: Identifiable, Codable, Hashable, Sendable {
     public let sideLens: String
     public let funScore: Double
     public let funDTScore: Double
+    public let averageAITurns: Double?
+    public let aiTurnSamples: [Int]
     public let weakestDimension: FunDimension
     public let weakestDimensionScore: Int
     public let strongestDTAxes: [String]
@@ -21,6 +23,7 @@ public struct FunBattleSideScore: Identifiable, Codable, Hashable, Sendable {
 
 public struct FunBattleSideReport: Codable, Hashable, Sendable {
     public let rows: [FunBattleSideScore]
+    public let turnSummaries: [FunBattleTurnRunSummary]
 
     public var highestFunRows: [FunBattleSideScore] {
         ranked(rows, by: \.funScore, descending: true)
@@ -38,44 +41,75 @@ public struct FunBattleSideReport: Codable, Hashable, Sendable {
         ranked(rows, by: \.funDTScore, descending: false)
     }
 
+    public var longestAITurnBattles: [FunBattleTurnRunSummary] {
+        ranked(turnSummaries, by: \.averageTurns, descending: true)
+    }
+
+    public var shortestAITurnBattles: [FunBattleTurnRunSummary] {
+        ranked(turnSummaries, by: \.averageTurns, descending: false)
+    }
+
     public func markdownAppendix(topLimit: Int = 5, bottomLimit: Int = 5) -> String {
         var lines: [String] = []
+        let turnRunCount = turnSummaries.map(\.runCount).max() ?? 0
+
         lines.append("## Battle Fun And funDT Appendix")
         lines.append("")
-        lines.append("This appendix is generated from `FunBattleSideReportCatalog.generate()`. `Fun` is the side-adjusted weighted score from the catalog audit. `funDT` is the side-specific temporal-difference reconstruction: it asks how much this side's posture, command lens, objectives, pressure, force texture, and continuity change over campaign time. Scores are signals for tuning, not final truth.")
+        lines.append("This appendix is generated from `FunBattleSideReportCatalog.generate()`. `Fun` is the side-adjusted weighted score from the catalog audit. `funDT` is the side-specific temporal-difference reconstruction: it asks how much this side's posture, command lens, objectives, pressure, force texture, and continuity change over campaign time. `Avg AI turns` is an independent pacing-fun signal from AI-vs-AI autoplay; it records the average completed turns per battle\(turnRunCount > 0 ? " across \(turnRunCount) runs" : ""). Scores are signals for tuning, not final truth.")
         lines.append("")
         lines.append("### Highest Fun")
         for row in highestFunRows.prefix(topLimit) {
-            lines.append("- \(row.order). \(row.title) / \(row.sideTitle): \(FunScoreFormatter.percent(row.funScore)) fun; weakest \(row.weakestDimension.rawValue) \(row.weakestDimensionScore).")
+            lines.append("- \(row.order). \(row.title) / \(row.sideTitle): \(FunScoreFormatter.percent(row.funScore)) fun\(turnSuffix(for: row)); weakest \(row.weakestDimension.rawValue) \(row.weakestDimensionScore).")
         }
         lines.append("")
         lines.append("### Lowest Fun")
         for row in lowestFunRows.prefix(bottomLimit) {
-            lines.append("- \(row.order). \(row.title) / \(row.sideTitle): \(FunScoreFormatter.percent(row.funScore)) fun; improve \(row.improvementFocus).")
+            lines.append("- \(row.order). \(row.title) / \(row.sideTitle): \(FunScoreFormatter.percent(row.funScore)) fun\(turnSuffix(for: row)); improve \(row.improvementFocus).")
         }
         lines.append("")
         lines.append("### Highest funDT")
         for row in highestFunDTRows.prefix(topLimit) {
-            lines.append("- \(row.order). \(row.title) / \(row.sideTitle): \(FunScoreFormatter.percent(row.funDTScore)) funDT; strongest axes \(row.strongestDTAxes.joined(separator: ", ")).")
+            lines.append("- \(row.order). \(row.title) / \(row.sideTitle): \(FunScoreFormatter.percent(row.funDTScore)) funDT\(turnSuffix(for: row)); strongest axes \(row.strongestDTAxes.joined(separator: ", ")).")
         }
         lines.append("")
         lines.append("### Lowest funDT")
         for row in lowestFunDTRows.prefix(bottomLimit) {
-            lines.append("- \(row.order). \(row.title) / \(row.sideTitle): \(FunScoreFormatter.percent(row.funDTScore)) funDT; add/change \(row.improvementFocus).")
+            lines.append("- \(row.order). \(row.title) / \(row.sideTitle): \(FunScoreFormatter.percent(row.funDTScore)) funDT\(turnSuffix(for: row)); add/change \(row.improvementFocus).")
+        }
+        if !turnSummaries.isEmpty {
+            lines.append("")
+            lines.append("### Longest AI Battles")
+            for summary in longestAITurnBattles.prefix(topLimit) {
+                lines.append("- \(summary.order). \(summary.title): \(formatTurns(summary.averageTurns)) average turns; samples \(summary.completedTurns.map(String.init).joined(separator: ", ")).")
+            }
+            lines.append("")
+            lines.append("### Shortest AI Battles")
+            for summary in shortestAITurnBattles.prefix(bottomLimit) {
+                lines.append("- \(summary.order). \(summary.title): \(formatTurns(summary.averageTurns)) average turns; samples \(summary.completedTurns.map(String.init).joined(separator: ", ")).")
+            }
+            let blockedSummaries = turnSummaries.filter { !$0.blockers.isEmpty }
+            if !blockedSummaries.isEmpty {
+                lines.append("")
+                lines.append("### AI Turn Run Notes")
+                for summary in blockedSummaries {
+                    lines.append("- \(summary.order). \(summary.title): \(summary.blockers.prefix(2).joined(separator: "; ").markdownEscaped)")
+                }
+            }
         }
         lines.append("")
         lines.append("### Per Battle / Per Side Data")
         lines.append("")
-        lines.append("| # | Battle | Side | Fun | funDT | Weakest | Strongest funDT axes | Improvement focus |")
-        lines.append("| ---: | --- | --- | ---: | ---: | --- | --- | --- |")
+        lines.append("| # | Battle | Side | Fun | funDT | Avg AI turns | Weakest | Strongest funDT axes | Improvement focus |")
+        lines.append("| ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- |")
         for row in rows {
-            lines.append("| \(row.order) | \(row.title.markdownEscaped) | \(row.sideTitle.markdownEscaped) | \(FunScoreFormatter.percent(row.funScore)) | \(FunScoreFormatter.percent(row.funDTScore)) | \(row.weakestDimension.rawValue) \(row.weakestDimensionScore) | \(row.strongestDTAxes.joined(separator: ", ").markdownEscaped) | \(row.improvementFocus.markdownEscaped) |")
+            lines.append("| \(row.order) | \(row.title.markdownEscaped) | \(row.sideTitle.markdownEscaped) | \(FunScoreFormatter.percent(row.funScore)) | \(FunScoreFormatter.percent(row.funDTScore)) | \(formatTurns(row.averageAITurns)) | \(row.weakestDimension.rawValue) \(row.weakestDimensionScore) | \(row.strongestDTAxes.joined(separator: ", ").markdownEscaped) | \(row.improvementFocus.markdownEscaped) |")
         }
         lines.append("")
         lines.append("### Improvement Themes")
         lines.append("")
         lines.append("- Raise low-fun rows by strengthening their weakest scored dimension first: for this catalog that usually means richer consequence/debrief language, more side-specific agency, or clearer command-study caveats.")
         lines.append("- Raise low-funDT rows by changing the temporal grammar rather than merely adding content: alter objective verbs, pressure triggers, force texture, or map-use rhythm compared with the previous three battles.")
+        lines.append("- Raise turn-count fun by tuning the AI pressure arc toward meaningful duration: very short battles need recoverable counterplay, staged objectives, or delayed scoring reveals; very long battles need sharper victory thresholds, stronger pursuit logic, or fewer low-impact blocked phases.")
         lines.append("- Late-career staff-context battles need the most funDT help because many share Soviet pressure, German defensive context, medium tempo, and command-caveat structure. They benefit from sharper asymmetry: mines versus bridgeheads, fortress reduction versus pursuit, urban compression versus operational breakout, supply collapse versus relief attempts.")
         lines.append("- Guderian-command rows stay fun when they remain explicit command study. Their safest improvements are better comparative objectives, visible caveat labels, non-celebratory debriefs, and AI/player parity, not heroic copy or conquest rewards.")
         lines.append("- Opposing-force rows gain fun when partial success is more granular: preserved units, delayed crossings, denied exits, exhausted supply, and readable counterattack timing should all show up in score channels and debriefs.")
@@ -99,14 +133,48 @@ public struct FunBattleSideReport: Codable, Hashable, Sendable {
             return descending ? lhsScore > rhsScore : lhsScore < rhsScore
         }
     }
+
+    private func ranked(
+        _ summaries: [FunBattleTurnRunSummary],
+        by keyPath: KeyPath<FunBattleTurnRunSummary, Double>,
+        descending: Bool
+    ) -> [FunBattleTurnRunSummary] {
+        summaries.sorted { lhs, rhs in
+            let lhsScore = lhs[keyPath: keyPath]
+            let rhsScore = rhs[keyPath: keyPath]
+            if lhsScore == rhsScore {
+                return lhs.order < rhs.order
+            }
+            return descending ? lhsScore > rhsScore : lhsScore < rhsScore
+        }
+    }
+
+    private func turnSuffix(for row: FunBattleSideScore) -> String {
+        guard let averageAITurns = row.averageAITurns else {
+            return ""
+        }
+        return "; avg AI turns \(formatTurns(averageAITurns))"
+    }
+
+    private func formatTurns(_ turns: Double?) -> String {
+        guard let turns else {
+            return "n/a"
+        }
+        return formatTurns(turns)
+    }
+
+    private func formatTurns(_ turns: Double) -> String {
+        String(format: "%.1f", turns)
+    }
 }
 
 public enum FunBattleSideReportCatalog {
-    public static func generate(runUnifiedHarness: Bool = false) throws -> FunBattleSideReport {
+    public static func generate(runUnifiedHarness: Bool = false, turnRunCount: Int = 0) throws -> FunBattleSideReport {
         let report = try FunOptimizationReport.generate(runUnifiedHarness: runUnifiedHarness)
         let auditsByID = Dictionary(uniqueKeysWithValues: report.audits.map { ($0.id, $0) })
         let sideDTTimelines = sideFunDTTimelines()
         let baseVectors = FunDTCatalog.allBattleVectors().sorted { $0.order < $1.order }
+        let turnSummaries = try FunAITurnRunCatalog.averageTurns(runCount: turnRunCount)
 
         let rows = baseVectors.flatMap { vector -> [FunBattleSideScore] in
             guard let audit = auditsByID[vector.id] else {
@@ -123,6 +191,7 @@ public enum FunBattleSideReportCatalog {
                     return lhs.score < rhs.score
                 }.first
                 let sideDT = sideDTTimelines[option.sideID]?[vector.id]
+                let turnSummary = turnSummaries[vector.id]
 
                 return FunBattleSideScore(
                     id: "\(vector.id):\(option.sideID)",
@@ -136,6 +205,8 @@ public enum FunBattleSideReportCatalog {
                     sideLens: option.isCommandSide ? "Command study" : "Default opposing-force play",
                     funScore: weighted,
                     funDTScore: sideDT?.funDTScore ?? 0,
+                    averageAITurns: turnSummary?.averageTurns,
+                    aiTurnSamples: turnSummary?.completedTurns ?? [],
                     weakestDimension: weakest?.dimension ?? .clarity,
                     weakestDimensionScore: weakest?.score ?? 0,
                     strongestDTAxes: sideDT?.strongestDeltaAxisLabels ?? [],
@@ -144,12 +215,17 @@ public enum FunBattleSideReportCatalog {
             }
         }
 
-        return FunBattleSideReport(rows: rows.sorted { lhs, rhs in
-            if lhs.order == rhs.order {
-                return sideSortKey(lhs.sideID) < sideSortKey(rhs.sideID)
+        return FunBattleSideReport(
+            rows: rows.sorted { lhs, rhs in
+                if lhs.order == rhs.order {
+                    return sideSortKey(lhs.sideID) < sideSortKey(rhs.sideID)
+                }
+                return lhs.order < rhs.order
+            },
+            turnSummaries: turnSummaries.values.sorted { lhs, rhs in
+                lhs.order < rhs.order
             }
-            return lhs.order < rhs.order
-        })
+        )
     }
 
     private static func sideDimensionScores(
