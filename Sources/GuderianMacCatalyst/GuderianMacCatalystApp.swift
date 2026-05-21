@@ -650,8 +650,8 @@ private struct GuderianCatalystRootView: View {
     }
 
     private func mapContentInsets(in size: CGSize) -> EdgeInsets {
-        let top = min(210, max(150, size.height * 0.13))
-        let bottom = min(130, max(90, size.height * 0.07))
+        let top = min(150, max(112, size.height * 0.09))
+        let bottom = min(120, max(82, size.height * 0.06))
         return EdgeInsets(top: top, leading: 0, bottom: bottom, trailing: 0)
     }
 
@@ -1126,6 +1126,9 @@ private struct CatalystBattleMapView: View {
 
     private static let boardWidth = CGFloat(game_board_width())
     private static let boardHeight = CGFloat(game_board_height())
+    private static let pointsPerBoardUnit: CGFloat = 22
+
+    @State private var dragPreview: [Int: CGPoint] = [:]
 
     var body: some View {
         GeometryReader { proxy in
@@ -1137,7 +1140,16 @@ private struct CatalystBattleMapView: View {
             ScrollView([.horizontal, .vertical], showsIndicators: true) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(CatalystPalette.mapBase)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.52, green: 0.50, blue: 0.35),
+                                    Color(red: 0.31, green: 0.32, blue: 0.24),
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     boardGrid(in: fittedSize)
 
                     ForEach(snapshot.zones) { zone in
@@ -1155,164 +1167,261 @@ private struct CatalystBattleMapView: View {
                 .frame(width: fittedSize.width, height: fittedSize.height)
                 .overlay {
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.black.opacity(0.32), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
                 }
                 .padding(28)
                 .padding(.top, contentInsets.top)
                 .padding(.bottom, contentInsets.bottom)
-                .frame(minWidth: proxy.size.width, minHeight: proxy.size.height, alignment: .top)
+                .frame(minWidth: proxy.size.width, minHeight: proxy.size.height, alignment: .topLeading)
             }
             .background(CatalystPalette.background)
         }
         .accessibilityIdentifier("catalyst-battle-map")
     }
 
-    private func fittedBoardSize(in available: CGSize) -> CGSize {
-        let safeWidth = max(available.width - 56, 320)
-        let safeHeight = max(available.height - 56, 240)
-        let aspect = Self.boardWidth / Self.boardHeight
-        let widthFirstHeight = safeWidth / aspect
-        let base: CGSize
-        if widthFirstHeight <= safeHeight {
-            base = CGSize(width: safeWidth, height: widthFirstHeight)
-        } else {
-            base = CGSize(width: safeHeight * aspect, height: safeHeight)
-        }
+    private func fittedBoardSize(in _: CGSize) -> CGSize {
+        let base = CGSize(
+            width: Self.boardWidth * Self.pointsPerBoardUnit,
+            height: Self.boardHeight * Self.pointsPerBoardUnit
+        )
         return CGSize(width: base.width * zoom, height: base.height * zoom)
     }
 
     private func boardGrid(in size: CGSize) -> some View {
         Path { path in
-            for column in 1..<12 {
-                let x = size.width * CGFloat(column) / 12
+            for column in 0...Int(Self.boardWidth) {
+                let x = size.width * CGFloat(column) / Self.boardWidth
                 path.move(to: CGPoint(x: x, y: 0))
                 path.addLine(to: CGPoint(x: x, y: size.height))
             }
-            for row in 1..<8 {
-                let y = size.height * CGFloat(row) / 8
+            for row in 0...Int(Self.boardHeight) {
+                let y = size.height * CGFloat(row) / Self.boardHeight
                 path.move(to: CGPoint(x: 0, y: y))
                 path.addLine(to: CGPoint(x: size.width, y: y))
             }
         }
-        .stroke(Color.black.opacity(0.12), lineWidth: 1)
+        .stroke(Color.black.opacity(0.18), lineWidth: 1)
     }
 
     private func terrainZone(_ zone: NativeBoardZoneSnapshot, in size: CGSize) -> some View {
-        Rectangle()
-            .fill(terrainColor(zone).opacity(zone.kind == "Impassable" ? 0.42 : 0.26))
-            .overlay {
-                Rectangle()
-                    .stroke(terrainColor(zone).opacity(0.65), lineWidth: zone.blocksLineOfSight ? 2 : 1)
+        let rect = boardRect(zone, in: size)
+        let fill = terrainFill(for: zone)
+
+        return RoundedRectangle(cornerRadius: 8)
+            .fill(fill)
+            .frame(width: rect.width, height: rect.height)
+            .position(x: rect.midX, y: rect.midY)
+            .overlay(alignment: .topLeading) {
+                Text(zone.name)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color.black.opacity(0.68)))
+                    .padding(8)
+                    .position(x: rect.minX + 54, y: rect.minY + 18)
             }
-            .frame(
-                width: max(8, size.width * zone.width / Self.boardWidth),
-                height: max(8, size.height * zone.height / Self.boardHeight)
-            )
-            .position(
-                x: size.width * (zone.x + zone.width / 2) / Self.boardWidth,
-                y: size.height * (zone.y + zone.height / 2) / Self.boardHeight
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        Color.white.opacity(0.18),
+                        style: StrokeStyle(lineWidth: 1, dash: zone.blocksLineOfSight ? [6, 4] : [])
+                    )
+                    .frame(width: rect.width, height: rect.height)
+                    .position(x: rect.midX, y: rect.midY)
             )
             .accessibilityLabel(zone.name)
     }
 
     private func objectiveMarker(_ objective: NativeBoardObjectiveSnapshot, in size: CGSize) -> some View {
-        let diameter = max(24, objective.radius * 6 * min(size.width / Self.boardWidth, size.height / Self.boardHeight))
+        let position = boardPoint(CGPoint(x: objective.x, y: objective.y), in: size)
+        let boardScale = size.width / Self.boardWidth
+        let radius = CGFloat(objective.radius) * boardScale
+        let markerColor = objectiveColor(
+            objective.controller,
+            contested: objective.playerPresence > 0 && objective.opponentPresence > 0
+        )
+
         return ZStack {
             Circle()
-                .fill(objectiveColor(objective.controller).opacity(0.82))
-                .frame(width: diameter, height: diameter)
-                .overlay {
-                    Circle()
-                        .stroke(Color.white.opacity(0.8), lineWidth: 1)
-                }
-            Image(systemName: "target")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.white)
+                .stroke(markerColor.opacity(0.7), style: StrokeStyle(lineWidth: 2, dash: [8, 4]))
+                .frame(width: radius * 2, height: radius * 2)
+
+            Circle()
+                .fill(markerColor)
+                .frame(width: 24, height: 24)
+                .overlay(
+                    Text("\(objective.id)")
+                        .font(.system(size: 11, weight: .black, design: .monospaced))
+                        .foregroundStyle(.white)
+                )
+
             Text(objective.name)
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
                 .lineLimit(1)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 5))
-                .offset(y: diameter * 0.62)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.black.opacity(0.7)))
+                .offset(y: radius + 14)
         }
-        .position(x: size.width * objective.x / Self.boardWidth, y: size.height * objective.y / Self.boardHeight)
+        .position(position)
         .accessibilityLabel(objective.name)
     }
 
+    @ViewBuilder
     private func unitToken(_ unit: NativeBoardUnitSnapshot, in size: CGSize) -> some View {
-        let point = CGPoint(
-            x: size.width * unit.x / Self.boardWidth,
-            y: size.height * unit.y / Self.boardHeight
-        )
-        return ZStack {
-            Circle()
-                .fill(Self.unitColor(unit.owner))
-            Image(systemName: Self.unitSymbol(unit))
-                .font(.system(size: unit.selected || unit.targeted ? 15 : 13, weight: .black))
-                .foregroundStyle(.white)
+        let gamePoint = dragPreview[unit.id] ?? CGPoint(x: unit.x, y: unit.y)
+        let position = boardPoint(gamePoint, in: size)
+        let radius = tokenRadius(for: unit, in: size)
+        let isSelected = unit.selected || unit.targeted
+        let ownerColor = Self.unitColor(unit.owner)
+        let selectionStroke = isSelected ? Color.white.opacity(0.98) : Color.white.opacity(0.35)
+
+        ZStack {
+            if unit.kind == "Vehicle" || unit.kind == "Assault gun" {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(ownerColor)
+                    .frame(width: radius * 2.4, height: radius * 1.6)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(selectionStroke, lineWidth: isSelected ? 3.5 : 1)
+                    }
+            } else {
+                Circle()
+                    .fill(ownerColor)
+                    .frame(width: radius * 2, height: radius * 2)
+                    .overlay {
+                        Circle()
+                            .stroke(selectionStroke, lineWidth: isSelected ? 3.5 : 1)
+                    }
+            }
+
+            VStack(spacing: 2) {
+                Text(tokenName(for: unit))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .frame(width: radius * 2.2)
+                    .lineLimit(2)
+                Text("\(unit.totalWoundsRemaining)")
+                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(.white)
+            }
+
+            if unit.kind == "Vehicle" || unit.kind == "Assault gun" {
+                Rectangle()
+                    .fill(Color.white.opacity(0.9))
+                    .frame(width: radius * 0.15, height: radius * 0.9)
+                    .offset(y: -radius * 1.05)
+                    .rotationEffect(.degrees(unit.facingDegrees))
+            }
         }
-        .frame(width: unit.selected || unit.targeted ? 32 : 26, height: unit.selected || unit.targeted ? 32 : 26)
-        .overlay {
-            Circle()
-                .stroke(unit.selected ? CatalystPalette.gold : unit.targeted ? .white : .black.opacity(0.22), lineWidth: unit.selected || unit.targeted ? 3 : 1)
-        }
-        .opacity(unit.destroyed ? 0.32 : snapshot.activePlayer == unit.owner ? 1 : 0.86)
-        .position(point)
-        .contentShape(Circle())
+        .position(position)
+        .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 6)
+        .shadow(color: isSelected ? ownerColor.opacity(0.45) : .clear, radius: 12, x: 0, y: 0)
+        .opacity(unit.destroyed ? 0.35 : 1)
         .onTapGesture {
             onSelect(unit)
         }
         .gesture(
-            DragGesture(minimumDistance: 8)
+            DragGesture()
+                .onChanged { value in
+                    guard canPreviewMove(unit) else {
+                        return
+                    }
+                    onSelect(unit)
+                    dragPreview[unit.id] = gameCoordinates(for: value.location, in: size)
+                }
                 .onEnded { value in
-                    let x = min(
-                        max(1, unit.x + Double(value.translation.width / size.width * Self.boardWidth)),
-                        Double(Self.boardWidth - 1)
-                    )
-                    let y = min(
-                        max(1, unit.y + Double(value.translation.height / size.height * Self.boardHeight)),
-                        Double(Self.boardHeight - 1)
-                    )
-                    onMove(unit, NativeBattleCoordinate(x: x, y: y))
+                    guard canPreviewMove(unit) else {
+                        dragPreview[unit.id] = nil
+                        return
+                    }
+                    let point = gameCoordinates(for: value.location, in: size)
+                    dragPreview[unit.id] = nil
+                    onMove(unit, NativeBattleCoordinate(x: Double(point.x), y: Double(point.y)))
                 }
         )
+        .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(unit.name), \(sideTitle(unit.owner))")
     }
 
-    private func terrainColor(_ zone: NativeBoardZoneSnapshot) -> Color {
-        if zone.kind == "Impassable" {
-            return Color(red: 0.12, green: 0.34, blue: 0.64)
+    private func boardRect(_ zone: NativeBoardZoneSnapshot, in size: CGSize) -> CGRect {
+        let origin = boardPoint(CGPoint(x: zone.x, y: zone.y), in: size)
+        let width = size.width * CGFloat(zone.width) / Self.boardWidth
+        let height = size.height * CGFloat(zone.height) / Self.boardHeight
+        return CGRect(x: origin.x, y: origin.y, width: width, height: height)
+    }
+
+    private func boardPoint(_ point: CGPoint, in size: CGSize) -> CGPoint {
+        CGPoint(
+            x: size.width * point.x / Self.boardWidth,
+            y: size.height * point.y / Self.boardHeight
+        )
+    }
+
+    private func gameCoordinates(for point: CGPoint, in size: CGSize) -> CGPoint {
+        CGPoint(
+            x: min(max(0, point.x / size.width * Self.boardWidth), Self.boardWidth),
+            y: min(max(0, point.y / size.height * Self.boardHeight), Self.boardHeight)
+        )
+    }
+
+    private func canPreviewMove(_ unit: NativeBoardUnitSnapshot) -> Bool {
+        snapshot.activePlayer == unit.owner && unit.canMoveNow && !unit.destroyed
+    }
+
+    private func tokenRadius(for unit: NativeBoardUnitSnapshot, in size: CGSize) -> CGFloat {
+        let base: CGFloat = unit.kind == "Vehicle" || unit.kind == "Assault gun" ? 20 : 18
+        return max(base, size.width / 46)
+    }
+
+    private func tokenName(for unit: NativeBoardUnitSnapshot) -> String {
+        unit.name
+            .replacingOccurrences(of: "German ", with: "")
+            .replacingOccurrences(of: "British ", with: "")
+            .replacingOccurrences(of: "Polish ", with: "")
+            .split(separator: " ")
+            .prefix(2)
+            .joined(separator: " ")
+    }
+
+    private func terrainFill(for zone: NativeBoardZoneSnapshot) -> Color {
+        switch zone.kind {
+        case "Difficult":
+            return Color(red: 0.36, green: 0.27, blue: 0.18).opacity(0.65)
+        case "Impassable":
+            return Color(red: 0.28, green: 0.15, blue: 0.16).opacity(0.8)
+        default:
+            return Color(red: 0.55, green: 0.56, blue: 0.46).opacity(0.45)
         }
-        if zone.hullDown {
-            return Color(red: 0.50, green: 0.48, blue: 0.38)
-        }
-        if zone.blocksLineOfSight {
-            return Color(red: 0.18, green: 0.42, blue: 0.25)
-        }
-        return Color(red: 0.55, green: 0.48, blue: 0.36)
     }
 
     static func unitColor(_ player: NativeBoardPlayer) -> Color {
         switch player {
         case .player:
-            return Color(red: 0.08, green: 0.33, blue: 0.70)
+            return Color(red: 0.13, green: 0.32, blue: 0.67)
         case .guderianAI:
-            return Color(red: 0.68, green: 0.13, blue: 0.10)
+            return Color(red: 0.63, green: 0.23, blue: 0.16)
         case .none:
-            return .secondary
+            return Color(red: 0.55, green: 0.56, blue: 0.46)
         }
     }
 
-    private func objectiveColor(_ player: NativeBoardPlayer) -> Color {
-        switch player {
+    private func objectiveColor(_ controller: NativeBoardPlayer, contested: Bool) -> Color {
+        if contested {
+            return .orange
+        }
+        switch controller {
         case .player:
-            return Color(red: 0.07, green: 0.47, blue: 0.60)
+            return Color(red: 0.13, green: 0.32, blue: 0.67)
         case .guderianAI:
-            return Color(red: 0.70, green: 0.22, blue: 0.10)
+            return Color(red: 0.63, green: 0.23, blue: 0.16)
         case .none:
-            return Color(red: 0.40, green: 0.32, blue: 0.64)
+            return Color(red: 0.93, green: 0.89, blue: 0.72)
         }
     }
 

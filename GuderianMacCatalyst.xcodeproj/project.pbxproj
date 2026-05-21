@@ -7,14 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B10000000000000000000011 /* GuderianMacCatalystApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* GuderianMacCatalystApp.swift */; };
-		B10000000000000000000012 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* Assets.xcassets */; };
+		B10000000000000000000011 /* Sources/GuderianMacCatalyst/GuderianMacCatalystApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* Sources/GuderianMacCatalyst/GuderianMacCatalystApp.swift */; };
+		B10000000000000000000012 /* Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* Resources/Assets.xcassets */; };
 		B10000000000000000000013 /* GuderianCore in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000071 /* GuderianCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B10000000000000000000021 /* GuderianMacCatalystApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianMacCatalyst/GuderianMacCatalystApp.swift; sourceTree = SOURCE_ROOT; };
-		B10000000000000000000022 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		B10000000000000000000021 /* Sources/GuderianMacCatalyst/GuderianMacCatalystApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/GuderianMacCatalyst/GuderianMacCatalystApp.swift; sourceTree = SOURCE_ROOT; };
+		B10000000000000000000022 /* Resources/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		B10000000000000000000024 /* GuderianMacCatalyst.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GuderianMacCatalyst.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -42,7 +42,7 @@
 		B10000000000000000000042 /* Mac Catalyst Sources */ = {
 			isa = PBXGroup;
 			children = (
-				B10000000000000000000021 /* GuderianMacCatalystApp.swift */,
+				B10000000000000000000021 /* Sources/GuderianMacCatalyst/GuderianMacCatalystApp.swift */,
 			);
 			name = "Mac Catalyst Sources";
 			sourceTree = "<group>";
@@ -50,7 +50,7 @@
 		B10000000000000000000043 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				B10000000000000000000022 /* Assets.xcassets */,
+				B10000000000000000000022 /* Resources/Assets.xcassets */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -127,7 +127,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B10000000000000000000012 /* Assets.xcassets in Resources */,
+				B10000000000000000000012 /* Resources/Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,7 +138,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B10000000000000000000011 /* GuderianMacCatalystApp.swift in Sources */,
+				B10000000000000000000011 /* Sources/GuderianMacCatalyst/GuderianMacCatalystApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +267,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
+				DEVELOPMENT_TEAM = R9M79846SQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Guderian;
 				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
@@ -299,6 +300,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
+				DEVELOPMENT_TEAM = R9M79846SQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Guderian;
 				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
