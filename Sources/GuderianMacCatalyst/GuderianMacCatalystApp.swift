@@ -621,6 +621,8 @@ private struct GuderianCatalystRootView: View {
                         snapshot: snapshot,
                         zoom: zoom,
                         contentInsets: mapContentInsets(in: proxy.size),
+                        humanPlayer: model.humanPlayer,
+                        canIssueHumanOrders: model.canIssueHumanOrders,
                         sideTitle: model.sideTitle(for:),
                         onSelect: model.select(_:),
                         onMove: model.move(_:to:)
@@ -672,6 +674,20 @@ private struct GuderianCatalystRootView: View {
                     Text("\(model.sideTitle(for: .player)) \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) \(model.sideTitle(for: .guderianAI))")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.white.opacity(0.82))
+                    HStack(spacing: 6) {
+                        sideStatusPill(
+                            title: "You control",
+                            value: model.sideTitle(for: model.humanPlayer),
+                            color: CatalystBattleMapView.unitColor(model.humanPlayer),
+                            systemImage: "shield.fill"
+                        )
+                        sideStatusPill(
+                            title: snapshot.activePlayer == model.humanPlayer ? "Your move" : "Active",
+                            value: model.sideTitle(for: snapshot.activePlayer),
+                            color: CatalystBattleMapView.unitColor(snapshot.activePlayer),
+                            systemImage: snapshot.activePlayer == model.humanPlayer ? "arrow.up.right.circle.fill" : "clock.fill"
+                        )
+                    }
                 }
 
                 Spacer(minLength: 10)
@@ -699,6 +715,25 @@ private struct GuderianCatalystRootView: View {
         .accessibilityIdentifier("catalyst-battle-hud")
     }
 
+    private func sideStatusPill(title: String, value: String, color: Color, systemImage: String) -> some View {
+        Label {
+            Text("\(title): \(value)")
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        } icon: {
+            Image(systemName: systemImage)
+        }
+        .font(.caption2.weight(.bold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.86), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(Color.white.opacity(0.36), lineWidth: 1)
+        }
+    }
+
     private func bottomDock(in size: CGSize) -> some View {
         let availableWidth = max(260, size.width - 24)
         let compact = availableWidth < 620
@@ -711,56 +746,79 @@ private struct GuderianCatalystRootView: View {
 
             Divider()
                 .frame(height: 26)
+                .overlay(Color.white.opacity(0.36))
 
-            Button {
+            dockIconButton(systemImage: "minus.magnifyingglass", help: "Zoom out") {
                 zoom = max(0.65, zoom - 0.15)
-            } label: {
-                Image(systemName: "minus.magnifyingglass")
-                    .frame(width: 26, height: 26)
             }
-            .help("Zoom out")
 
             if !compact {
                 Slider(value: $zoom, in: 0.65...2.1)
-                    .frame(width: 120)
+                    .tint(CatalystPalette.gold)
+                    .frame(width: 126)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(CatalystPalette.dockButtonBackground, in: Capsule())
                     .accessibilityIdentifier("catalyst-zoom-slider")
             }
 
-            Button {
+            dockIconButton(systemImage: "plus.magnifyingglass", help: "Zoom in") {
                 zoom = min(2.1, zoom + 0.15)
-            } label: {
-                Image(systemName: "plus.magnifyingglass")
-                    .frame(width: 26, height: 26)
             }
-            .help("Zoom in")
         }
-        .buttonStyle(.bordered)
-        .tint(CatalystPalette.gold)
+        .buttonStyle(.plain)
+        .foregroundStyle(CatalystPalette.dockForeground)
         .padding(10)
         .frame(maxWidth: min(availableWidth, compact ? 430 : 640))
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .background(CatalystPalette.dockBackground, in: RoundedRectangle(cornerRadius: 8))
         .overlay {
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                .stroke(Color.white.opacity(0.28), lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 8)
         .padding(.horizontal, 12)
         .padding(.bottom, 12)
         .accessibilityIdentifier("catalyst-command-dock")
     }
 
     private func overlayButton(_ panel: CatalystOverlay) -> some View {
-        Button {
-            overlay = overlay == panel ? nil : panel
+        let active = overlay == panel
+        return Button {
+            overlay = active ? nil : panel
         } label: {
             Image(systemName: panel.systemImage)
-                .frame(width: 26, height: 26)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(active ? Color.black : CatalystPalette.dockForeground)
+                .frame(width: 44, height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(active ? CatalystPalette.gold : CatalystPalette.dockButtonBackground)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(active ? CatalystPalette.gold.opacity(0.95) : Color.white.opacity(0.18), lineWidth: 1)
+                }
         }
+        .buttonStyle(.plain)
         .help(panel.title)
         .accessibilityLabel(panel.title)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(overlay == panel ? CatalystPalette.gold.opacity(0.20) : Color.clear)
-        )
+    }
+
+    private func dockIconButton(systemImage: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(CatalystPalette.gold)
+                .frame(width: 44, height: 44)
+                .background(CatalystPalette.dockButtonBackground, in: RoundedRectangle(cornerRadius: 8))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(help)
     }
 
     private func overlayPanel(_ panel: CatalystOverlay, in size: CGSize) -> some View {
@@ -1120,6 +1178,8 @@ private struct CatalystBattleMapView: View {
     let snapshot: NativeBoardSnapshot
     let zoom: CGFloat
     let contentInsets: EdgeInsets
+    let humanPlayer: NativeBoardPlayer
+    let canIssueHumanOrders: Bool
     let sideTitle: (NativeBoardPlayer) -> String
     let onSelect: (NativeBoardUnitSnapshot) -> Void
     let onMove: (NativeBoardUnitSnapshot, NativeBattleCoordinate) -> Void
@@ -1277,9 +1337,25 @@ private struct CatalystBattleMapView: View {
         let radius = tokenRadius(for: unit, in: size)
         let isSelected = unit.selected || unit.targeted
         let ownerColor = Self.unitColor(unit.owner)
+        let isFriendly = unit.owner == humanPlayer
+        let canMove = canPreviewMove(unit)
         let selectionStroke = isSelected ? Color.white.opacity(0.98) : Color.white.opacity(0.35)
 
         ZStack {
+            if canMove {
+                Circle()
+                    .stroke(
+                        CatalystPalette.gold,
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [7, 5])
+                    )
+                    .frame(width: radius * 2.85, height: radius * 2.85)
+                    .shadow(color: CatalystPalette.gold.opacity(0.46), radius: 10, x: 0, y: 0)
+            } else if isFriendly && !unit.destroyed {
+                Circle()
+                    .stroke(Color.white.opacity(0.42), lineWidth: 1.5)
+                    .frame(width: radius * 2.65, height: radius * 2.65)
+            }
+
             if unit.kind == "Vehicle" || unit.kind == "Assault gun" {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(ownerColor)
@@ -1316,6 +1392,19 @@ private struct CatalystBattleMapView: View {
                     .frame(width: radius * 0.15, height: radius * 0.9)
                     .offset(y: -radius * 1.05)
                     .rotationEffect(.degrees(unit.facingDegrees))
+            }
+
+            if canMove {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: max(11, radius * 0.48), weight: .black))
+                    .foregroundStyle(.black)
+                    .padding(4)
+                    .background(CatalystPalette.gold, in: Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(Color.black.opacity(0.55), lineWidth: 1)
+                    }
+                    .offset(x: radius * 0.95, y: -radius * 0.95)
             }
         }
         .position(position)
@@ -1371,7 +1460,12 @@ private struct CatalystBattleMapView: View {
     }
 
     private func canPreviewMove(_ unit: NativeBoardUnitSnapshot) -> Bool {
-        snapshot.activePlayer == unit.owner && unit.canMoveNow && !unit.destroyed
+        canIssueHumanOrders &&
+            snapshot.phase == .movement &&
+            snapshot.activePlayer == unit.owner &&
+            unit.owner == humanPlayer &&
+            unit.canMoveNow &&
+            !unit.destroyed
     }
 
     private func tokenRadius(for unit: NativeBoardUnitSnapshot, in size: CGSize) -> CGFloat {
@@ -1448,6 +1542,9 @@ private struct CatalystSelectedUnitSummary: View {
             Text("\(sideTitle(unit.owner)) | \(unit.roleLine)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text(readinessLine)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(unit.canMoveNow ? CatalystPalette.gold : .secondary)
             Text("Wounds \(unit.totalWoundsRemaining) | \(unit.inCover ? "Cover" : "Open") | \(unit.hullDown ? "Hull-down" : "Exposed")")
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
@@ -1461,6 +1558,22 @@ private struct CatalystSelectedUnitSummary: View {
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var readinessLine: String {
+        if unit.destroyed {
+            return "Destroyed"
+        }
+        if unit.canMoveNow {
+            return "Can move now"
+        }
+        if unit.canShootNow {
+            return "Can fire now"
+        }
+        if unit.canAssaultNow {
+            return "Can assault now"
+        }
+        return "Waiting for phase"
     }
 }
 
@@ -1488,4 +1601,7 @@ private enum CatalystPalette {
     static let mapBase = Color(red: 0.58, green: 0.61, blue: 0.45)
     static let gold = Color(red: 0.92, green: 0.71, blue: 0.32)
     static let commandBlue = Color(red: 0.12, green: 0.31, blue: 0.62)
+    static let dockBackground = Color(red: 0.07, green: 0.08, blue: 0.08).opacity(0.94)
+    static let dockButtonBackground = Color.white.opacity(0.14)
+    static let dockForeground = Color.white.opacity(0.94)
 }
