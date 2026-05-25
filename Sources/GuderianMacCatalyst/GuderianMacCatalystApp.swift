@@ -308,13 +308,44 @@ private struct CatalystCompletion: Equatable {
     let detail: String
 }
 
+private struct CatalystBattleResult: Codable, Equatable {
+    let entryKey: String
+    let title: String
+    let statusTitle: String
+    let winner: NativeBoardPlayer?
+    let winnerTitle: String
+    let loser: NativeBoardPlayer?
+    let loserTitle: String
+    let scoreLine: String
+    let completedTurn: Int
+    let victoryBand: String?
+
+    var hasWinner: Bool {
+        winner != nil
+    }
+
+    var wallSummary: String {
+        hasWinner ? "Most recent winner: \(winnerTitle)" : "Most recent result: no winner"
+    }
+
+    var wallDetail: String {
+        if hasWinner {
+            return "Loser: \(loserTitle) | \(scoreLine) | turn \(completedTurn)"
+        }
+        return "\(scoreLine) | turn \(completedTurn)"
+    }
+}
+
 @MainActor
 private final class GuderianCatalystBattleViewModel: ObservableObject {
+    private static let latestResultsStorageKey = "guderian.catalyst.latestBattleResults.v1"
+
     @Published private(set) var entries: [UnifiedGuderianBattleEntry]
     @Published private(set) var selectedEntry: UnifiedGuderianBattleEntry?
     @Published private(set) var snapshot: NativeBoardSnapshot?
     @Published private(set) var completion: CatalystCompletion?
     @Published private(set) var errorMessage: String?
+    @Published private(set) var latestResults: [String: CatalystBattleResult]
 
     private var session: CatalystNativeSession?
     private var restartCount = 0
@@ -325,6 +356,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
         snapshot = nil
         completion = nil
         errorMessage = nil
+        latestResults = Self.loadLatestResults()
         if let first = entries.first {
             launch(first)
         }
@@ -361,6 +393,19 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
             return nil
         }
         return "\(completion.victoryBand) | \(completion.score) VP | turn \(completion.completedTurn)"
+    }
+
+    var currentResult: CatalystBattleResult? {
+        guard let entry = selectedEntry,
+              let snapshot,
+              completion != nil || snapshot.mission.winner != .none else {
+            return nil
+        }
+        return makeBattleResult(for: entry, snapshot: snapshot, completion: completion)
+    }
+
+    func latestResult(for entry: UnifiedGuderianBattleEntry) -> CatalystBattleResult? {
+        latestResults[Self.resultKey(for: entry.id)]
     }
 
     func launch(_ entry: UnifiedGuderianBattleEntry) {
@@ -604,6 +649,95 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
 
     private func refresh() {
         snapshot = session?.snapshot()
+        recordCurrentResultIfAvailable()
+    }
+
+    private func recordCurrentResultIfAvailable() {
+        guard let entry = selectedEntry,
+              let snapshot,
+              completion != nil || snapshot.mission.winner != .none else {
+            return
+        }
+
+        let result = makeBattleResult(for: entry, snapshot: snapshot, completion: completion)
+        if latestResults[result.entryKey] == result {
+            return
+        }
+
+        var updated = latestResults
+        updated[result.entryKey] = result
+        latestResults = updated
+        persistLatestResults()
+    }
+
+    private func makeBattleResult(
+        for entry: UnifiedGuderianBattleEntry,
+        snapshot: NativeBoardSnapshot,
+        completion: CatalystCompletion?
+    ) -> CatalystBattleResult {
+        let engineWinner = snapshot.mission.winner == .none ? nil : snapshot.mission.winner
+        let scoreWinner: NativeBoardPlayer?
+        if snapshot.mission.playerScore > snapshot.mission.opponentScore {
+            scoreWinner = .player
+        } else if snapshot.mission.opponentScore > snapshot.mission.playerScore {
+            scoreWinner = .guderianAI
+        } else {
+            scoreWinner = nil
+        }
+
+        let winner = engineWinner ?? (completion == nil ? nil : scoreWinner)
+        let loser = winner.flatMap(Self.loser(for:))
+        let statusTitle: String
+        if engineWinner != nil {
+            statusTitle = "Final result"
+        } else if winner != nil {
+            statusTitle = "Score decision"
+        } else {
+            statusTitle = "No winner recorded"
+        }
+
+        return CatalystBattleResult(
+            entryKey: Self.resultKey(for: entry.id),
+            title: entry.title,
+            statusTitle: statusTitle,
+            winner: winner,
+            winnerTitle: winner.map(sideTitle(for:)) ?? "Not recorded",
+            loser: loser,
+            loserTitle: loser.map(sideTitle(for:)) ?? "Not recorded",
+            scoreLine: "\(sideTitle(for: .player)) \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) \(sideTitle(for: .guderianAI))",
+            completedTurn: completion?.completedTurn ?? snapshot.turnNumber,
+            victoryBand: completion?.victoryBand
+        )
+    }
+
+    private static func loser(for winner: NativeBoardPlayer) -> NativeBoardPlayer? {
+        switch winner {
+        case .player:
+            return .guderianAI
+        case .guderianAI:
+            return .player
+        case .none:
+            return nil
+        }
+    }
+
+    private static func resultKey(for id: UnifiedGuderianBattleID) -> String {
+        "\(id.kind.rawValue):\(id.rawValue)"
+    }
+
+    private static func loadLatestResults() -> [String: CatalystBattleResult] {
+        guard let data = UserDefaults.standard.data(forKey: latestResultsStorageKey),
+              let decoded = try? JSONDecoder().decode([String: CatalystBattleResult].self, from: data) else {
+            return [:]
+        }
+        return decoded
+    }
+
+    private func persistLatestResults() {
+        guard let data = try? JSONEncoder().encode(latestResults) else {
+            return
+        }
+        UserDefaults.standard.set(data, forKey: Self.latestResultsStorageKey)
     }
 }
 
@@ -692,16 +826,20 @@ private struct GuderianCatalystRootView: View {
 
                 Spacer(minLength: 10)
 
-                if let line = model.completionLine {
-                    Label(line, systemImage: "flag.checkered")
+                if let result = model.currentResult {
+                    Label(result.statusTitle, systemImage: result.hasWinner ? "flag.checkered" : "questionmark.diamond")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.green)
-                        .lineLimit(2)
-                } else if snapshot.mission.winner != .none {
-                    Label(model.sideTitle(for: snapshot.mission.winner), systemImage: "rosette")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(result.hasWinner ? .green : .orange)
+                        .lineLimit(1)
                 }
+            }
+
+            if let result = model.currentResult {
+                resultStrip(result)
+            } else if snapshot.mission.winner != .none {
+                Label("\(model.sideTitle(for: snapshot.mission.winner)) has reached the scenario result.", systemImage: "flag.checkered")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.green)
             }
         }
         .frame(maxWidth: maxWidth, alignment: .leading)
@@ -731,6 +869,57 @@ private struct GuderianCatalystRootView: View {
         .overlay {
             Capsule()
                 .stroke(Color.white.opacity(0.36), lineWidth: 1)
+        }
+    }
+
+    private func resultStrip(_ result: CatalystBattleResult) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+                .overlay(Color.white.opacity(0.20))
+            HStack(alignment: .top, spacing: 12) {
+                resultColumn(
+                    title: "Winner",
+                    value: result.winnerTitle,
+                    systemImage: result.hasWinner ? "flag.checkered" : "questionmark.diamond",
+                    color: result.hasWinner ? .green : .orange
+                )
+                resultColumn(
+                    title: "Loser",
+                    value: result.loserTitle,
+                    systemImage: "xmark.circle",
+                    color: result.hasWinner ? CatalystPalette.commandRed : .secondary
+                )
+                Spacer(minLength: 4)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(result.victoryBand ?? result.statusTitle)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text("\(result.scoreLine) | turn \(result.completedTurn)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.82))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+        }
+    }
+
+    private func resultColumn(title: String, value: String, systemImage: String, color: Color) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.66))
+                Text(value)
+                    .font(.caption.weight(.heavy))
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(color)
         }
     }
 
@@ -892,6 +1081,17 @@ private struct GuderianCatalystRootView: View {
                             Text("\(entry.dateLabel) | \(entry.id.kind.rawValue)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if let result = model.latestResult(for: entry) {
+                                Label(result.wallSummary, systemImage: result.hasWinner ? "flag.checkered" : "questionmark.diamond")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(result.hasWinner ? .green : .orange)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.72)
+                                Text(result.wallDetail)
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
                         }
                         Spacer()
                         if model.selectedEntry?.id == entry.id {
@@ -1073,7 +1273,9 @@ private struct GuderianCatalystRootView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let line = model.completionLine {
+                if let result = model.currentResult {
+                    resultDetail(result)
+                } else if let line = model.completionLine {
                     Label(line, systemImage: "flag.checkered")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.green)
@@ -1088,6 +1290,28 @@ private struct GuderianCatalystRootView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+            }
+        }
+    }
+
+    private func resultDetail(_ result: CatalystBattleResult) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(result.statusTitle, systemImage: result.hasWinner ? "flag.checkered" : "questionmark.diamond")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(result.hasWinner ? .green : .orange)
+            Text("Winner: \(result.winnerTitle)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(result.hasWinner ? .green : .secondary)
+            Text("Loser: \(result.loserTitle)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(result.hasWinner ? CatalystPalette.commandRed : .secondary)
+            Text("\(result.scoreLine) | turn \(result.completedTurn)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+            if let victoryBand = result.victoryBand {
+                Text(victoryBand)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
             }
         }
     }
