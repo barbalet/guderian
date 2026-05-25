@@ -668,8 +668,8 @@ private struct GuderianCatalystRootView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Text("\(snapshot.mission.name) | Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(CatalystPalette.gold)
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(CatalystPalette.commandTextRed)
                         .lineLimit(2)
                     Text("\(model.sideTitle(for: .player)) \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) \(model.sideTitle(for: .guderianAI))")
                         .font(.caption.monospacedDigit())
@@ -754,7 +754,7 @@ private struct GuderianCatalystRootView: View {
 
             if !compact {
                 Slider(value: $zoom, in: 0.65...2.1)
-                    .tint(CatalystPalette.gold)
+                    .tint(CatalystPalette.commandRed)
                     .frame(width: 126)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
@@ -788,15 +788,15 @@ private struct GuderianCatalystRootView: View {
         } label: {
             Image(systemName: panel.systemImage)
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(active ? Color.black : CatalystPalette.dockForeground)
+                .foregroundStyle(active ? Color.white : CatalystPalette.dockForeground)
                 .frame(width: 44, height: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(active ? CatalystPalette.gold : CatalystPalette.dockButtonBackground)
+                        .fill(active ? CatalystPalette.commandRed : CatalystPalette.dockButtonBackground)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(active ? CatalystPalette.gold.opacity(0.95) : Color.white.opacity(0.18), lineWidth: 1)
+                        .stroke(active ? CatalystPalette.commandRed.opacity(0.95) : Color.white.opacity(0.18), lineWidth: 1)
                 }
         }
         .buttonStyle(.plain)
@@ -808,7 +808,7 @@ private struct GuderianCatalystRootView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(CatalystPalette.gold)
+                .foregroundStyle(CatalystPalette.commandRed)
                 .frame(width: 44, height: 44)
                 .background(CatalystPalette.dockButtonBackground, in: RoundedRectangle(cornerRadius: 8))
                 .overlay {
@@ -896,14 +896,14 @@ private struct GuderianCatalystRootView: View {
                         Spacer()
                         if model.selectedEntry?.id == entry.id {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(CatalystPalette.gold)
+                                .foregroundStyle(CatalystPalette.commandRed)
                         }
                     }
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(model.selectedEntry?.id == entry.id ? CatalystPalette.gold.opacity(0.16) : Color.white.opacity(0.04))
+                            .fill(model.selectedEntry?.id == entry.id ? CatalystPalette.commandRed.opacity(0.18) : Color.white.opacity(0.04))
                     )
                 }
                 .buttonStyle(.plain)
@@ -1220,6 +1220,8 @@ private struct CatalystBattleMapView: View {
                         objectiveMarker(objective, in: fittedSize)
                     }
 
+                    targetLink(in: fittedSize)
+
                     ForEach(snapshot.units) { unit in
                         unitToken(unit, in: fittedSize)
                     }
@@ -1339,17 +1341,20 @@ private struct CatalystBattleMapView: View {
         let ownerColor = Self.unitColor(unit.owner)
         let isFriendly = unit.owner == humanPlayer
         let canMove = canPreviewMove(unit)
+        let canFire = canPreviewFire(unit)
+        let canAssault = canPreviewAssault(unit)
+        let readiness = readinessBadge(canMove: canMove, canFire: canFire, canAssault: canAssault)
         let selectionStroke = isSelected ? Color.white.opacity(0.98) : Color.white.opacity(0.35)
 
         ZStack {
-            if canMove {
+            if let readiness {
                 Circle()
                     .stroke(
-                        CatalystPalette.gold,
+                        readiness.color,
                         style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [7, 5])
                     )
                     .frame(width: radius * 2.85, height: radius * 2.85)
-                    .shadow(color: CatalystPalette.gold.opacity(0.46), radius: 10, x: 0, y: 0)
+                    .shadow(color: readiness.color.opacity(0.46), radius: 10, x: 0, y: 0)
             } else if isFriendly && !unit.destroyed {
                 Circle()
                     .stroke(Color.white.opacity(0.42), lineWidth: 1.5)
@@ -1394,12 +1399,12 @@ private struct CatalystBattleMapView: View {
                     .rotationEffect(.degrees(unit.facingDegrees))
             }
 
-            if canMove {
-                Image(systemName: "arrow.up.right")
+            if let readiness {
+                Image(systemName: readiness.systemImage)
                     .font(.system(size: max(11, radius * 0.48), weight: .black))
                     .foregroundStyle(.black)
                     .padding(4)
-                    .background(CatalystPalette.gold, in: Circle())
+                    .background(readiness.color, in: Circle())
                     .overlay {
                         Circle()
                             .stroke(Color.black.opacity(0.55), lineWidth: 1)
@@ -1438,6 +1443,23 @@ private struct CatalystBattleMapView: View {
         .accessibilityLabel("\(unit.name), \(sideTitle(unit.owner))")
     }
 
+    @ViewBuilder
+    private func targetLink(in size: CGSize) -> some View {
+        if (snapshot.phase == .shooting || snapshot.phase == .assault),
+           let selected = snapshot.selectedUnit,
+           let target = snapshot.selectedTarget {
+            let start = boardPoint(CGPoint(x: selected.x, y: selected.y), in: size)
+            let end = boardPoint(CGPoint(x: target.x, y: target.y), in: size)
+            Path { path in
+                path.move(to: start)
+                path.addLine(to: end)
+            }
+            .stroke(targetLinkColor, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [10, 6]))
+            .shadow(color: targetLinkColor.opacity(0.42), radius: 8, x: 0, y: 0)
+            .opacity(0.88)
+        }
+    }
+
     private func boardRect(_ zone: NativeBoardZoneSnapshot, in size: CGSize) -> CGRect {
         let origin = boardPoint(CGPoint(x: zone.x, y: zone.y), in: size)
         let width = size.width * CGFloat(zone.width) / Self.boardWidth
@@ -1466,6 +1488,46 @@ private struct CatalystBattleMapView: View {
             unit.owner == humanPlayer &&
             unit.canMoveNow &&
             !unit.destroyed
+    }
+
+    private func canPreviewFire(_ unit: NativeBoardUnitSnapshot) -> Bool {
+        canIssueHumanOrders &&
+            snapshot.phase == .shooting &&
+            unit.owner == humanPlayer &&
+            unit.canShootNow &&
+            !unit.destroyed
+    }
+
+    private func canPreviewAssault(_ unit: NativeBoardUnitSnapshot) -> Bool {
+        canIssueHumanOrders &&
+            snapshot.phase == .assault &&
+            unit.owner == humanPlayer &&
+            unit.canAssaultNow &&
+            !unit.destroyed
+    }
+
+    private var targetLinkColor: Color {
+        switch snapshot.phase {
+        case .shooting:
+            return CatalystPalette.fireRed
+        case .assault:
+            return CatalystPalette.assaultOrange
+        default:
+            return CatalystPalette.gold
+        }
+    }
+
+    private func readinessBadge(canMove: Bool, canFire: Bool, canAssault: Bool) -> (systemImage: String, color: Color)? {
+        if canMove {
+            return ("arrow.up.right", CatalystPalette.gold)
+        }
+        if canFire {
+            return ("scope", CatalystPalette.fireRed)
+        }
+        if canAssault {
+            return ("figure.run", CatalystPalette.assaultOrange)
+        }
+        return nil
     }
 
     private func tokenRadius(for unit: NativeBoardUnitSnapshot, in size: CGSize) -> CGFloat {
@@ -1600,6 +1662,10 @@ private enum CatalystPalette {
     static let background = Color(red: 0.09, green: 0.11, blue: 0.10)
     static let mapBase = Color(red: 0.58, green: 0.61, blue: 0.45)
     static let gold = Color(red: 0.92, green: 0.71, blue: 0.32)
+    static let commandTextRed = Color(red: 0.42, green: 0.00, blue: 0.00)
+    static let commandRed = Color(red: 0.68, green: 0.08, blue: 0.06)
+    static let fireRed = Color(red: 0.95, green: 0.32, blue: 0.22)
+    static let assaultOrange = Color(red: 0.96, green: 0.50, blue: 0.18)
     static let commandBlue = Color(red: 0.12, green: 0.31, blue: 0.62)
     static let dockBackground = Color(red: 0.07, green: 0.08, blue: 0.08).opacity(0.94)
     static let dockButtonBackground = Color.white.opacity(0.14)
