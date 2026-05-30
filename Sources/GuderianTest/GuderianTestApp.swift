@@ -75,6 +75,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
     @Published private(set) var runState: GuderianTestFirstBattleRunState = .ready
     @Published private(set) var steps: [PlayableTestGameStep] = []
     @Published private(set) var phaseAdvances = 0
+    @Published private(set) var activationSteps = 0
     @Published private(set) var blockers: [String] = []
     @Published private(set) var isRunning = false
     @Published private(set) var speed: GuderianTestFirstBattleAutoplaySpeed = .standard
@@ -151,6 +152,14 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
 
     var phaseProgressFraction: Double {
         controller?.phaseProgressFraction ?? 0
+    }
+
+    var maxActivationSteps: Int {
+        controller?.maxActivationSteps ?? 0
+    }
+
+    var activationBudgetRemaining: Int {
+        controller?.activationBudgetRemaining ?? 0
     }
 
     func setSpeed(_ speed: GuderianTestFirstBattleAutoplaySpeed) {
@@ -297,6 +306,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
         runState = controller.runState
         steps = controller.steps
         phaseAdvances = controller.phaseAdvances
+        activationSteps = controller.activationSteps
         blockers = controller.blockers
         isRunning = controller.runState == .running
         boardSyncToken += 1
@@ -309,6 +319,7 @@ final class GuderianTestFirstBattleAutoplayViewModel: ObservableObject {
             runState.rawValue,
             "\(steps.count)",
             "\(phaseAdvances)",
+            "\(activationSteps)",
             "\(blockers.count)",
             report == nil ? "no-report" : "report",
             errorMessage ?? "no-error",
@@ -458,8 +469,11 @@ struct GuderianTestAutoplayControlPanel: View {
 
             metric("State", viewModel.runState.rawValue)
             metric("Speed", viewModel.speed.rawValue)
+            metric("Order-dice activations", "\(viewModel.activationSteps)")
+                .accessibilityIdentifier("guderian-test-activation-count")
             metric("Phase advances", "\(viewModel.phaseAdvances)")
-            metric("Safety cap", "\(viewModel.phaseBudgetRemaining) of \(viewModel.maxPhaseAdvances) left")
+            metric("Activation safety", "\(viewModel.activationBudgetRemaining) of \(viewModel.maxActivationSteps) left")
+                .accessibilityIdentifier("guderian-test-activation-safety-cap")
             metric("Steps", "\(viewModel.steps.count)")
             ProgressView(value: viewModel.phaseProgressFraction)
                 .accessibilityIdentifier("guderian-test-safety-cap")
@@ -532,6 +546,7 @@ struct GuderianTestAutoplayControlPanel: View {
                 metric("Turn", "\(report.result.completion.completionRecord.completedTurn)")
                 metric("Default-side steps", "\(report.result.antiGuderianStepCount)")
                 metric("Guderian-command steps", "\(report.result.germanStepCount)")
+                metric("Order-dice activations", "\(report.result.activationSteps)")
                 metric("Phase advances", "\(report.result.phaseAdvances)")
                 metric("Persisted", report.completedToDebrief ? "Yes" : "No")
                 Text(report.result.completion.debriefSummary)

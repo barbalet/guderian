@@ -1517,8 +1517,9 @@ public final class LateCareerNativeBoardSession {
         guard let unit = selectedUnitView() else {
             return failAction("No unit selected", "Select a unit before issuing movement.")
         }
-        guard unifiedBoardPhase(game_view(handle).phase) == .movement, unit.can_move_now else {
-            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move in the current phase.")
+        guard orderDiceRulesetActive || unifiedBoardPhase(game_view(handle).phase) == .movement,
+              unit.can_move_now else {
+            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move with the current phase or order.")
         }
         guard let objective = nearestObjective(to: unit) else {
             return failAction("No objective", "The board has no scenario objective to move toward.")
@@ -1538,8 +1539,9 @@ public final class LateCareerNativeBoardSession {
         guard let unit = selectedUnitView() else {
             return failAction("No unit selected", "Select a unit before issuing movement.")
         }
-        guard unifiedBoardPhase(game_view(handle).phase) == .movement, unit.can_move_now else {
-            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move in the current phase.")
+        guard orderDiceRulesetActive || unifiedBoardPhase(game_view(handle).phase) == .movement,
+              unit.can_move_now else {
+            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move with the current phase or order.")
         }
         let priorityObjectives = priorityObjectives(named: priorityNames)
         var candidateObjectives = priorityObjectives
@@ -1564,8 +1566,9 @@ public final class LateCareerNativeBoardSession {
         guard let unit = unitView(id: id) else {
             return failAction("Unit unavailable", "Unit \(id) is not present on the board.")
         }
-        guard unifiedBoardPhase(game_view(handle).phase) == .movement, unit.can_move_now else {
-            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move in the current phase.")
+        guard orderDiceRulesetActive || unifiedBoardPhase(game_view(handle).phase) == .movement,
+              unit.can_move_now else {
+            return failAction("Movement blocked", "\(unitDisplayName(unit)) cannot move with the current phase or order.")
         }
 
         let x = unifiedClamp(point.x, min: 1, max: loadout.blueprint.engineBoardFrame.width - 1)
@@ -1622,8 +1625,9 @@ public final class LateCareerNativeBoardSession {
         guard let unit = unitView(id: attackerID) else {
             return failAction("Unit unavailable", "Unit \(attackerID) is not present on the board.")
         }
-        guard unifiedBoardPhase(game_view(handle).phase) == .shooting, unit.can_shoot_now else {
-            return failAction("Shooting blocked", "\(unitDisplayName(unit)) cannot shoot in the current phase.")
+        guard orderDiceRulesetActive || unifiedBoardPhase(game_view(handle).phase) == .shooting,
+              unit.can_shoot_now else {
+            return failAction("Shooting blocked", "\(unitDisplayName(unit)) cannot shoot with the current phase or order.")
         }
         if game_shoot_unit(handle, Int32(attackerID), Int32(targetID)) {
             selectedUnitID = attackerID
@@ -1640,8 +1644,9 @@ public final class LateCareerNativeBoardSession {
         guard let unit = unitView(id: attackerID) else {
             return failAction("Unit unavailable", "Unit \(attackerID) is not present on the board.")
         }
-        guard unifiedBoardPhase(game_view(handle).phase) == .assault, unit.can_assault_now else {
-            return failAction("Assault blocked", "\(unitDisplayName(unit)) cannot assault in the current phase.")
+        guard orderDiceRulesetActive || unifiedBoardPhase(game_view(handle).phase) == .assault,
+              unit.can_assault_now else {
+            return failAction("Assault blocked", "\(unitDisplayName(unit)) cannot assault with the current phase or order.")
         }
         let followUp = advance ? DZW_FOLLOW_UP_ADVANCE : DZW_FOLLOW_UP_CONSOLIDATE
         if game_assault_unit(handle, Int32(attackerID), Int32(targetID), followUp) {
@@ -1678,6 +1683,75 @@ public final class LateCareerNativeBoardSession {
             detail: "\(unitDisplayName(unit)) received \(order.rawValue)."
         )
         return true
+    }
+
+    @discardableResult
+    public func prepareNextOrderDiceActivation() -> Bool {
+        if !orderDiceRulesetActive {
+            guard game_set_ruleset(handle, DZW_RULESET_ORDER_DICE) else {
+                return failFromEngine("Order mode blocked")
+            }
+        }
+
+        if game_order_dice_turn_complete(handle) {
+            guard game_end_order_dice_turn(handle) else {
+                return failFromEngine("Order-dice turn end blocked")
+            }
+        }
+
+        if !game_current_order_die_view(handle).available {
+            if game_order_dice_remaining_count(handle) == 0 {
+                guard game_end_order_dice_turn(handle) else {
+                    return failFromEngine("Order-dice turn end blocked")
+                }
+            }
+            guard game_draw_order_die(handle) else {
+                return failFromEngine("Order die draw blocked")
+            }
+        }
+
+        selectFirstActiveUnit()
+        selectNearestEnemyToSelectedUnit()
+        let current = game_current_order_die_view(handle)
+        lastAction = NativeBoardActionMessage(
+            status: current.available ? .succeeded : .blocked,
+            title: current.available ? "Order die drawn" : "Order die blocked",
+            detail: current.available ? "Order die drawn for \(NativeBoardPlayer(current.owner).rawValue)." : lastEngineError()
+        )
+        return current.available
+    }
+
+    @discardableResult
+    public func resolveOrderTestIfNeeded(for unitID: Int) -> Bool {
+        guard orderDiceRulesetActive else {
+            return true
+        }
+        guard let unit = unitView(id: unitID), unit.current_order != DZW_ORDER_NONE else {
+            return true
+        }
+        let result = game_resolve_order_test(handle, Int32(unitID))
+        let refreshed = unitView(id: unitID) ?? unit
+        lastAction = NativeBoardActionMessage(
+            status: result ? .succeeded : .blocked,
+            title: result ? "Order test resolved" : "Order test blocked",
+            detail: result ? orderDiceSummary(for: refreshed) : lastEngineError()
+        )
+        return result
+    }
+
+    @discardableResult
+    public func resolveRallyOrder(for unitID: Int) -> Bool {
+        guard orderDiceRulesetActive else {
+            return false
+        }
+        let result = game_resolve_rally_order(handle, Int32(unitID))
+        let detail = unitView(id: unitID).map(orderDiceSummary(for:)) ?? lastEngineError()
+        lastAction = NativeBoardActionMessage(
+            status: result ? .succeeded : .blocked,
+            title: result ? "Rally resolved" : "Rally blocked",
+            detail: detail
+        )
+        return result
     }
 
     @discardableResult
@@ -1834,6 +1908,10 @@ public final class LateCareerNativeBoardSession {
             return nil
         }
         return unitView(id: selectedUnitID)
+    }
+
+    private var orderDiceRulesetActive: Bool {
+        game_ruleset(handle) == DZW_RULESET_ORDER_DICE
     }
 
     private func unitView(id: Int) -> unit_view_t? {

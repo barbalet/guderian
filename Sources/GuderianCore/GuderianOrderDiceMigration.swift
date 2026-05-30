@@ -3000,6 +3000,388 @@ public enum GuderianOrderDiceMigrationCycle100AcceptanceCatalog {
     }
 }
 
+public struct GuderianOrderDiceAutoplayHarnessReport: Codable, Hashable, Sendable {
+    public let cycleRange: ClosedRange<Int>
+    public let firstBattleActivationSteps: Int
+    public let firstBattlePhaseCompatibilitySteps: Int
+    public let playableRunnerActivationSteps: Int
+    public let speedModes: [GuderianTestFirstBattleAutoplaySpeed]
+    public let pauseResumePreserved: Bool
+    public let safetyCapPreserved: Bool
+    public let usesOrderDiceActivationVocabulary: Bool
+    public let blockers: [String]
+
+    public var isReadyThroughCycle105: Bool {
+        blockers.isEmpty &&
+            cycleRange == 101...105 &&
+            firstBattleActivationSteps > 0 &&
+            firstBattleActivationSteps == firstBattlePhaseCompatibilitySteps &&
+            playableRunnerActivationSteps > 0 &&
+            speedModes == GuderianTestFirstBattleAutoplaySpeed.allCases &&
+            pauseResumePreserved &&
+            safetyCapPreserved &&
+            usesOrderDiceActivationVocabulary
+    }
+}
+
+public enum GuderianOrderDiceAutoplayHarnessCatalog {
+    public static let cycleRange = 101...105
+
+    public static var report: GuderianOrderDiceAutoplayHarnessReport {
+        var blockers: [String] = []
+        let controller = try? GuderianTestFirstBattleRunController()
+        if controller == nil {
+            blockers.append("GuderianTest first-battle controller could not launch.")
+        }
+        let step = try? controller?.stepOnce()
+        if step == nil {
+            blockers.append("GuderianTest could not perform one order-dice activation step.")
+        }
+        let playableResult = try? PlayableTestGameRunner.runBattle(for: .tucholaForest, seed: 101_105)
+        if playableResult == nil {
+            blockers.append("PlayableTestGameRunner could not complete Tuchola with activation stepping.")
+        }
+
+        return GuderianOrderDiceAutoplayHarnessReport(
+            cycleRange: cycleRange,
+            firstBattleActivationSteps: controller?.activationSteps ?? 0,
+            firstBattlePhaseCompatibilitySteps: controller?.phaseAdvances ?? 0,
+            playableRunnerActivationSteps: playableResult?.activationSteps ?? 0,
+            speedModes: GuderianTestFirstBattleAutoplaySpeed.allCases,
+            pauseResumePreserved: controller?.canRun == true || controller?.runState == .paused,
+            safetyCapPreserved: (controller?.maxActivationSteps ?? 0) >= 24 &&
+                (controller?.activationBudgetRemaining ?? -1) >= 0,
+            usesOrderDiceActivationVocabulary: step?.title.localizedCaseInsensitiveContains("activation") == true &&
+                playableResult?.summary.localizedCaseInsensitiveContains("order-dice activations") == true,
+            blockers: blockers
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle105: Bool {
+        report.isReadyThroughCycle105
+    }
+}
+
+public enum GuderianOrderDiceScenarioTuningTheater: String, Codable, Hashable, Sendable {
+    case poland = "Poland 1939"
+    case france = "France 1940"
+    case easternFront = "Eastern Front"
+}
+
+public enum GuderianOrderDiceScenarioTuningEmphasis: String, CaseIterable, Codable, Hashable, Sendable {
+    case orderDicePacing = "Order-dice pacing"
+    case pinRallyDown = "Pins, Rally, and Down"
+    case roughTerrain = "Rough terrain"
+    case roadMovement = "Road movement"
+    case earlyWarArmorInfantry = "Early-war armor and infantry weapons"
+    case riverCrossings = "River crossings"
+    case frenchCounterattacks = "French counterattacks"
+    case charB1Shock = "Char B1 shock"
+    case portDefense = "Port defense"
+    case evacuationPressure = "Evacuation pressure"
+    case airArtilleryPinning = "Air and artillery pinning"
+    case sovietCounterattacks = "Soviet counterattacks"
+    case pocketBreakout = "Pocket breakout"
+    case t34KVArmour = "T-34/KV armour"
+    case logisticsFriction = "Logistics friction"
+    case winterMovement = "Winter movement"
+    case moralePressure = "Morale pressure"
+}
+
+public struct GuderianOrderDiceScenarioTuningRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: UnifiedGuderianBattleID
+    public let scenarioID: GuderianBattleID
+    public let title: String
+    public let theater: GuderianOrderDiceScenarioTuningTheater
+    public let targetTurnRange: ClosedRange<Int>
+    public let targetActivationRange: ClosedRange<Int>
+    public let emphases: Set<GuderianOrderDiceScenarioTuningEmphasis>
+    public let pinMoraleTuning: String
+    public let movementTuning: String
+    public let combatTuning: String
+    public let aiTuning: String
+
+    public var isReady: Bool {
+        targetTurnRange.lowerBound > 0 &&
+            targetActivationRange.lowerBound >= targetTurnRange.lowerBound * 8 &&
+            targetActivationRange.upperBound >= targetTurnRange.upperBound * 8 &&
+            !emphases.isEmpty &&
+            !pinMoraleTuning.isEmpty &&
+            !movementTuning.isEmpty &&
+            !combatTuning.isEmpty &&
+            !aiTuning.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceFieldScenarioTuningCatalog {
+    public static let cycleRange = 106...120
+
+    public static var allRows: [GuderianOrderDiceScenarioTuningRow] {
+        GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map(row)
+    }
+
+    public static var polandRows: [GuderianOrderDiceScenarioTuningRow] {
+        allRows.filter { $0.theater == .poland }
+    }
+
+    public static var franceRows: [GuderianOrderDiceScenarioTuningRow] {
+        allRows.filter { $0.theater == .france }
+    }
+
+    public static var easternFrontRows: [GuderianOrderDiceScenarioTuningRow] {
+        allRows.filter { $0.theater == .easternFront }
+    }
+
+    public static func row(for battleID: UnifiedGuderianBattleID) -> GuderianOrderDiceScenarioTuningRow? {
+        guard let scenarioID = battleID.fieldCommandID,
+              let scenario = GuderianCampaignCatalog.scenario(id: scenarioID) else {
+            return nil
+        }
+        return row(for: scenario)
+    }
+
+    public static func row(for scenario: GuderianScenario) -> GuderianOrderDiceScenarioTuningRow {
+        let profile = ScenarioBalanceCatalog.profile(for: scenario)
+        let impact = GuderianOrderDiceScenarioImpactCatalog.row(for: .fieldCommand(scenario.id))
+        let emphases = emphases(for: scenario.id)
+        let activationLower = profile.targetTurns.lowerBound * max(8, impact?.playerOrderDice ?? 8)
+        let activationUpper = profile.targetTurns.upperBound * max(8, (impact?.playerOrderDice ?? 8) + (impact?.guderianOrderDice ?? 8))
+        return GuderianOrderDiceScenarioTuningRow(
+            id: .fieldCommand(scenario.id),
+            scenarioID: scenario.id,
+            title: scenario.title,
+            theater: theater(for: scenario.id),
+            targetTurnRange: profile.targetTurns,
+            targetActivationRange: activationLower...max(activationLower, activationUpper),
+            emphases: emphases,
+            pinMoraleTuning: pinMoraleTuning(for: scenario.id, profile: profile),
+            movementTuning: movementTuning(for: scenario.id, profile: profile),
+            combatTuning: combatTuning(for: scenario.id, profile: profile),
+            aiTuning: aiTuning(for: scenario.id, profile: profile)
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle110: Bool {
+        polandRows.count == 4 &&
+            polandRows.allSatisfy(\.isReady) &&
+            polandRows.allSatisfy { $0.emphases.isSuperset(of: [.orderDicePacing, .pinRallyDown, .roughTerrain, .roadMovement, .earlyWarArmorInfantry]) }
+    }
+
+    public static var acceptanceReadyThroughCycle115: Bool {
+        franceRows.count == 8 &&
+            franceRows.allSatisfy(\.isReady) &&
+            franceRows.contains { $0.emphases.contains(.riverCrossings) } &&
+            franceRows.contains { $0.emphases.contains(.frenchCounterattacks) } &&
+            franceRows.contains { $0.emphases.contains(.charB1Shock) } &&
+            franceRows.contains { $0.emphases.contains(.portDefense) } &&
+            franceRows.contains { $0.emphases.contains(.evacuationPressure) } &&
+            franceRows.contains { $0.emphases.contains(.airArtilleryPinning) }
+    }
+
+    public static var acceptanceReadyThroughCycle120: Bool {
+        easternFrontRows.count == 7 &&
+            easternFrontRows.allSatisfy(\.isReady) &&
+            easternFrontRows.contains { $0.emphases.contains(.sovietCounterattacks) } &&
+            easternFrontRows.contains { $0.emphases.contains(.pocketBreakout) } &&
+            easternFrontRows.contains { $0.emphases.contains(.t34KVArmour) } &&
+            easternFrontRows.contains { $0.emphases.contains(.logisticsFriction) } &&
+            easternFrontRows.contains { $0.emphases.contains(.winterMovement) } &&
+            easternFrontRows.allSatisfy { $0.emphases.contains(.moralePressure) }
+    }
+
+    private static func theater(for id: GuderianBattleID) -> GuderianOrderDiceScenarioTuningTheater {
+        switch id {
+        case .tucholaForest, .wizna, .brzescLitewski, .kobryn:
+            return .poland
+        case .sedan, .stonne, .montcornet, .amiensAbbeville, .boulogne, .calais, .dunkirk, .fallRot:
+            return .france
+        case .bialystokMinsk, .smolensk, .roslavlNovozybkov, .kiev, .bryansk, .mtsensk, .moscowTulaKashira:
+            return .easternFront
+        }
+    }
+
+    private static func emphases(for id: GuderianBattleID) -> Set<GuderianOrderDiceScenarioTuningEmphasis> {
+        var result: Set<GuderianOrderDiceScenarioTuningEmphasis> = [.orderDicePacing, .pinRallyDown, .moralePressure]
+        switch theater(for: id) {
+        case .poland:
+            result.formUnion([.roughTerrain, .roadMovement, .earlyWarArmorInfantry])
+        case .france:
+            result.formUnion([.roadMovement, .airArtilleryPinning])
+            switch id {
+            case .sedan, .fallRot:
+                result.insert(.riverCrossings)
+            case .stonne:
+                result.formUnion([.frenchCounterattacks, .charB1Shock])
+            case .montcornet:
+                result.insert(.frenchCounterattacks)
+            case .boulogne, .calais, .dunkirk:
+                result.formUnion([.portDefense, .evacuationPressure])
+            case .amiensAbbeville:
+                result.insert(.evacuationPressure)
+            default:
+                break
+            }
+        case .easternFront:
+            result.formUnion([.sovietCounterattacks, .pocketBreakout, .logisticsFriction])
+            switch id {
+            case .mtsensk, .moscowTulaKashira:
+                result.insert(.t34KVArmour)
+            default:
+                break
+            }
+            if id == .moscowTulaKashira {
+                result.insert(.winterMovement)
+            }
+        }
+        return result
+    }
+
+    private static func pinMoraleTuning(
+        for id: GuderianBattleID,
+        profile: ScenarioBalanceProfile
+    ) -> String {
+        switch theater(for: id) {
+        case .poland:
+            return "Pins should create Rally/Down choices without erasing the early withdrawal window: \(profile.germanPressureLimit)"
+        case .france:
+            return "Air/artillery pins suppress tempo but must preserve counterattack agency: \(profile.germanPressureLimit)"
+        case .easternFront:
+            return "Morale pressure should make pockets and winter exhaustion visible while keeping breakout decisions alive: \(profile.germanPressureLimit)"
+        }
+    }
+
+    private static func movementTuning(
+        for id: GuderianBattleID,
+        profile: ScenarioBalanceProfile
+    ) -> String {
+        switch theater(for: id) {
+        case .poland:
+            return "Road movement gives German pressure speed; rough ground and crossings require Advance/Rally/Down tradeoffs."
+        case .france:
+            return "River, bridge, port, and road chokepoints must consume real order-dice activation windows."
+        case .easternFront:
+            return id == .moscowTulaKashira ?
+                "Winter movement and road-speed temptation must punish overextension without freezing all attacks." :
+                "Pocket routes, rail/road corridors, and logistics friction should slow repeated Run pressure."
+        }
+    }
+
+    private static func combatTuning(
+        for id: GuderianBattleID,
+        profile: ScenarioBalanceProfile
+    ) -> String {
+        let scoreNames = profile.scoreChannels.map(\.name).prefix(3).joined(separator: ", ")
+        switch theater(for: id) {
+        case .poland:
+            return "Early-war armour, infantry weapons, anti-tank guns, and armored trains tune combat around \(scoreNames)."
+        case .france:
+            return "French counterattack, Char B1 shock, port defense, and air/artillery pin effects tune combat around \(scoreNames)."
+        case .easternFront:
+            return "Soviet counterattacks, T-34/KV armour, pockets, and morale checks tune combat around \(scoreNames)."
+        }
+    }
+
+    private static func aiTuning(
+        for id: GuderianBattleID,
+        profile: ScenarioBalanceProfile
+    ) -> String {
+        "AI order priorities must support the scenario win condition: \(profile.playerWinCondition)"
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle120Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let cycle100Ready: Bool
+    public let autoplayHarnessReady: Bool
+    public let polandTuningReady: Bool
+    public let franceTuningReady: Bool
+    public let easternFrontTuningReady: Bool
+    public let tuningRows: Int
+    public let missingSourceIdentifiers: [String]
+    public let blockers: [String]
+
+    public var isReadyThroughCycle120: Bool {
+        blockers.isEmpty &&
+            cycleStart == 101 &&
+            cycleEnd == 120 &&
+            cycle100Ready &&
+            autoplayHarnessReady &&
+            polandTuningReady &&
+            franceTuningReady &&
+            easternFrontTuningReady &&
+            tuningRows == 19 &&
+            missingSourceIdentifiers.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle120AcceptanceCatalog {
+    public static let cycleRange = 101...120
+    public static let requiredSourceIdentifiers = [
+        "guderian-test-activation-count",
+        "guderian-test-activation-safety-cap",
+        "order-dice-scenario-tuning-panel",
+        "poland-order-dice-tuning",
+        "france-order-dice-tuning",
+        "eastern-front-order-dice-tuning",
+    ]
+
+    public static func report(
+        cycle80And100SourceText: String,
+        guderianTestSourceText: String
+    ) -> GuderianOrderDiceMigrationCycle120Report {
+        let combinedSource = cycle80And100SourceText + "\n" + guderianTestSourceText
+        let missingIdentifiers = requiredSourceIdentifiers.filter { !combinedSource.contains($0) }
+        let cycle100Ready = GuderianOrderDiceMigrationCycle100AcceptanceCatalog.acceptanceReadyThroughCycle100(
+            cycle80SourceText: cycle80And100SourceText
+        )
+        var blockers: [String] = []
+        if !cycle100Ready {
+            blockers.append("Cycle 81-100 opposing-force AI and reaction gates are not ready.")
+        }
+        if !GuderianOrderDiceAutoplayHarnessCatalog.acceptanceReadyThroughCycle105 {
+            blockers.append("Cycle 101-105 autoplay activation harness is incomplete.")
+        }
+        if !GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle110 {
+            blockers.append("Cycle 106-110 Poland tuning is incomplete.")
+        }
+        if !GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle115 {
+            blockers.append("Cycle 111-115 France tuning is incomplete.")
+        }
+        if !GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle120 {
+            blockers.append("Cycle 116-120 Eastern Front tuning is incomplete.")
+        }
+        if !missingIdentifiers.isEmpty {
+            blockers.append("Cycle 101-120 UI/source identifiers are missing: \(missingIdentifiers.joined(separator: ", ")).")
+        }
+
+        return GuderianOrderDiceMigrationCycle120Report(
+            cycleStart: 101,
+            cycleEnd: 120,
+            cycle100Ready: cycle100Ready,
+            autoplayHarnessReady: GuderianOrderDiceAutoplayHarnessCatalog.acceptanceReadyThroughCycle105,
+            polandTuningReady: GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle110,
+            franceTuningReady: GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle115,
+            easternFrontTuningReady: GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle120,
+            tuningRows: GuderianOrderDiceFieldScenarioTuningCatalog.allRows.count,
+            missingSourceIdentifiers: missingIdentifiers,
+            blockers: blockers
+        )
+    }
+
+    public static func acceptanceReadyThroughCycle120(
+        cycle80And100SourceText: String,
+        guderianTestSourceText: String
+    ) -> Bool {
+        report(
+            cycle80And100SourceText: cycle80And100SourceText,
+            guderianTestSourceText: guderianTestSourceText
+        ).isReadyThroughCycle120
+    }
+}
+
 public struct GuderianOrderDiceMigrationCycle80Report: Codable, Hashable, Sendable {
     public let cycleStart: Int
     public let cycleEnd: Int

@@ -71,6 +71,8 @@ public enum GuderianTestFirstBattleAutoplayContract {
         "guderian-test-pause-button",
         "guderian-test-speed-picker",
         "guderian-test-safety-cap",
+        "guderian-test-activation-count",
+        "guderian-test-activation-safety-cap",
         "guderian-test-event-log",
         "guderian-test-result-panel",
         "guderian-test-result-summary",
@@ -104,9 +106,11 @@ public struct GuderianTestFirstBattleAutoplayAcceptanceReport: Hashable, Sendabl
     public let retiredPrimarySurfaceNames: [String]
     public let speedModes: [GuderianTestFirstBattleAutoplaySpeed]
     public let maxPhaseAdvances: Int
+    public let maxActivationSteps: Int
     public let supportsDeterministicSeed: Bool
     public let usesLegalNativeBoardActions: Bool
     public let exposesFinalResultSummary: Bool
+    public let countsOrderDiceActivations: Bool
 
     public var isReady: Bool {
         cycleRange == 931...960 &&
@@ -118,12 +122,16 @@ public struct GuderianTestFirstBattleAutoplayAcceptanceReport: Hashable, Sendabl
             requiredAccessibilityIdentifiers.contains("guderian-test-first-battle-autoplay") &&
             requiredAccessibilityIdentifiers.contains("guderian-test-speed-picker") &&
             requiredAccessibilityIdentifiers.contains("guderian-test-safety-cap") &&
+            requiredAccessibilityIdentifiers.contains("guderian-test-activation-count") &&
+            requiredAccessibilityIdentifiers.contains("guderian-test-activation-safety-cap") &&
             requiredAccessibilityIdentifiers.contains("guderian-test-result-summary") &&
             speedModes == GuderianTestFirstBattleAutoplaySpeed.allCases &&
             maxPhaseAdvances >= 24 &&
+            maxActivationSteps >= maxPhaseAdvances &&
             supportsDeterministicSeed &&
             usesLegalNativeBoardActions &&
-            exposesFinalResultSummary
+            exposesFinalResultSummary &&
+            countsOrderDiceActivations
     }
 }
 
@@ -132,7 +140,12 @@ public enum GuderianTestFirstBattleAutoplayAcceptanceCatalog {
 
     public static var report: GuderianTestFirstBattleAutoplayAcceptanceReport {
         let maxPhaseAdvances = (try? GuderianTestFirstBattleAutoplayContract.primaryScenario()).map { scenario in
-            max(24, ScenarioBalanceCatalog.profile(for: scenario).targetTurns.upperBound * 8)
+            let liveUnitCount = NativeBoardSession(scenario: scenario, seed: GuderianTestFirstBattleAutoplayContract.defaultSeed)?
+                .snapshot()
+                .units
+                .filter { !$0.destroyed }
+                .count ?? 8
+            return max(48, ScenarioBalanceCatalog.profile(for: scenario).targetTurns.upperBound * max(24, liveUnitCount * 3))
         } ?? 0
 
         return GuderianTestFirstBattleAutoplayAcceptanceReport(
@@ -144,9 +157,11 @@ public enum GuderianTestFirstBattleAutoplayAcceptanceCatalog {
             retiredPrimarySurfaceNames: GuderianTestFirstBattleAutoplayContract.retiredPrimarySurfaceNames,
             speedModes: GuderianTestFirstBattleAutoplaySpeed.allCases,
             maxPhaseAdvances: maxPhaseAdvances,
+            maxActivationSteps: maxPhaseAdvances,
             supportsDeterministicSeed: GuderianTestFirstBattleAutoplayContract.defaultSeed == 620_001,
             usesLegalNativeBoardActions: true,
-            exposesFinalResultSummary: true
+            exposesFinalResultSummary: true,
+            countsOrderDiceActivations: true
         )
     }
 
@@ -216,12 +231,20 @@ public final class GuderianTestFirstBattleRunController {
     public private(set) var germanPlan: GermanAIPlan
     public private(set) var steps: [PlayableTestGameStep] = []
     public private(set) var phaseAdvances = 0
+    public private(set) var activationSteps = 0
     public private(set) var blockers: [String] = []
     public private(set) var progress = CampaignProgress()
     public private(set) var lastReport: GuderianTestFirstBattleAutoplayReport?
 
     public var maxPhaseAdvances: Int {
-        max(24, ScenarioBalanceCatalog.profile(for: scenario).targetTurns.upperBound * 8)
+        maxActivationSteps
+    }
+
+    public var maxActivationSteps: Int {
+        max(
+            48,
+            ScenarioBalanceCatalog.profile(for: scenario).targetTurns.upperBound * max(24, openingSnapshot.units.filter { !$0.destroyed }.count * 3)
+        )
     }
 
     public var phaseBudgetRemaining: Int {
@@ -233,6 +256,17 @@ public final class GuderianTestFirstBattleRunController {
             return 0
         }
         return min(1, Double(phaseAdvances) / Double(maxPhaseAdvances))
+    }
+
+    public var activationBudgetRemaining: Int {
+        max(0, maxActivationSteps - activationSteps)
+    }
+
+    public var activationProgressFraction: Double {
+        guard maxActivationSteps > 0 else {
+            return 0
+        }
+        return min(1, Double(activationSteps) / Double(maxActivationSteps))
     }
 
     public var antiGuderianStepCount: Int {
@@ -285,6 +319,7 @@ public final class GuderianTestFirstBattleRunController {
         germanPlan = GermanAIPlanCatalog.plan(for: scenario)
         steps = []
         phaseAdvances = 0
+        activationSteps = 0
         blockers = []
         progress.reset()
         lastReport = nil
@@ -353,12 +388,20 @@ public final class GuderianTestFirstBattleRunController {
             return report.result.steps.last
         }
 
-        let before = latestSnapshot
-        let step = performActiveAIPhase(before: before, stepIndex: steps.count)
+        let preferredOwner = activationSteps == 0 ? latestSnapshot.activePlayer : nil
+        guard session.prepareNextOrderDiceActivation(preferredOwner: preferredOwner) else {
+            appendBlocker("\(scenario.title) could not draw the next order die for activation \(activationSteps + 1).")
+            runState = .failed
+            return nil
+        }
+        let activationSnapshot = session.snapshot()
+        let step = performActiveAIPhase(before: activationSnapshot, stepIndex: steps.count)
         steps.append(step)
         drainPendingChoices()
+        resolveLingeringOrderDiceEffects()
         session.advancePhase()
         phaseAdvances += 1
+        activationSteps += 1
         latestSnapshot = session.snapshot()
         _ = try finishIfDebriefable()
         return step
@@ -371,7 +414,7 @@ public final class GuderianTestFirstBattleRunController {
 
         let balance = ScenarioBalanceCatalog.profile(for: scenario)
         latestSnapshot = session.snapshot()
-        let hitPhaseGuard = phaseAdvances >= maxPhaseAdvances
+        let hitPhaseGuard = activationSteps >= maxActivationSteps
         let reachedTurnLimit = latestSnapshot.turnNumber > balance.targetTurns.upperBound
         let hasWinner = latestSnapshot.mission.winner != .none
 
@@ -380,7 +423,7 @@ public final class GuderianTestFirstBattleRunController {
         }
 
         if hitPhaseGuard {
-            appendBlocker("\(scenario.title) hit the \(maxPhaseAdvances)-phase autoplay guard before debrief.")
+            appendBlocker("\(scenario.title) hit the \(maxActivationSteps)-activation autoplay guard before debrief.")
         }
         let automatedSides = Set(steps.map(\.activePlayer))
         if !automatedSides.contains(.player) {
@@ -431,42 +474,33 @@ public final class GuderianTestFirstBattleRunController {
         let title: String
         let detail: String
 
-        switch snapshot.phase {
-        case .movement:
-            let moved = moveActiveUnits(snapshot: snapshot)
-            let target = priorityTarget(for: snapshot)
-            let reason = priorityInstruction(for: snapshot)
-            status = moved == 0 ? .blocked : .succeeded
-            title = "\(controller.rawValue) movement"
-            detail = moved == 0 ?
-                "No legal movement was available for priority target \(target); fallback to nearest legal objective also failed. Reason: \(reason)" :
-                "\(moved) active units moved toward priority target \(target), with nearest legal objective as fallback. Reason: \(reason)"
-        case .shooting:
-            let shots = shootActiveUnits(snapshot: snapshot)
-            let target = priorityTarget(for: snapshot)
-            let reason = priorityInstruction(for: snapshot)
-            status = shots == 0 ? .blocked : .succeeded
-            title = "\(controller.rawValue) shooting"
-            detail = shots == 0 ?
-                "No legal shots were available while protecting priority target \(target). Reason: \(reason)" :
-                "\(shots) active units fired at nearest enemies to protect priority target \(target). Reason: \(reason)"
-        case .assault:
-            let assaults = assaultActiveUnits(snapshot: snapshot)
-            let resolved = session.resolveFirstPendingChoice()
-            let target = priorityTarget(for: snapshot)
-            let reason = priorityInstruction(for: snapshot)
-            title = "\(controller.rawValue) assault"
-            if assaults > 0 {
-                status = .succeeded
-                detail = "\(assaults) active units assaulted nearest enemies around priority target \(target). Reason: \(reason)"
-            } else if resolved {
-                status = .succeeded
-                detail = "Resolved a pending assault or damage choice around priority target \(target). Reason: \(reason)"
-            } else {
-                status = .blocked
-                detail = "No legal assaults or pending choices were available around priority target \(target). Reason: \(reason)"
-            }
+        let target = priorityTarget(for: snapshot)
+        let reason = priorityInstruction(for: snapshot)
+        guard let unit = activationUnit(in: snapshot) else {
+            return PlayableTestGameStep(
+                id: "\(snapshot.scenarioID.rawValue)-guderian-test-step-\(stepIndex)",
+                turnNumber: snapshot.turnNumber,
+                activePlayer: snapshot.activePlayer,
+                controller: controller,
+                phase: snapshot.phase,
+                status: .blocked,
+                title: "\(controller.rawValue) activation",
+                detail: "No legal order-dice activation was available for priority target \(target). Reason: \(reason)"
+            )
         }
+
+        session.selectUnit(unit.id)
+        session.selectNearestEnemyToSelectedUnit()
+        let order = activationOrder(for: unit, phase: snapshot.phase)
+        let issued = session.issueOrder(order, to: unit.id)
+        _ = issued ? session.resolveOrderTestIfNeeded(for: unit.id) : false
+        let afterOrder = session.snapshot().units.first { $0.id == unit.id } ?? unit
+        let action = resolveActivationAction(order: afterOrder.currentOrder ?? order, originalOrder: order, unit: afterOrder, snapshot: snapshot)
+        status = issued && action.succeeded ? .succeeded : .blocked
+        title = "\(controller.rawValue) \(order.rawValue) activation"
+        detail = issued ?
+            "\(unit.name) received \(order.rawValue); \(action.detail) Reason: \(reason)" :
+            "\(unit.name) could not receive \(order.rawValue) for priority target \(target). Reason: \(reason)"
 
         return PlayableTestGameStep(
             id: "\(snapshot.scenarioID.rawValue)-guderian-test-step-\(stepIndex)",
@@ -478,6 +512,17 @@ public final class GuderianTestFirstBattleRunController {
             title: title,
             detail: detail
         )
+    }
+
+    private func resolveLingeringOrderDiceEffects() {
+        let snapshot = session.snapshot()
+        for unit in snapshot.units where !unit.destroyed && unit.currentOrder != nil {
+            _ = session.resolveOrderTestIfNeeded(for: unit.id)
+            if unit.currentOrder == .rally {
+                _ = session.resolveRallyOrder(for: unit.id)
+            }
+        }
+        drainPendingChoices()
     }
 
     private func moveActiveUnits(snapshot: NativeBoardSnapshot) -> Int {
@@ -499,6 +544,90 @@ public final class GuderianTestFirstBattleRunController {
         }
 
         return moved
+    }
+
+    private func activationUnit(in snapshot: NativeBoardSnapshot) -> NativeBoardUnitSnapshot? {
+        snapshot.units
+            .filter { $0.owner == snapshot.activePlayer && !$0.destroyed && !$0.retainedOrder && $0.currentOrder == nil }
+            .sorted { activationScore($0, phase: snapshot.phase) > activationScore($1, phase: snapshot.phase) }
+            .first
+    }
+
+    private func activationScore(_ unit: NativeBoardUnitSnapshot, phase: NativeBoardPhase) -> Int {
+        var score = 100 - unit.pinCount
+        if unit.pinCount >= 2 { score += 8 }
+        if unit.kind == "Artillery" || unit.kind == "Gun" { score += phase == .shooting ? 10 : 2 }
+        if unit.kind == "Vehicle" || unit.kind == "Assault gun" { score += phase == .movement ? 8 : 4 }
+        if unit.inCover || unit.hullDown { score += 2 }
+        return score
+    }
+
+    private func activationOrder(
+        for unit: NativeBoardUnitSnapshot,
+        phase: NativeBoardPhase
+    ) -> HistoricalBoardOrder {
+        let options = unit.availableOrders.isEmpty ? HistoricalBoardOrder.allCases : unit.availableOrders
+        if unit.pinCount >= 2, options.contains(.rally) {
+            return .rally
+        }
+        switch phase {
+        case .shooting where options.contains(.fire):
+            return .fire
+        case .assault where options.contains(.run):
+            return .run
+        case .movement:
+            if (unit.kind == "Artillery" || unit.kind == "Gun"), options.contains(.fire) {
+                return .fire
+            }
+            if (unit.kind == "Vehicle" || unit.kind == "Assault gun"), options.contains(.run) {
+                return .run
+            }
+            if options.contains(.advance) {
+                return .advance
+            }
+        default:
+            break
+        }
+        if options.contains(.advance) { return .advance }
+        if options.contains(.fire) { return .fire }
+        return options.first ?? .down
+    }
+
+    private func resolveActivationAction(
+        order: HistoricalBoardOrder,
+        originalOrder: HistoricalBoardOrder,
+        unit: NativeBoardUnitSnapshot,
+        snapshot: NativeBoardSnapshot
+    ) -> (succeeded: Bool, detail: String) {
+        switch order {
+        case .advance, .run:
+            let maxDistance = order == .run ? max(unit.runMoveAllowance, movementDistance(for: unit, controller: aiController(for: snapshot.activePlayer))) : max(unit.advanceMoveAllowance, movementDistance(for: unit, controller: aiController(for: snapshot.activePlayer)))
+            let moved = session.moveSelectedUnitTowardPriorityObjective(named: phasePriorityNames(for: snapshot.activePlayer, phase: snapshot.phase), maxDistance: maxDistance) ||
+                session.moveSelectedUnitTowardNearestObjective(maxDistance: maxDistance)
+            return (
+                moved,
+                moved ?
+                    "1 active units moved toward priority target \(priorityTarget(for: snapshot)), with nearest legal objective as fallback." :
+                    "No legal movement was available for priority target \(priorityTarget(for: snapshot)); fallback to nearest legal objective also failed."
+            )
+        case .fire:
+            session.selectNearestEnemyToSelectedUnit()
+            let fired = session.shootSelectedTarget()
+            drainPendingChoices()
+            return (
+                fired,
+                fired ?
+                    "1 active units fired at nearest enemies to protect priority target \(priorityTarget(for: snapshot))." :
+                    "No legal shots were available while protecting priority target \(priorityTarget(for: snapshot))."
+            )
+        case .rally:
+            let rallied = session.resolveRallyOrder(for: unit.id)
+            return (rallied || originalOrder == .rally, rallied ? "\(unit.name) rallied and removed pin pressure." : "\(unit.name) held the Rally order after order-test resolution.")
+        case .ambush:
+            return (true, "\(unit.name) retained Ambush for opportunity fire.")
+        case .down:
+            return (true, "\(unit.name) went Down to reduce incoming fire.")
+        }
     }
 
     private func shootActiveUnits(snapshot: NativeBoardSnapshot) -> Int {
@@ -540,23 +669,9 @@ public final class GuderianTestFirstBattleRunController {
 
     private func drainPendingChoices() {
         for _ in 0..<16 {
-            let before = session.snapshot()
             guard session.resolveFirstPendingChoice() else {
                 return
             }
-            let after = session.snapshot()
-            steps.append(
-                PlayableTestGameStep(
-                    id: "\(before.scenarioID.rawValue)-guderian-test-step-\(steps.count)",
-                    turnNumber: before.turnNumber,
-                    activePlayer: before.activePlayer,
-                    controller: aiController(for: before.activePlayer),
-                    phase: before.phase,
-                    status: after.lastAction.status,
-                    title: after.lastAction.title,
-                    detail: after.lastAction.detail
-                )
-            )
         }
     }
 

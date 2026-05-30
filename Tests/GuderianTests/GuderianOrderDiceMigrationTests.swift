@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-100")
+@Suite("Guderian order-dice migration cycles 1-120")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -315,6 +315,41 @@ struct GuderianOrderDiceMigrationTests {
         #expect(reactions.contains { $0.recommendedReaction == .ambushOpportunity && $0.attackerSide == .player })
         #expect(acceptance.isReadyThroughCycle100)
         #expect(acceptance.missingUISourceIdentifiers.isEmpty)
+        #expect(acceptance.blockers.isEmpty)
+    }
+
+    @Test("Cycles 101-120 expose activation-step autoplay and field-command tuning")
+    func activationHarnessAndScenarioTuningAreReady() throws {
+        let battleSource = try String(contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift", encoding: .utf8)
+        let guderianTestSource = try String(contentsOfFile: "Sources/GuderianTest/GuderianTestApp.swift", encoding: .utf8)
+        let harness = GuderianOrderDiceAutoplayHarnessCatalog.report
+        let rows = GuderianOrderDiceFieldScenarioTuningCatalog.allRows
+        let tuchola = try #require(GuderianOrderDiceFieldScenarioTuningCatalog.row(for: .fieldCommand(.tucholaForest)))
+        let sedan = try #require(GuderianOrderDiceFieldScenarioTuningCatalog.row(for: .fieldCommand(.sedan)))
+        let moscow = try #require(GuderianOrderDiceFieldScenarioTuningCatalog.row(for: .fieldCommand(.moscowTulaKashira)))
+        let acceptance = GuderianOrderDiceMigrationCycle120AcceptanceCatalog.report(
+            cycle80And100SourceText: battleSource,
+            guderianTestSourceText: guderianTestSource
+        )
+        let allRowsReady = rows.allSatisfy(\.isReady)
+
+        #expect(GuderianOrderDiceAutoplayHarnessCatalog.acceptanceReadyThroughCycle105)
+        #expect(harness.isReadyThroughCycle105)
+        #expect(harness.firstBattleActivationSteps == harness.firstBattlePhaseCompatibilitySteps)
+        #expect(harness.speedModes == GuderianTestFirstBattleAutoplaySpeed.allCases)
+        #expect(GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle110)
+        #expect(GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle115)
+        #expect(GuderianOrderDiceFieldScenarioTuningCatalog.acceptanceReadyThroughCycle120)
+        #expect(rows.count == 19)
+        #expect(allRowsReady)
+        #expect(tuchola.theater == .poland)
+        #expect(tuchola.emphases.contains(.earlyWarArmorInfantry))
+        #expect(sedan.emphases.contains(.riverCrossings))
+        #expect(sedan.emphases.contains(.airArtilleryPinning))
+        #expect(moscow.emphases.contains(.winterMovement))
+        #expect(moscow.emphases.contains(.t34KVArmour))
+        #expect(acceptance.isReadyThroughCycle120)
+        #expect(acceptance.missingSourceIdentifiers.isEmpty)
         #expect(acceptance.blockers.isEmpty)
     }
 }

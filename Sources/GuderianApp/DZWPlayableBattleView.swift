@@ -1162,6 +1162,10 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             incomingAction: attacker.currentOrder ?? .fire
         )
     }
+
+    func scenarioTuningState() -> GuderianOrderDiceScenarioTuningRow? {
+        GuderianOrderDiceFieldScenarioTuningCatalog.row(for: source.battleID)
+    }
 }
 
 private enum DZWPlayableBattlePanel: String, CaseIterable, Identifiable {
@@ -1738,6 +1742,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             closeQuartersSection(snapshot)
             guderianAISection(snapshot)
             opposingAISection(snapshot)
+            orderDiceTuningSection()
             actionsSection(snapshot)
             resultSection(snapshot)
         case .inspector:
@@ -2267,6 +2272,53 @@ private struct DZWPlayableBattlePanelWindow: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("opposing-order-ai-panel")
+    }
+
+    private func orderDiceTuningSection() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Scenario Tuning")
+                .font(.headline)
+            if let row = model.scenarioTuningState() {
+                Text(row.theater.rawValue)
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier(tuningIdentifier(for: row.theater))
+                Text("Turns \(row.targetTurnRange.lowerBound)-\(row.targetTurnRange.upperBound) | Activations \(row.targetActivationRange.lowerBound)-\(row.targetActivationRange.upperBound)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-activation-tuning")
+                Text(row.pinMoraleTuning)
+                    .font(.caption)
+                    .accessibilityIdentifier("order-dice-pin-morale-tuning")
+                Text(row.movementTuning)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-movement-tuning")
+                Text(row.combatTuning)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-combat-tuning")
+            } else {
+                Text("Late-career tuning enters in cycles 121-125.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("order-dice-scenario-tuning-panel")
+    }
+
+    private func tuningIdentifier(for theater: GuderianOrderDiceScenarioTuningTheater) -> String {
+        switch theater {
+        case .poland:
+            return "poland-order-dice-tuning"
+        case .france:
+            return "france-order-dice-tuning"
+        case .easternFront:
+            return "eastern-front-order-dice-tuning"
+        }
     }
 
     private func orderInspectorSummary(for unit: NativeBoardUnitSnapshot) -> some View {
