@@ -1493,6 +1493,540 @@ public enum GuderianOrderDiceMigrationCycle40AcceptanceCatalog {
     }
 }
 
+public struct GuderianOrderDiceSideOwnershipBinding: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let chosenHumanSideID: String
+    public let selectedSideTitle: String
+    public let opposingSideTitle: String
+    public let humanPlayer: NativeBoardPlayer
+    public let aiPlayer: NativeBoardPlayer
+    public let humanDice: Int
+    public let aiDice: Int
+    public let blockers: [String]
+
+    public var canHumanControlDrawnDice: Bool {
+        humanDice > 0
+    }
+
+    public var isReady: Bool {
+        blockers.isEmpty &&
+            humanPlayer != .none &&
+            aiPlayer != .none &&
+            humanPlayer != aiPlayer &&
+            humanDice > 0 &&
+            aiDice > 0 &&
+            !selectedSideTitle.isEmpty &&
+            !opposingSideTitle.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceSideOwnershipCatalog {
+    public static let cycleRange = 41...45
+    public static let sideIDs = [
+        GuderianHistoricalSideID.guderianCommand,
+        GuderianHistoricalSideID.opposingForce,
+    ]
+
+    public static var allBindings: [GuderianOrderDiceSideOwnershipBinding] {
+        fieldCommandBindings + lateCareerBindings
+    }
+
+    public static var fieldCommandBindings: [GuderianOrderDiceSideOwnershipBinding] {
+        GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .flatMap { scenario in
+                sideIDs.map { sideID in
+                    fieldCommandBinding(for: scenario, chosenHumanSideID: sideID)
+                }
+            }
+    }
+
+    public static var lateCareerBindings: [GuderianOrderDiceSideOwnershipBinding] {
+        LateCareerGuderianPresentationCatalog.allEntries
+            .sorted { $0.order < $1.order }
+            .flatMap { entry in
+                sideIDs.map { sideID in
+                    lateCareerBinding(for: entry, chosenHumanSideID: sideID)
+                }
+            }
+    }
+
+    public static var acceptanceReadyThroughCycle45: Bool {
+        cycleRange == 41...45 &&
+            allBindings.count == 70 &&
+            allBindings.allSatisfy(\.isReady) &&
+            allBindings.contains { $0.chosenHumanSideID == GuderianHistoricalSideID.guderianCommand && $0.humanPlayer == .guderianAI } &&
+            allBindings.contains { $0.chosenHumanSideID == GuderianHistoricalSideID.opposingForce && $0.humanPlayer == .player }
+    }
+
+    public static func binding(
+        for battleID: UnifiedGuderianBattleID,
+        chosenHumanSideID: String
+    ) -> GuderianOrderDiceSideOwnershipBinding? {
+        allBindings.first { $0.battleID == battleID && $0.chosenHumanSideID == chosenHumanSideID }
+    }
+
+    private static func fieldCommandBinding(
+        for scenario: GuderianScenario,
+        chosenHumanSideID: String
+    ) -> GuderianOrderDiceSideOwnershipBinding {
+        var blockers: [String] = []
+        let battleID = UnifiedGuderianBattleID.fieldCommand(scenario.id)
+        let humanPlayer = GuderianHistoricalSideSelectionResolver.nativePlayer(for: chosenHumanSideID) ?? .none
+        let aiPlayer: NativeBoardPlayer = humanPlayer == .guderianAI ? .player : .guderianAI
+        let selectedTitle = GuderianHistoricalScenarioAdapter.scenario(for: scenario).sideOption(id: chosenHumanSideID)?.title ?? ""
+        let opposingTitle = GuderianHistoricalScenarioAdapter.scenario(for: scenario).opposingSideOption(to: chosenHumanSideID)?.title ?? ""
+
+        guard let launch = try? GuderianHistoricalSideSelectionResolver.makeLaunch(
+            for: scenario,
+            chosenHumanSideID: chosenHumanSideID,
+            seed: UInt32(41_000 + scenario.order)
+        ), let session = NativeBoardSession(scenario: scenario, launch: launch) else {
+            return GuderianOrderDiceSideOwnershipBinding(
+                id: "\(battleID.rawValue)-\(chosenHumanSideID)",
+                battleID: battleID,
+                title: scenario.title,
+                chosenHumanSideID: chosenHumanSideID,
+                selectedSideTitle: selectedTitle,
+                opposingSideTitle: opposingTitle,
+                humanPlayer: humanPlayer,
+                aiPlayer: aiPlayer,
+                humanDice: 0,
+                aiDice: 0,
+                blockers: ["Could not launch field-command order-dice session."]
+            )
+        }
+
+        let report = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        blockers.append(contentsOf: report.blockers)
+        if session.humanPlayer != humanPlayer {
+            blockers.append("Historical side selection did not bind the expected human engine owner.")
+        }
+        return GuderianOrderDiceSideOwnershipBinding(
+            id: "\(battleID.rawValue)-\(chosenHumanSideID)",
+            battleID: battleID,
+            title: scenario.title,
+            chosenHumanSideID: chosenHumanSideID,
+            selectedSideTitle: selectedTitle,
+            opposingSideTitle: opposingTitle,
+            humanPlayer: humanPlayer,
+            aiPlayer: aiPlayer,
+            humanDice: diceCount(from: report, for: humanPlayer),
+            aiDice: diceCount(from: report, for: aiPlayer),
+            blockers: blockers
+        )
+    }
+
+    private static func lateCareerBinding(
+        for entry: LateCareerGuderianPresentation,
+        chosenHumanSideID: String
+    ) -> GuderianOrderDiceSideOwnershipBinding {
+        var blockers: [String] = []
+        let battleID = UnifiedGuderianBattleID.lateCareer(entry.id)
+        let humanPlayer = UnifiedGuderianBattleSideSelectionCatalog.nativePlayer(for: chosenHumanSideID) ?? .none
+        let aiPlayer: NativeBoardPlayer = humanPlayer == .guderianAI ? .player : .guderianAI
+        guard let session = LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(41_500 + entry.order)) else {
+            return GuderianOrderDiceSideOwnershipBinding(
+                id: "\(battleID.rawValue)-\(chosenHumanSideID)",
+                battleID: battleID,
+                title: entry.title,
+                chosenHumanSideID: chosenHumanSideID,
+                selectedSideTitle: UnifiedGuderianBattleSideSelectionCatalog.selectedSideTitle(for: chosenHumanSideID, in: entry),
+                opposingSideTitle: UnifiedGuderianBattleSideSelectionCatalog.opposingSideTitle(to: chosenHumanSideID, in: entry),
+                humanPlayer: humanPlayer,
+                aiPlayer: aiPlayer,
+                humanDice: 0,
+                aiDice: 0,
+                blockers: ["Could not launch late-career order-dice session."]
+            )
+        }
+
+        let report = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        blockers.append(contentsOf: report.blockers)
+        return GuderianOrderDiceSideOwnershipBinding(
+            id: "\(battleID.rawValue)-\(chosenHumanSideID)",
+            battleID: battleID,
+            title: entry.title,
+            chosenHumanSideID: chosenHumanSideID,
+            selectedSideTitle: UnifiedGuderianBattleSideSelectionCatalog.selectedSideTitle(for: chosenHumanSideID, in: entry),
+            opposingSideTitle: UnifiedGuderianBattleSideSelectionCatalog.opposingSideTitle(to: chosenHumanSideID, in: entry),
+            humanPlayer: humanPlayer,
+            aiPlayer: aiPlayer,
+            humanDice: diceCount(from: report, for: humanPlayer),
+            aiDice: diceCount(from: report, for: aiPlayer),
+            blockers: blockers
+        )
+    }
+
+    private static func diceCount(
+        from report: GuderianOrderDiceSideCupReport,
+        for player: NativeBoardPlayer
+    ) -> Int {
+        switch player {
+        case .player:
+            return report.playerDice
+        case .guderianAI:
+            return report.guderianDice
+        case .none:
+            return 0
+        }
+    }
+}
+
+public struct GuderianOrderDiceCommandPanelState: Codable, Hashable, Sendable {
+    public let drawnSideTitle: String
+    public let humanSideTitle: String
+    public let canHumanControlDrawnDie: Bool
+    public let eligibleUnitIDs: [Int]
+    public let eligibleUnitNames: [String]
+    public let selectedUnitID: Int?
+    public let selectedUnitName: String?
+    public let orderPickerOptions: [HistoricalBoardOrder]
+    public let orderTestResultSummary: String
+    public let actionExecutionSummary: String
+    public let turnEndStatus: String
+
+    public var isReady: Bool {
+        !drawnSideTitle.isEmpty &&
+            !humanSideTitle.isEmpty &&
+            !eligibleUnitIDs.isEmpty &&
+            !orderPickerOptions.isEmpty &&
+            !orderTestResultSummary.isEmpty &&
+            !actionExecutionSummary.isEmpty &&
+            !turnEndStatus.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceCommandPanelPresenter {
+    public static let cycleRange = 46...50
+
+    public static func state(
+        snapshot: NativeBoardSnapshot,
+        humanPlayer: NativeBoardPlayer,
+        humanSideTitle: String,
+        activeSideTitle: String
+    ) -> GuderianOrderDiceCommandPanelState {
+        let eligibleUnits = snapshot.units
+            .filter { $0.owner == humanPlayer && !$0.destroyed && !$0.retainedOrder && $0.currentOrder == nil }
+            .sorted { $0.id < $1.id }
+        let selected = snapshot.selectedUnit?.owner == humanPlayer ? snapshot.selectedUnit : eligibleUnits.first
+        let orderOptions = selected.map(orderOptions(for:)) ?? HistoricalBoardOrder.allCases
+        return GuderianOrderDiceCommandPanelState(
+            drawnSideTitle: activeSideTitle,
+            humanSideTitle: humanSideTitle,
+            canHumanControlDrawnDie: snapshot.activePlayer == humanPlayer,
+            eligibleUnitIDs: eligibleUnits.map(\.id),
+            eligibleUnitNames: eligibleUnits.map(\.name),
+            selectedUnitID: selected?.id,
+            selectedUnitName: selected?.name,
+            orderPickerOptions: orderOptions,
+            orderTestResultSummary: orderTestSummary(for: selected),
+            actionExecutionSummary: actionExecutionSummary(for: selected, options: orderOptions),
+            turnEndStatus: turnEndStatus(for: snapshot)
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle50: Bool {
+        guard let scenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+              let session = NativeBoardSession(scenario: scenario, seed: 50_001) else {
+            return false
+        }
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        let snapshot = session.snapshot()
+        let state = state(
+            snapshot: snapshot,
+            humanPlayer: .player,
+            humanSideTitle: GuderianHistoricalSideSelectionResolver.sideTitle(for: .player, in: scenario),
+            activeSideTitle: GuderianHistoricalSideSelectionResolver.sideTitle(for: snapshot.activePlayer, in: scenario)
+        )
+        return cycleRange == 46...50 &&
+            state.isReady &&
+            state.orderPickerOptions == HistoricalBoardOrder.allCases &&
+            state.drawnSideTitle.contains("Polish")
+    }
+
+    private static func orderOptions(for unit: NativeBoardUnitSnapshot) -> [HistoricalBoardOrder] {
+        unit.availableOrders.isEmpty ? HistoricalBoardOrder.allCases : unit.availableOrders
+    }
+
+    private static func orderTestSummary(for unit: NativeBoardUnitSnapshot?) -> String {
+        guard let unit else {
+            return "Select a unit to see order-test pressure."
+        }
+        if unit.pinCount > 0 {
+            return "\(unit.pinCount) pin marker\(unit.pinCount == 1 ? "" : "s") may require an order test."
+        }
+        return "No order test currently required for \(unit.name)."
+    }
+
+    private static func actionExecutionSummary(
+        for unit: NativeBoardUnitSnapshot?,
+        options: [HistoricalBoardOrder]
+    ) -> String {
+        guard let unit else {
+            return "Draw a side and select an eligible unit before execution."
+        }
+        if let order = unit.currentOrder {
+            return "\(unit.name) is executing \(order.rawValue)."
+        }
+        return "\(unit.name) can choose \(options.map(\.rawValue).joined(separator: ", "))."
+    }
+
+    private static func turnEndStatus(for snapshot: NativeBoardSnapshot) -> String {
+        let unorderedActiveUnits = snapshot.units.filter {
+            $0.owner == snapshot.activePlayer && !$0.destroyed && !$0.retainedOrder && $0.currentOrder == nil
+        }
+        if unorderedActiveUnits.isEmpty {
+            return "No unassigned active-side units remain before order-dice cleanup."
+        }
+        return "\(unorderedActiveUnits.count) active-side unit\(unorderedActiveUnits.count == 1 ? "" : "s") still await an order."
+    }
+}
+
+public struct GuderianOrderDiceInspectorState: Codable, Hashable, Sendable {
+    public let unitID: Int
+    public let unitName: String
+    public let pinCount: Int
+    public let moraleQuality: String
+    public let currentOrderLabel: String
+    public let retainedOrder: Bool
+    public let actedState: String
+    public let downDetails: String
+    public let ambushDetails: String
+    public let rallyDetails: String
+    public let officerModifierSummary: String
+    public let fubarSummary: String
+    public let orderDiceSummary: String
+
+    public var isReady: Bool {
+        !unitName.isEmpty &&
+            !moraleQuality.isEmpty &&
+            !currentOrderLabel.isEmpty &&
+            !actedState.isEmpty &&
+            !downDetails.isEmpty &&
+            !ambushDetails.isEmpty &&
+            !rallyDetails.isEmpty &&
+            !officerModifierSummary.isEmpty &&
+            !fubarSummary.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceInspectorPresenter {
+    public static let cycleRange = 51...55
+
+    public static func state(for unit: NativeBoardUnitSnapshot) -> GuderianOrderDiceInspectorState {
+        let summary = unit.orderDiceSummary.isEmpty ? "Order \(unit.currentOrder?.rawValue ?? "None") | \(unit.moraleQuality) | Pins \(unit.pinCount)" : unit.orderDiceSummary
+        return GuderianOrderDiceInspectorState(
+            unitID: unit.id,
+            unitName: unit.name,
+            pinCount: unit.pinCount,
+            moraleQuality: unit.moraleQuality,
+            currentOrderLabel: unit.currentOrder?.rawValue ?? "None",
+            retainedOrder: unit.retainedOrder,
+            actedState: unit.currentOrder == nil ? "Awaiting order" : "Order assigned",
+            downDetails: unit.downOrderActive ? "Down order active" : "Down order inactive",
+            ambushDetails: unit.ambushOrderActive ? "Ambush retained" : "Ambush inactive",
+            rallyDetails: unit.currentOrder == .rally ? "Rally order selected" : "Rally available through the order picker",
+            officerModifierSummary: summary.localizedCaseInsensitiveContains("officer") ? summary : "Officer modifiers surface in DZW order-test summaries when present.",
+            fubarSummary: summary.localizedCaseInsensitiveContains("fubar") ? summary : "No FUBAR result recorded.",
+            orderDiceSummary: summary
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle55: Bool {
+        guard let scenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+              let session = NativeBoardSession(scenario: scenario, seed: 55_001) else {
+            return false
+        }
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        guard let unit = session.snapshot().selectedUnit else {
+            return false
+        }
+        let state = state(for: unit)
+        return cycleRange == 51...55 &&
+            state.isReady &&
+            state.pinCount >= 0 &&
+            state.currentOrderLabel == "None" &&
+            state.orderDiceSummary.contains("Pins")
+    }
+}
+
+public struct GuderianOrderDiceMovementPreviewState: Codable, Hashable, Sendable {
+    public let unitID: Int
+    public let unitName: String
+    public let advanceMoveAllowance: Double
+    public let runMoveAllowance: Double
+    public let currentOrderMoveAllowance: Double
+    public let reverseMoveAllowance: Double
+    public let canReverseNow: Bool
+    public let pivotBudget: Int
+    public let pivotCountUsed: Int
+    public let terrainClasses: [GuderianOrderDiceMovementClass]
+    public let movementRejectionReason: String
+    public let advanceEnabled: Bool
+    public let runEnabled: Bool
+    public let roadRoughObstacleMessage: String
+
+    public var isReady: Bool {
+        !unitName.isEmpty &&
+            advanceMoveAllowance >= 0 &&
+            runMoveAllowance >= advanceMoveAllowance &&
+            pivotBudget >= pivotCountUsed &&
+            !terrainClasses.isEmpty &&
+            !roadRoughObstacleMessage.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceMovementPreviewPresenter {
+    public static let cycleRange = 56...60
+
+    public static func state(
+        snapshot: NativeBoardSnapshot,
+        battleID: UnifiedGuderianBattleID
+    ) -> GuderianOrderDiceMovementPreviewState? {
+        guard let selected = snapshot.selectedUnit else {
+            return nil
+        }
+        let setup = GuderianOrderDiceSetupMigrationCatalog.allRows.first { $0.id == battleID }
+        let terrainClasses = setup?.movementClasses ?? [.openAdvanceRun]
+        return GuderianOrderDiceMovementPreviewState(
+            unitID: selected.id,
+            unitName: selected.name,
+            advanceMoveAllowance: selected.advanceMoveAllowance,
+            runMoveAllowance: selected.runMoveAllowance,
+            currentOrderMoveAllowance: selected.currentOrderMoveAllowance,
+            reverseMoveAllowance: selected.reverseMoveAllowance,
+            canReverseNow: selected.canReverseNow,
+            pivotBudget: selected.pivotBudget,
+            pivotCountUsed: selected.pivotCountUsed,
+            terrainClasses: terrainClasses,
+            movementRejectionReason: selected.movementRejectionReason,
+            advanceEnabled: selected.advanceMoveAllowance > 0 && !selected.destroyed,
+            runEnabled: selected.runMoveAllowance > 0 && !selected.destroyed,
+            roadRoughObstacleMessage: message(for: terrainClasses, unit: selected)
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle60: Bool {
+        guard let scenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+              let session = NativeBoardSession(scenario: scenario, seed: 60_001) else {
+            return false
+        }
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        guard let state = state(snapshot: session.snapshot(), battleID: .fieldCommand(.tucholaForest)) else {
+            return false
+        }
+        return cycleRange == 56...60 &&
+            state.isReady &&
+            state.advanceMoveAllowance > 0 &&
+            state.runMoveAllowance >= state.advanceMoveAllowance &&
+            state.terrainClasses.contains(.roadRunBonus)
+    }
+
+    private static func message(
+        for terrainClasses: [GuderianOrderDiceMovementClass],
+        unit: NativeBoardUnitSnapshot
+    ) -> String {
+        var parts: [String] = []
+        if terrainClasses.contains(.roadRunBonus) {
+            parts.append("Roads favor Run movement.")
+        }
+        if terrainClasses.contains(.roughAdvanceOnly) {
+            parts.append("Rough ground favors Advance movement.")
+        }
+        if terrainClasses.contains(.waterCrossingLimited) || terrainClasses.contains(.obstacleAdvanceCheck) {
+            parts.append("Crossings and obstacles can reject overlong movement.")
+        }
+        if unit.pivotBudget > 0 {
+            parts.append("Vehicle pivot budget \(unit.pivotCountUsed)/\(unit.pivotBudget).")
+        }
+        if parts.isEmpty {
+            parts.append("Open ground supports normal Advance and Run previews.")
+        }
+        return parts.joined(separator: " ")
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle60Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let sideBindings: Int
+    public let sideSelectionReady: Bool
+    public let commandPanelReady: Bool
+    public let inspectorReady: Bool
+    public let movementPreviewReady: Bool
+    public let missingUISourceIdentifiers: [String]
+    public let blockers: [String]
+
+    public var isReadyThroughCycle60: Bool {
+        blockers.isEmpty &&
+            cycleStart == 41 &&
+            cycleEnd == 60 &&
+            sideBindings == 70 &&
+            sideSelectionReady &&
+            commandPanelReady &&
+            inspectorReady &&
+            movementPreviewReady &&
+            missingUISourceIdentifiers.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle60AcceptanceCatalog {
+    public static let cycleRange = 41...60
+    public static let requiredUISourceIdentifiers = [
+        "order-dice-command-panel",
+        "order-drawn-side",
+        "order-eligible-units-list",
+        "order-picker",
+        "order-test-result",
+        "order-action-execution",
+        "order-turn-end-status",
+        "order-inspector-summary",
+        "order-movement-preview",
+        "advance-move-preview",
+        "run-move-preview",
+        "vehicle-pivot-budget",
+    ]
+
+    public static func acceptanceReadyThroughCycle60(sourceText: String) -> Bool {
+        report(sourceText: sourceText).isReadyThroughCycle60
+    }
+
+    public static func report(sourceText: String) -> GuderianOrderDiceMigrationCycle60Report {
+        let missingIdentifiers = requiredUISourceIdentifiers.filter { !sourceText.contains($0) }
+        var blockers: [String] = []
+        if !GuderianOrderDiceSideOwnershipCatalog.acceptanceReadyThroughCycle45 {
+            blockers.append("Cycle 41-45 side ownership binding is incomplete.")
+        }
+        if !GuderianOrderDiceCommandPanelPresenter.acceptanceReadyThroughCycle50 {
+            blockers.append("Cycle 46-50 command panel presenter is incomplete.")
+        }
+        if !GuderianOrderDiceInspectorPresenter.acceptanceReadyThroughCycle55 {
+            blockers.append("Cycle 51-55 inspector presenter is incomplete.")
+        }
+        if !GuderianOrderDiceMovementPreviewPresenter.acceptanceReadyThroughCycle60 {
+            blockers.append("Cycle 56-60 movement preview presenter is incomplete.")
+        }
+        if !missingIdentifiers.isEmpty {
+            blockers.append("DZWPlayableBattleView is missing order-dice UI identifiers: \(missingIdentifiers.joined(separator: ", ")).")
+        }
+
+        return GuderianOrderDiceMigrationCycle60Report(
+            cycleStart: 41,
+            cycleEnd: 60,
+            sideBindings: GuderianOrderDiceSideOwnershipCatalog.allBindings.count,
+            sideSelectionReady: GuderianOrderDiceSideOwnershipCatalog.acceptanceReadyThroughCycle45,
+            commandPanelReady: GuderianOrderDiceCommandPanelPresenter.acceptanceReadyThroughCycle50,
+            inspectorReady: GuderianOrderDiceInspectorPresenter.acceptanceReadyThroughCycle55,
+            movementPreviewReady: GuderianOrderDiceMovementPreviewPresenter.acceptanceReadyThroughCycle60,
+            missingUISourceIdentifiers: missingIdentifiers,
+            blockers: blockers
+        )
+    }
+}
+
 private func guderianCString(_ pointer: UnsafePointer<CChar>?) -> String {
     pointer.map { String(cString: $0) } ?? ""
 }

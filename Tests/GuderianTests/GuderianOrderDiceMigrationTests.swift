@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-40")
+@Suite("Guderian order-dice migration cycles 1-60")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -183,5 +183,66 @@ struct GuderianOrderDiceMigrationTests {
         #expect(acceptance.blockers.isEmpty)
         #expect(acceptance.qualityAssignments == GuderianOrderDiceUnitQualityCatalog.allAssignments.count)
         #expect(acceptance.setupRows == 35)
+    }
+
+    @Test("Cycles 41-45 bind historical side selection to order-dice ownership")
+    func sideSelectionBindsOrderDiceOwnership() throws {
+        let bindings = GuderianOrderDiceSideOwnershipCatalog.allBindings
+        let opposing = try #require(GuderianOrderDiceSideOwnershipCatalog.binding(
+            for: .fieldCommand(.tucholaForest),
+            chosenHumanSideID: GuderianHistoricalSideID.opposingForce
+        ))
+        let guderian = try #require(GuderianOrderDiceSideOwnershipCatalog.binding(
+            for: .fieldCommand(.tucholaForest),
+            chosenHumanSideID: GuderianHistoricalSideID.guderianCommand
+        ))
+        let lateCareer = try #require(bindings.first { $0.battleID.kind == .lateCareer && $0.chosenHumanSideID == GuderianHistoricalSideID.guderianCommand })
+
+        #expect(GuderianOrderDiceSideOwnershipCatalog.acceptanceReadyThroughCycle45)
+        #expect(bindings.count == 70)
+        #expect(bindings.allSatisfy { $0.isReady })
+        #expect(opposing.humanPlayer == .player)
+        #expect(opposing.aiPlayer == .guderianAI)
+        #expect(guderian.humanPlayer == .guderianAI)
+        #expect(guderian.aiPlayer == .player)
+        #expect(opposing.humanDice > 0)
+        #expect(guderian.humanDice > 0)
+        #expect(lateCareer.canHumanControlDrawnDice)
+    }
+
+    @Test("Cycles 46-60 expose order panel, inspector, and movement-preview contracts")
+    func orderPanelInspectorAndMovementContractsAreReady() throws {
+        let sourceText = try String(contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift", encoding: .utf8)
+        let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let session = try #require(NativeBoardSession(scenario: scenario, seed: 60_060))
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        let snapshot = session.snapshot()
+        let selected = try #require(snapshot.selectedUnit)
+        let commandState = GuderianOrderDiceCommandPanelPresenter.state(
+            snapshot: snapshot,
+            humanPlayer: .player,
+            humanSideTitle: GuderianHistoricalSideSelectionResolver.sideTitle(for: .player, in: scenario),
+            activeSideTitle: GuderianHistoricalSideSelectionResolver.sideTitle(for: snapshot.activePlayer, in: scenario)
+        )
+        let inspectorState = GuderianOrderDiceInspectorPresenter.state(for: selected)
+        let movementState = try #require(GuderianOrderDiceMovementPreviewPresenter.state(snapshot: snapshot, battleID: .fieldCommand(.tucholaForest)))
+        let acceptance = GuderianOrderDiceMigrationCycle60AcceptanceCatalog.report(sourceText: sourceText)
+
+        #expect(GuderianOrderDiceCommandPanelPresenter.acceptanceReadyThroughCycle50)
+        #expect(GuderianOrderDiceInspectorPresenter.acceptanceReadyThroughCycle55)
+        #expect(GuderianOrderDiceMovementPreviewPresenter.acceptanceReadyThroughCycle60)
+        #expect(commandState.isReady)
+        #expect(commandState.canHumanControlDrawnDie)
+        #expect(commandState.orderPickerOptions == HistoricalBoardOrder.allCases)
+        #expect(commandState.turnEndStatus.contains("await"))
+        #expect(inspectorState.isReady)
+        #expect(inspectorState.orderDiceSummary.contains("Pins"))
+        #expect(movementState.isReady)
+        #expect(movementState.advanceMoveAllowance > 0)
+        #expect(movementState.runMoveAllowance >= movementState.advanceMoveAllowance)
+        #expect(movementState.terrainClasses.contains(.roadRunBonus))
+        #expect(acceptance.isReadyThroughCycle60)
+        #expect(acceptance.missingUISourceIdentifiers.isEmpty)
+        #expect(acceptance.blockers.isEmpty)
     }
 }

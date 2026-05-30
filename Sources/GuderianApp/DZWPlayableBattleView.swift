@@ -37,6 +37,7 @@ private protocol DZWPlayableBoardSession: AnyObject {
     func toggleHullDown(for id: Int, enabled: Bool) -> Bool
     func shootUnit(_ attackerID: Int, targetID: Int) -> Bool
     func assaultUnit(_ attackerID: Int, targetID: Int, advance: Bool) -> Bool
+    func issueOrder(_ order: HistoricalBoardOrder, to unitID: Int) -> Bool
     func shootSelectedTarget() -> Bool
     func resolveFirstPendingChoice() -> Bool
     func advancePhase()
@@ -117,6 +118,15 @@ private enum DZWPlayableBattleSource {
             return scenario.title
         case .lateCareer(let entry, _):
             return entry.title
+        }
+    }
+
+    var battleID: UnifiedGuderianBattleID {
+        switch self {
+        case .fieldCommand(let scenario, _):
+            return .fieldCommand(scenario.id)
+        case .lateCareer(let entry, _):
+            return .lateCareer(entry.id)
         }
     }
 
@@ -516,6 +526,17 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         refresh()
         dzwPlayableLog.info("Assault requested attacker=\(selectedUnit.id, privacy: .public) target=\(selectedTarget.id, privacy: .public) advance=\(advance, privacy: .public) assaulted=\(assaulted, privacy: .public)")
         recordTutorialTrigger(assaulted ? .assault : .blockedAction)
+    }
+
+    func issueOrder(_ order: HistoricalBoardOrder) {
+        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer else {
+            recordTutorialTrigger(.blockedAction)
+            return
+        }
+        let issued = session?.issueOrder(order, to: selectedUnit.id) ?? false
+        refresh()
+        dzwPlayableLog.info("Order requested unitID=\(selectedUnit.id, privacy: .public) order=\(order.rawValue, privacy: .public) issued=\(issued, privacy: .public)")
+        recordTutorialTrigger(issued ? .unitSelection : .blockedAction)
     }
 
     func resolvePendingChoice() {
@@ -985,6 +1006,23 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             return "the scenario objectives"
         }
         return visiblePriorities.joined(separator: ", ")
+    }
+
+    func commandPanelState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceCommandPanelState {
+        GuderianOrderDiceCommandPanelPresenter.state(
+            snapshot: snapshot,
+            humanPlayer: humanPlayer,
+            humanSideTitle: humanSideTitle,
+            activeSideTitle: sideTitle(for: snapshot.activePlayer)
+        )
+    }
+
+    func inspectorState(for unit: NativeBoardUnitSnapshot) -> GuderianOrderDiceInspectorState {
+        GuderianOrderDiceInspectorPresenter.state(for: unit)
+    }
+
+    func movementPreviewState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceMovementPreviewState? {
+        GuderianOrderDiceMovementPreviewPresenter.state(snapshot: snapshot, battleID: source.battleID)
     }
 }
 
@@ -1555,6 +1593,8 @@ private struct DZWPlayableBattlePanelWindow: View {
         switch panel {
         case .command:
             header(snapshot)
+            orderPanelSection(snapshot)
+            movementPreviewSection(snapshot)
             actionsSection(snapshot)
             resultSection(snapshot)
         case .inspector:
@@ -1706,6 +1746,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                         .foregroundStyle(.secondary)
                     Text("Wounds \(selected.totalWoundsRemaining) | \(selected.inCover ? "Cover" : "Open") | \(selected.hullDown ? "Hull-down" : "Exposed")")
                         .font(.caption.monospaced())
+                    orderInspectorSummary(for: selected)
                     Text(selected.historicalNote.isEmpty ? "Engine unit: \(selected.engineName)" : selected.historicalNote)
                         .font(.caption.monospaced())
                 }
@@ -1808,6 +1849,123 @@ private struct DZWPlayableBattlePanelWindow: View {
             .disabled(!model.canIssueHumanOrders)
         }
         .buttonStyle(.bordered)
+    }
+
+    private func orderPanelSection(_ snapshot: NativeBoardSnapshot) -> some View {
+        let state = model.commandPanelState(for: snapshot)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Order Dice")
+                .font(.headline)
+            Text("Drawn side: \(state.drawnSideTitle)")
+                .font(.subheadline.weight(.semibold))
+                .accessibilityIdentifier("order-drawn-side")
+            Text(state.canHumanControlDrawnDie ? "\(state.humanSideTitle) can act from this draw." : "Waiting for a \(state.humanSideTitle) die.")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(state.canHumanControlDrawnDie ? .green : .secondary)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Eligible units")
+                    .font(.caption.weight(.bold))
+                ForEach(Array(state.eligibleUnitNames.prefix(5).enumerated()), id: \.offset) { _, name in
+                    Text(name)
+                        .font(.caption2.monospaced())
+                        .lineLimit(1)
+                }
+            }
+            .accessibilityIdentifier("order-eligible-units-list")
+
+            if let selectedName = state.selectedUnitName {
+                Text("Selected order unit: \(selectedName)")
+                    .font(.caption.weight(.semibold))
+            }
+
+            HStack(spacing: 6) {
+                ForEach(state.orderPickerOptions, id: \.self) { order in
+                    Button {
+                        model.issueOrder(order)
+                    } label: {
+                        Text(order.rawValue)
+                    }
+                    .disabled(!state.canHumanControlDrawnDie || snapshot.selectedUnit?.owner != model.humanPlayer)
+                    .accessibilityIdentifier("order-picker-\(order.rawValue.lowercased())")
+                }
+            }
+            .accessibilityIdentifier("order-picker")
+
+            Text(state.orderTestResultSummary)
+                .font(.caption)
+                .accessibilityIdentifier("order-test-result")
+            Text(state.actionExecutionSummary)
+                .font(.caption)
+                .accessibilityIdentifier("order-action-execution")
+            Text(state.turnEndStatus)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("order-turn-end-status")
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.45)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("order-dice-command-panel")
+        .buttonStyle(.bordered)
+    }
+
+    private func movementPreviewSection(_ snapshot: NativeBoardSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Movement")
+                .font(.headline)
+            if let preview = model.movementPreviewState(for: snapshot) {
+                Text("Advance \(Self.distance(preview.advanceMoveAllowance))")
+                    .font(.caption.monospaced())
+                    .accessibilityIdentifier("advance-move-preview")
+                Text("Run \(Self.distance(preview.runMoveAllowance))")
+                    .font(.caption.monospaced())
+                    .accessibilityIdentifier("run-move-preview")
+                Text("Current order allowance \(Self.distance(preview.currentOrderMoveAllowance))")
+                    .font(.caption.monospaced())
+                Text("Reverse \(Self.distance(preview.reverseMoveAllowance))\(preview.canReverseNow ? "" : " unavailable")")
+                    .font(.caption.monospaced())
+                Text("Pivot \(preview.pivotCountUsed)/\(preview.pivotBudget)")
+                    .font(.caption.monospaced())
+                    .accessibilityIdentifier("vehicle-pivot-budget")
+                Text(preview.movementRejectionReason.isEmpty ? "No movement rejection currently shown." : preview.movementRejectionReason)
+                    .font(.caption)
+                    .foregroundStyle(preview.movementRejectionReason.isEmpty ? Color.secondary : Color.orange)
+                    .accessibilityIdentifier("movement-rejection-reason")
+                Text(preview.roadRoughObstacleMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Select a unit to preview Advance and Run movement.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("order-movement-preview")
+    }
+
+    private func orderInspectorSummary(for unit: NativeBoardUnitSnapshot) -> some View {
+        let state = model.inspectorState(for: unit)
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("Order \(state.currentOrderLabel) | \(state.moraleQuality) | Pins \(state.pinCount)")
+                .font(.caption.monospaced())
+            Text("\(state.actedState) | \(state.downDetails) | \(state.ambushDetails)")
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+            Text(state.fubarSummary)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityIdentifier("order-inspector-summary")
+    }
+
+    private static func distance(_ value: Double) -> String {
+        String(format: "%.1f", value)
     }
 
     private func actionsSection(_ snapshot: NativeBoardSnapshot) -> some View {

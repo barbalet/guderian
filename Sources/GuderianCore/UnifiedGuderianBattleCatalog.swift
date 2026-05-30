@@ -1655,6 +1655,40 @@ public final class LateCareerNativeBoardSession {
     }
 
     @discardableResult
+    public func issueOrder(_ order: HistoricalBoardOrder, to unitID: Int) -> Bool {
+        if game_ruleset(handle) != DZW_RULESET_ORDER_DICE {
+            guard game_set_ruleset(handle, DZW_RULESET_ORDER_DICE) else {
+                return failFromEngine("Order mode blocked")
+            }
+        }
+        guard let unit = unitView(id: unitID) else {
+            return failAction("Unit unavailable", "Unit \(unitID) is not present on the board.")
+        }
+        guard currentOrderDieBelongs(to: unit.owner) || drawOrderDie(for: unit.owner) else {
+            return failFromEngine("Order die blocked")
+        }
+        guard game_assign_order(handle, Int32(unitID), order.unifiedCValue) else {
+            return failFromEngine("Order blocked")
+        }
+
+        selectedUnitID = unitID
+        lastAction = NativeBoardActionMessage(
+            status: .succeeded,
+            title: "\(order.rawValue) order",
+            detail: "\(unitDisplayName(unit)) received \(order.rawValue)."
+        )
+        return true
+    }
+
+    @discardableResult
+    public func issueOrderToSelectedUnit(_ order: HistoricalBoardOrder) -> Bool {
+        guard let selectedUnitID else {
+            return failAction("No unit selected", "Select a unit before issuing an order.")
+        }
+        return issueOrder(order, to: selectedUnitID)
+    }
+
+    @discardableResult
     public func shootSelectedTarget() -> Bool {
         guard let unit = selectedUnitView() else {
             return failAction("No unit selected", "Select a unit before shooting.")
@@ -1926,7 +1960,23 @@ public final class LateCareerNativeBoardSession {
                 canShootNow: unit.can_shoot_now,
                 canAssaultNow: unit.can_assault_now,
                 selected: Int(unit.id) == selectedUnitID,
-                targeted: Int(unit.id) == selectedTargetID
+                targeted: Int(unit.id) == selectedTargetID,
+                currentOrder: HistoricalBoardOrder(unifiedOrder: unit.current_order),
+                availableOrders: availableOrders(for: unit),
+                orderDiceSummary: orderDiceSummary(for: unit),
+                pinCount: Int(unit.pin_count),
+                moraleQuality: unifiedCString(game_morale_quality_name(unit.morale_quality)),
+                retainedOrder: unit.retained_order,
+                downOrderActive: unit.down_order_active,
+                ambushOrderActive: unit.ambush_order_active,
+                advanceMoveAllowance: Double(unit.advance_move_allowance),
+                runMoveAllowance: Double(unit.run_move_allowance),
+                currentOrderMoveAllowance: Double(unit.current_order_move_allowance),
+                reverseMoveAllowance: Double(unit.reverse_move_allowance),
+                canReverseNow: unit.can_reverse_now,
+                pivotBudget: Int(unit.pivot_budget),
+                pivotCountUsed: Int(unit.pivot_count_used),
+                movementRejectionReason: unifiedCString(unit.movement_rejection_reason)
             )
         }
     }
@@ -1982,6 +2032,71 @@ public final class LateCareerNativeBoardSession {
         nativeUnitByEngineID[Int(unit.id)]?.name ?? unifiedCString(unit.name)
     }
 
+    private func currentOrderDieBelongs(to owner: player_t) -> Bool {
+        let current = game_current_order_die_view(handle)
+        return current.available && current.owner == owner
+    }
+
+    private func drawOrderDie(for owner: player_t) -> Bool {
+        var attemptsRemaining = Int(game_order_dice_remaining_count(handle)) + 1
+        while attemptsRemaining > 0 {
+            attemptsRemaining -= 1
+            let current = game_current_order_die_view(handle)
+            if current.available {
+                if current.owner == owner {
+                    return true
+                }
+                if let filler = firstOrderAssignableUnit(owner: current.owner, excluding: [selectedUnitID].compactMap { $0 }) {
+                    guard game_assign_order(handle, filler.id, DZW_ORDER_DOWN) else {
+                        return false
+                    }
+                    continue
+                }
+                return false
+            }
+            guard game_draw_order_die(handle) else {
+                return false
+            }
+        }
+        return false
+    }
+
+    private func firstOrderAssignableUnit(owner: player_t, excluding excludedIDs: [Int]) -> unit_view_t? {
+        (0..<Int(game_unit_count(handle))).lazy
+            .map { game_unit_view(self.handle, Int32($0)) }
+            .first { unit in
+                unit.owner == owner &&
+                    !excludedIDs.contains(Int(unit.id)) &&
+                    game_unit_order_eligibility_view(self.handle, unit.id, DZW_ORDER_DOWN).eligible
+            }
+    }
+
+    private func availableOrders(for unit: unit_view_t) -> [HistoricalBoardOrder] {
+        HistoricalBoardOrder.allCases.filter { order in
+            game_unit_order_eligibility_view(handle, unit.id, order.unifiedCValue).eligible
+        }
+    }
+
+    private func orderDiceSummary(for unit: unit_view_t) -> String {
+        var parts = ["Order \(unifiedCString(game_order_name(unit.current_order)))", "\(unifiedCString(game_morale_quality_name(unit.morale_quality)))", "Pins \(Int(unit.pin_count))"]
+        if unit.retained_order {
+            parts.append("Retained")
+        }
+        if unit.down_order_active {
+            parts.append("Down")
+        }
+        if unit.ambush_order_active {
+            parts.append("Ambush")
+        }
+        if unit.last_order_test_result != DZW_ORDER_TEST_NOT_REQUIRED {
+            parts.append(unifiedCString(game_order_test_result_name(unit.last_order_test_result)))
+        }
+        if unit.last_fubar_result != DZW_FUBAR_NONE {
+            parts.append(unifiedCString(game_fubar_result_name(unit.last_fubar_result)))
+        }
+        return parts.joined(separator: " | ")
+    }
+
     private static func nativeUnitMap(handle: OpaquePointer, instance: LateCareerNativeBattleInstance) -> [Int: NativeBattleUnit] {
         let nativeBySide: [NativeBoardPlayer: [NativeBattleUnit]] = [
             .player: instance.units.filter { $0.side == .player },
@@ -2017,6 +2132,44 @@ public final class LateCareerNativeBoardSession {
     private func lastEngineError() -> String {
         let error = unifiedCString(game_last_error(handle))
         return error.isEmpty ? "The engine rejected the action." : error
+    }
+}
+
+private extension HistoricalBoardOrder {
+    init?(unifiedOrder order: dzw_order_t) {
+        switch order {
+        case DZW_ORDER_FIRE:
+            self = .fire
+        case DZW_ORDER_ADVANCE:
+            self = .advance
+        case DZW_ORDER_RUN:
+            self = .run
+        case DZW_ORDER_AMBUSH:
+            self = .ambush
+        case DZW_ORDER_RALLY:
+            self = .rally
+        case DZW_ORDER_DOWN:
+            self = .down
+        default:
+            return nil
+        }
+    }
+
+    var unifiedCValue: dzw_order_t {
+        switch self {
+        case .fire:
+            return DZW_ORDER_FIRE
+        case .advance:
+            return DZW_ORDER_ADVANCE
+        case .run:
+            return DZW_ORDER_RUN
+        case .ambush:
+            return DZW_ORDER_AMBUSH
+        case .rally:
+            return DZW_ORDER_RALLY
+        case .down:
+            return DZW_ORDER_DOWN
+        }
     }
 }
 
