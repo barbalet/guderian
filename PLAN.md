@@ -1,5 +1,78 @@
 # Guderian Development Plan
 
+## DZW Order-Dice Rules Migration: Guderian 200-Cycle Adaptation Plan
+
+This plan tracks Guderian's consumer-layer work after the DZW rules engine migrates to the order-dice methodology described in `dzw/PLAN.md`. Guderian must not fork the rules. Its job is to adapt historical scenarios, AI, UI, automation, saves, tutorials, and documentation to the new DZW contracts.
+
+### Dependency Rule
+
+Implement Guderian cycles only after the corresponding DZW rules contract exists. If Guderian needs a rule behavior that is not in DZW yet, add it to `dzw/PLAN.md` and implement it there first.
+
+### Cycle Range Summary
+
+- **Cycles 1-20:** dependency audit, scenario impact map, and compatibility shims.
+- **Cycles 21-45:** scenario unit quality, order eligibility, and order-dice setup.
+- **Cycles 46-75:** playable battle UI conversion from phase buttons to order assignment.
+- **Cycles 76-105:** Guderian/opposing-force AI conversion to order-dice decisions.
+- **Cycles 106-130:** scenario balance, pins/morale, movement, and combat tuning.
+- **Cycles 131-155:** campaign save/progress, tutorials, and GuderianTest migration.
+- **Cycles 156-180:** full 35-battle regression, UX, and documentation.
+- **Cycles 181-200:** final acceptance and Monty handoff.
+
+### Cycles 1-200
+
+| Cycles | Focus | Technical Output |
+| --- | --- | --- |
+| 1-5 | DZW contract audit | Identify every Guderian type that calls old phase commands, reads phase names, assumes German AI turn boundaries, or scripts movement/shooting/assault in fixed order. |
+| 6-10 | Scenario impact map | Map all 35 battles to unit quality, side order dice, expected pin pressure, officer presence, vehicle classes, terrain categories, and likely retained-order usage. |
+| 11-15 | Compile shims | Add temporary Guderian adapters for DZW's old/new ruleset split so development can proceed without losing current playable campaign behavior. |
+| 16-20 | Acceptance gates | Add tests that fail if Guderian's default playable screen still relies on global movement/shooting/assault phase buttons after the DZW migration closes. |
+| 21-25 | Unit quality assignment | Assign Inexperienced/Regular/Veteran quality to Polish, French, BEF, Belgian/Dutch, Soviet, German, late-war German, and late-career generated units. |
+| 26-30 | Order dice per side | Update field-command and late-career native sessions to create order dice from alive eligible units for both Guderian-command and opposing-force play. |
+| 31-35 | Eligibility mapping | Surface Guderian-specific eligibility reasons: command caveats, immobilized vehicles, pinned units, retained Ambush/Down orders, embarked units, and destroyed units. |
+| 36-40 | Scenario setup migration | Update native battle instance builders so terrain, deployment, objectives, and scripted events classify terrain and mobility using DZW's new order/movement model. |
+| 41-45 | Historical side selection | Ensure Guderian/opposing-force side selection controls bind to order-dice side ownership before battle launch. The selected side must determine which drawn dice can be human-controlled. |
+| 46-50 | Order UI shell | Replace phase action clusters in `DZWPlayableBattleView` with an order panel: drawn side, eligible units, order picker, order-test result, action execution, and turn-end status. |
+| 51-55 | Unit inspector | Add pin count, morale quality, current/retained order, acted state, officer modifiers, and FUBAR/Rally/Down details to the unit inspector/sidebar. |
+| 56-60 | Movement UI | Replace generic move/drag allowances with order-specific Advance/Run previews, terrain rejection reasons, vehicle pivot budgets, and road/rough/obstacle messaging. |
+| 61-65 | Shooting UI | Present Fire/Advance shooting choices, target reactions, hit modifier breakdown, pin effects, and damage/morale result summaries in the battle log. |
+| 66-70 | Vehicle UI | Add vehicle armour facing, penetration modifiers, stunned/immobilized/on-fire/knocked-out state, wreck markers, and Down transitions to Guderian board rendering. |
+| 71-75 | Close quarters UI | Rework assault controls into Run-order assault flow with target reaction, round results, loser destruction, and regroup log output. |
+| 76-80 | Guderian-command AI | Rewrite Guderian AI as order-dice decision making: choose drawn-die unit, choose order, choose objective/target/path, and handle failed order tests. |
+| 81-85 | Opposing-army AI | Rewrite Polish/French/BEF/Soviet/late-war opponents as order-dice decision makers with distinct order priorities rather than old phase scripts. |
+| 86-90 | Ambush/Down AI | Teach AI when to retain Ambush, go Down, Rally, or consume a die for movement/fire. Add deterministic tests for each behavior. |
+| 91-95 | Pins and morale AI | Account for pin thresholds, morale quality, officer support, Rally priority, and FUBAR risk in automated decisions. |
+| 96-100 | Target reaction AI | Add target reaction choices for human-vs-AI and AI-vs-human shooting/assaults, including Down and Ambush opportunity decisions. |
+| 101-105 | Autoplay harness | Update GuderianTest and playable harnesses so one step equals an order-dice activation, not a phase advance. Preserve pause/resume/speed/safety-cap controls. |
+| 106-110 | Poland tuning | Retune Tuchola, Wizna, Brzesc Litewski, and Kobryn for order dice, pins, Rally/Down, rough terrain, road movement, and early-war armour/infantry weapon effects. |
+| 111-115 | France tuning | Retune Sedan through Fall Rot for order dice, river crossings, French counterattacks, Char B1 shock, port defense, evacuation pressure, and air/artillery pin effects. |
+| 116-120 | Eastern Front tuning | Retune Bialystok-Minsk through Moscow/Tula/Kashira for order dice, Soviet counterattacks, pockets, T-34/KV armour, logistics friction, winter movement, and morale pressure. |
+| 121-125 | Late-career tuning | Retune the 16 staff/epilogue battles with generated order dice, command-caveat labels, late-war armour, bridgehead defense, and collapse-route morale pressure. |
+| 126-130 | Scoring and pacing | Replace phase-count victory pacing with activation/turn-aware scoring, debrief text, safety caps, and deterministic completion thresholds. |
+| 131-135 | Save migration | Version campaign save/progress payloads for order-dice battle state, selected side, current turn, order cup, unit orders, retained orders, pins, and debrief records. |
+| 136-140 | Tutorials | Update first-run and first-battle tutorials to explain order dice, order choice, pins, Down/Ambush/Rally, and why the player may not control every activation in a row. |
+| 141-145 | GuderianTest UI | Convert the first-battle test app to show the order cup, current die, selected unit/order, activation log, safety cap by activations, and debrief outcome. |
+| 146-150 | Accessibility | Stabilize identifiers for order cup, drawn die, order picker, order test, pin count, Rally, Down, Ambush, Fire, Advance, Run, and activation log controls. |
+| 151-155 | Screenshots/manual QA | Add screenshot/manual QA targets proving the order UI is visible and playable in campaign, battle, GuderianTest, and compact-window layouts. |
+| 156-160 | Full field-command harness | Run battles 1-19 from both human sides through order-dice launch, at least one human activation, one AI activation, turn-end cleanup, and debrief path. |
+| 161-165 | Full late-career harness | Run battles 20-35 through the same order-dice harness and prove no late-career shortcut retains old phase semantics. |
+| 166-170 | Balance audit | Add per-battle reports for order-dice pacing, pin density, Rally usefulness, Down/Ambush frequency, vehicle damage frequency, and scenario completion rate. |
+| 171-175 | UI parity audit | Prove all 35 battles use the same order-dice battle surface. Retire stale phase-flow labels from acceptance reports, row copy, and test names. |
+| 176-180 | Documentation | Update Guderian README/book sections for order-dice gameplay, battle selection, side selection, tutorials, AI behavior, and historical scenario notes. |
+| 181-185 | Monty API handoff | Publish the Guderian-facing APIs Monty will consume: side selection, order-dice board session, snapshots, command callbacks, AI/autoplay, and debrief persistence. |
+| 186-190 | Build matrix | Run Guderian `swift test`, Guderian `swift build`, DZW tests/build, GuderianTest automation, and selected Xcode schemes where available. |
+| 191-195 | Migration cleanup | Remove temporary old-phase shims from Guderian default paths. Leave any legacy support clearly named and test-isolated. |
+| 196-200 | Acceptance closeout | Record verification, known limitations, visual evidence, downstream Monty requirements, and zero remaining Guderian cycles for the order-dice migration. |
+
+### Guderian Acceptance Gates
+
+- Every field-command battle can be launched after choosing Guderian or the opposing force.
+- The battle UI uses order assignment and drawn dice rather than global phase buttons.
+- AI and autoplay operate one activation at a time.
+- Scenario balance and debriefs are activation/turn aware.
+- Tutorials and docs explain the new method.
+- Monty has a stable consumer contract after Guderian cycle 185.
+
 ## Current Ship Status
 
 The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira; those field-command battles now include a playable-side selector with the opposing-force lens as the default and Guderian command play framed as sober command study. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19. Cycle 930 completes the tutorial onboarding block with first-run historical context and first-battle contextual hints. Cycle 1080 closes the local `REVIEW.md` hardening pass.
