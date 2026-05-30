@@ -3382,6 +3382,433 @@ public enum GuderianOrderDiceMigrationCycle120AcceptanceCatalog {
     }
 }
 
+public enum GuderianOrderDiceLateCareerTuningEmphasis: String, CaseIterable, Codable, Hashable, Sendable {
+    case orderDicePacing = "Order-dice pacing"
+    case commandCaveat = "Command caveat"
+    case staffInfluence = "Staff influence"
+    case withdrawalPressure = "Withdrawal pressure"
+    case logisticsFriction = "Logistics friction"
+    case sovietBreakthrough = "Soviet breakthrough"
+    case armoredForcePressure = "Armored-force pressure"
+    case urbanFortress = "Urban fortress"
+    case finalWarCompression = "Final-war compression"
+    case epilogueContext = "Epilogue context"
+    case moralePressure = "Morale pressure"
+    case retainedOrders = "Ambush/Down retention"
+}
+
+public struct GuderianOrderDiceLateCareerTuningRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let set: LateCareerPlayableSet
+    public let scope: GuderianCommandScope
+    public let targetTurnRange: ClosedRange<Int>
+    public let targetActivationRange: ClosedRange<Int>
+    public let emphases: Set<GuderianOrderDiceLateCareerTuningEmphasis>
+    public let caveatTuning: String
+    public let movementTuning: String
+    public let combatTuning: String
+    public let scoringTuning: String
+    public let aiTuning: String
+
+    public var isReady: Bool {
+        battleID.kind == .lateCareer &&
+            targetTurnRange.lowerBound > 0 &&
+            targetActivationRange.lowerBound >= targetTurnRange.lowerBound * 8 &&
+            targetActivationRange.upperBound >= targetTurnRange.upperBound * 8 &&
+            emphases.contains(.orderDicePacing) &&
+            emphases.contains(.commandCaveat) &&
+            emphases.contains(.moralePressure) &&
+            !caveatTuning.isEmpty &&
+            !movementTuning.isEmpty &&
+            !combatTuning.isEmpty &&
+            !scoringTuning.isEmpty &&
+            !aiTuning.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceLateCareerTuningCatalog {
+    public static let cycleRange = 121...125
+
+    public static var allRows: [GuderianOrderDiceLateCareerTuningRow] {
+        LateCareerGuderianPresentationCatalog.allEntries
+            .sorted { $0.order < $1.order }
+            .compactMap(row)
+    }
+
+    public static func row(for battleID: UnifiedGuderianBattleID) -> GuderianOrderDiceLateCareerTuningRow? {
+        guard let lateCareerID = battleID.lateCareerID,
+              let entry = LateCareerGuderianPresentationCatalog.entry(for: lateCareerID) else {
+            return nil
+        }
+        return row(for: entry)
+    }
+
+    public static func row(for entry: LateCareerGuderianPresentation) -> GuderianOrderDiceLateCareerTuningRow? {
+        guard let report = LateCareerPlayableSurfaceCatalog.report(for: entry.id),
+              let instance = LateCareerNativeBattleInstanceCatalog.instance(for: entry.id),
+              let set = LateCareerPlayableSet.set(for: entry.id) else {
+            return nil
+        }
+        let turnRange = report.scoringProfile.targetTurnLowerBound...report.scoringProfile.targetTurnUpperBound
+        let liveDice = max(8, instance.units.count)
+        let activationRange = (turnRange.lowerBound * max(8, liveDice / 2))...(turnRange.upperBound * max(16, liveDice))
+        return GuderianOrderDiceLateCareerTuningRow(
+            id: "\(entry.id)-order-dice-late-career-tuning",
+            battleID: .lateCareer(entry.id),
+            title: entry.title,
+            set: set,
+            scope: entry.scope,
+            targetTurnRange: turnRange,
+            targetActivationRange: activationRange,
+            emphases: emphases(for: entry, set: set, instance: instance),
+            caveatTuning: caveatTuning(for: entry),
+            movementTuning: movementTuning(for: entry, set: set, instance: instance),
+            combatTuning: combatTuning(for: entry, set: set, instance: instance),
+            scoringTuning: scoringTuning(for: report, activationRange: activationRange),
+            aiTuning: aiTuning(for: report, entry: entry)
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle125: Bool {
+        allRows.count == 16 &&
+            allRows.allSatisfy(\.isReady) &&
+            Set(allRows.map(\.set)) == Set(LateCareerPlayableSet.allCases) &&
+            allRows.allSatisfy { !$0.scope.allowsDirectBattlefieldScenario } &&
+            allRows.allSatisfy { $0.caveatTuning.localizedCaseInsensitiveContains("not a direct field command") }
+    }
+
+    private static func emphases(
+        for entry: LateCareerGuderianPresentation,
+        set: LateCareerPlayableSet,
+        instance: LateCareerNativeBattleInstance
+    ) -> Set<GuderianOrderDiceLateCareerTuningEmphasis> {
+        var result: Set<GuderianOrderDiceLateCareerTuningEmphasis> = [
+            .orderDicePacing,
+            .commandCaveat,
+            .moralePressure,
+            .retainedOrders,
+        ]
+        switch set {
+        case .setA:
+            result.formUnion([.staffInfluence, .armoredForcePressure])
+        case .setB:
+            result.formUnion([.withdrawalPressure, .logisticsFriction])
+        case .setC:
+            result.formUnion([.sovietBreakthrough, .urbanFortress])
+        case .setD:
+            result.formUnion([.finalWarCompression, .epilogueContext])
+        }
+        if entry.scope == .armyGeneralStaffInfluence {
+            result.insert(.staffInfluence)
+        }
+        if instance.terrain.contains(where: { [.town, .urbanDistrict, .bunker, .fortifiedLine].contains($0.kind) }) {
+            result.insert(.urbanFortress)
+        }
+        return result
+    }
+
+    private static func caveatTuning(for entry: LateCareerGuderianPresentation) -> String {
+        "\(entry.visibleCommandCaveatLabel): tune as not a direct field command while preserving selected-side study control."
+    }
+
+    private static func movementTuning(
+        for entry: LateCareerGuderianPresentation,
+        set: LateCareerPlayableSet,
+        instance: LateCareerNativeBattleInstance
+    ) -> String {
+        let terrainNames = instance.terrain.prefix(3).map(\.name).joined(separator: ", ")
+        switch set {
+        case .setA:
+            return "Armored and staff-influence movement must spend activations through \(terrainNames)."
+        case .setB:
+            return "Withdrawal corridors, roads, and rail links must consume visible activation windows through \(terrainNames)."
+        case .setC:
+            return "Soviet pressure and fortress defense movement must trade activation tempo against \(terrainNames)."
+        case .setD:
+            return "Final-war compression and epilogue movement must stay slow, caveated, and activation-limited through \(terrainNames)."
+        }
+    }
+
+    private static func combatTuning(
+        for entry: LateCareerGuderianPresentation,
+        set: LateCareerPlayableSet,
+        instance: LateCareerNativeBattleInstance
+    ) -> String {
+        let forceCount = instance.units.count
+        switch set {
+        case .setA:
+            return "\(forceCount) modeled forces emphasize armor, anti-tank fire, and staff-pressure firefights."
+        case .setB:
+            return "\(forceCount) modeled forces emphasize delaying fire, pins, Rally, Down, and withdrawal survival."
+        case .setC:
+            return "\(forceCount) modeled forces emphasize Soviet breakthrough pressure, urban fire lanes, and morale checks."
+        case .setD:
+            return "\(forceCount) modeled forces emphasize final-war attrition without celebratory victory framing."
+        }
+    }
+
+    private static func scoringTuning(
+        for report: LateCareerPlayableBattleReport,
+        activationRange: ClosedRange<Int>
+    ) -> String {
+        "Score \(report.scoringProfile.maxPlayerScore) VP against activation band \(activationRange.lowerBound)-\(activationRange.upperBound), with over-budget results softened by command caveats."
+    }
+
+    private static func aiTuning(
+        for report: LateCareerPlayableBattleReport,
+        entry: LateCareerGuderianPresentation
+    ) -> String {
+        let priorities = report.aiPlan.priorities.prefix(3).map(\.targetName).joined(separator: ", ")
+        return "AI order priorities \(priorities) must respect \(entry.scope.rawValue) limits and retained Ambush/Down choices."
+    }
+}
+
+public enum GuderianOrderDiceActivationScoringSource: String, Codable, Hashable, Sendable {
+    case fieldCommand = "Field command"
+    case lateCareer = "Late career"
+}
+
+public struct GuderianOrderDiceActivationScoringRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let source: GuderianOrderDiceActivationScoringSource
+    public let targetTurnRange: ClosedRange<Int>
+    public let targetActivationRange: ClosedRange<Int>
+    public let maxScore: Int
+    public let parScore: Int
+    public let fastActivationThreshold: Int
+    public let overBudgetActivationThreshold: Int
+    public let fastActivationBonus: Int
+    public let overBudgetPenalty: Int
+    public let scoringSummary: String
+    public let persistenceKey: String
+
+    public var isReady: Bool {
+        maxScore > 0 &&
+            parScore > 0 &&
+            fastActivationThreshold == targetActivationRange.lowerBound &&
+            overBudgetActivationThreshold == targetActivationRange.upperBound &&
+            fastActivationBonus > 0 &&
+            overBudgetPenalty > 0 &&
+            scoringSummary.localizedCaseInsensitiveContains("activation") &&
+            !persistenceKey.isEmpty
+    }
+
+    public func activationAdjustedScore(baseScore: Int, activationSteps: Int) -> Int {
+        let clampedBase = min(maxScore, max(0, baseScore))
+        if activationSteps <= fastActivationThreshold {
+            return min(maxScore + fastActivationBonus, clampedBase + fastActivationBonus)
+        }
+        if activationSteps > overBudgetActivationThreshold {
+            return max(0, clampedBase - overBudgetPenalty)
+        }
+        return clampedBase
+    }
+}
+
+public enum GuderianOrderDiceActivationScoringCatalog {
+    public static let cycleRange = 126...140
+
+    public static var allRows: [GuderianOrderDiceActivationScoringRow] {
+        fieldRows + lateCareerRows
+    }
+
+    public static var fieldRows: [GuderianOrderDiceActivationScoringRow] {
+        GuderianOrderDiceFieldScenarioTuningCatalog.allRows.compactMap { row in
+            guard let scenario = GuderianCampaignCatalog.scenario(id: row.scenarioID) else {
+                return nil
+            }
+            let balance = ScenarioBalanceCatalog.profile(for: scenario)
+            return activationRow(
+                battleID: row.id,
+                title: row.title,
+                source: .fieldCommand,
+                targetTurnRange: row.targetTurnRange,
+                targetActivationRange: row.targetActivationRange,
+                maxScore: balance.maxPlayerScore,
+                persistenceKey: "field-command-\(row.scenarioID.rawValue)-order-dice-score",
+                emphasis: "field-command objective score"
+            )
+        }
+    }
+
+    public static var lateCareerRows: [GuderianOrderDiceActivationScoringRow] {
+        GuderianOrderDiceLateCareerTuningCatalog.allRows.compactMap { row in
+            guard let report = LateCareerPlayableSurfaceCatalog.report(for: row.battleID.rawValue) else {
+                return nil
+            }
+            return activationRow(
+                battleID: row.battleID,
+                title: row.title,
+                source: .lateCareer,
+                targetTurnRange: row.targetTurnRange,
+                targetActivationRange: row.targetActivationRange,
+                maxScore: report.scoringProfile.maxPlayerScore,
+                persistenceKey: report.scoringProfile.persistenceKey,
+                emphasis: "late-career caveated score"
+            )
+        }
+    }
+
+    public static func row(for battleID: UnifiedGuderianBattleID) -> GuderianOrderDiceActivationScoringRow? {
+        allRows.first { $0.battleID == battleID }
+    }
+
+    public static var acceptanceReadyThroughCycle130: Bool {
+        fieldRows.count == 19 &&
+            fieldRows.allSatisfy(\.isReady) &&
+            fieldRows.allSatisfy { $0.source == .fieldCommand } &&
+            fieldRows.allSatisfy { $0.activationAdjustedScore(baseScore: $0.parScore, activationSteps: $0.fastActivationThreshold) >= $0.parScore }
+    }
+
+    public static var acceptanceReadyThroughCycle135: Bool {
+        lateCareerRows.count == 16 &&
+            lateCareerRows.allSatisfy(\.isReady) &&
+            lateCareerRows.allSatisfy { $0.source == .lateCareer } &&
+            Set(lateCareerRows.map(\.persistenceKey)).count == 16 &&
+            lateCareerRows.allSatisfy { $0.activationAdjustedScore(baseScore: $0.parScore, activationSteps: $0.overBudgetActivationThreshold + 1) <= $0.parScore }
+    }
+
+    public static var acceptanceReadyThroughCycle140: Bool {
+        allRows.count == 35 &&
+            acceptanceReadyThroughCycle130 &&
+            acceptanceReadyThroughCycle135 &&
+            allRows.allSatisfy { row in
+                row.targetActivationRange.lowerBound < row.targetActivationRange.upperBound &&
+                    row.activationAdjustedScore(baseScore: row.parScore, activationSteps: row.fastActivationThreshold) >
+                    row.activationAdjustedScore(baseScore: row.parScore, activationSteps: row.overBudgetActivationThreshold + 1)
+            }
+    }
+
+    private static func activationRow(
+        battleID: UnifiedGuderianBattleID,
+        title: String,
+        source: GuderianOrderDiceActivationScoringSource,
+        targetTurnRange: ClosedRange<Int>,
+        targetActivationRange: ClosedRange<Int>,
+        maxScore: Int,
+        persistenceKey: String,
+        emphasis: String
+    ) -> GuderianOrderDiceActivationScoringRow {
+        let bonus = max(1, maxScore / 6)
+        let penalty = max(1, maxScore / 8)
+        let par = max(1, maxScore - bonus)
+        return GuderianOrderDiceActivationScoringRow(
+            id: "\(battleID.rawValue)-activation-aware-scoring",
+            battleID: battleID,
+            title: title,
+            source: source,
+            targetTurnRange: targetTurnRange,
+            targetActivationRange: targetActivationRange,
+            maxScore: maxScore,
+            parScore: par,
+            fastActivationThreshold: targetActivationRange.lowerBound,
+            overBudgetActivationThreshold: targetActivationRange.upperBound,
+            fastActivationBonus: bonus,
+            overBudgetPenalty: penalty,
+            scoringSummary: "Activation-aware scoring uses \(targetActivationRange.lowerBound)-\(targetActivationRange.upperBound) activations for \(emphasis), with +\(bonus) fast-play pressure and -\(penalty) over-budget friction.",
+            persistenceKey: persistenceKey
+        )
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle140Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let cycle120Ready: Bool
+    public let lateCareerTuningReady: Bool
+    public let fieldActivationScoringReady: Bool
+    public let lateCareerActivationScoringReady: Bool
+    public let combinedActivationScoringReady: Bool
+    public let lateCareerTuningRows: Int
+    public let activationScoringRows: Int
+    public let missingSourceIdentifiers: [String]
+    public let blockers: [String]
+
+    public var isReadyThroughCycle140: Bool {
+        blockers.isEmpty &&
+            cycleStart == 121 &&
+            cycleEnd == 140 &&
+            cycle120Ready &&
+            lateCareerTuningReady &&
+            fieldActivationScoringReady &&
+            lateCareerActivationScoringReady &&
+            combinedActivationScoringReady &&
+            lateCareerTuningRows == 16 &&
+            activationScoringRows == 35 &&
+            missingSourceIdentifiers.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle140AcceptanceCatalog {
+    public static let cycleRange = 121...140
+    public static let requiredSourceIdentifiers = [
+        "late-career-order-dice-tuning",
+        "activation-aware-score-panel",
+        "order-dice-score-pacing-tuning",
+    ]
+
+    public static func report(
+        cycle80And100SourceText: String,
+        guderianTestSourceText: String,
+        battleSourceText: String
+    ) -> GuderianOrderDiceMigrationCycle140Report {
+        let cycle120Ready = GuderianOrderDiceMigrationCycle120AcceptanceCatalog.acceptanceReadyThroughCycle120(
+            cycle80And100SourceText: cycle80And100SourceText,
+            guderianTestSourceText: guderianTestSourceText
+        )
+        let missingIdentifiers = requiredSourceIdentifiers.filter { !battleSourceText.contains($0) }
+        var blockers: [String] = []
+        if !cycle120Ready {
+            blockers.append("Cycle 101-120 activation harness and field-command tuning gates are not ready.")
+        }
+        if !GuderianOrderDiceLateCareerTuningCatalog.acceptanceReadyThroughCycle125 {
+            blockers.append("Cycle 121-125 late-career order-dice tuning is incomplete.")
+        }
+        if !GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle130 {
+            blockers.append("Cycle 126-130 field-command activation-aware scoring is incomplete.")
+        }
+        if !GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle135 {
+            blockers.append("Cycle 131-135 late-career activation-aware scoring is incomplete.")
+        }
+        if !GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle140 {
+            blockers.append("Cycle 136-140 combined activation-aware scoring acceptance is incomplete.")
+        }
+        if !missingIdentifiers.isEmpty {
+            blockers.append("Cycle 121-140 UI/source identifiers are missing: \(missingIdentifiers.joined(separator: ", ")).")
+        }
+
+        return GuderianOrderDiceMigrationCycle140Report(
+            cycleStart: 121,
+            cycleEnd: 140,
+            cycle120Ready: cycle120Ready,
+            lateCareerTuningReady: GuderianOrderDiceLateCareerTuningCatalog.acceptanceReadyThroughCycle125,
+            fieldActivationScoringReady: GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle130,
+            lateCareerActivationScoringReady: GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle135,
+            combinedActivationScoringReady: GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle140,
+            lateCareerTuningRows: GuderianOrderDiceLateCareerTuningCatalog.allRows.count,
+            activationScoringRows: GuderianOrderDiceActivationScoringCatalog.allRows.count,
+            missingSourceIdentifiers: missingIdentifiers,
+            blockers: blockers
+        )
+    }
+
+    public static func acceptanceReadyThroughCycle140(
+        cycle80And100SourceText: String,
+        guderianTestSourceText: String,
+        battleSourceText: String
+    ) -> Bool {
+        report(
+            cycle80And100SourceText: cycle80And100SourceText,
+            guderianTestSourceText: guderianTestSourceText,
+            battleSourceText: battleSourceText
+        ).isReadyThroughCycle140
+    }
+}
+
 public struct GuderianOrderDiceMigrationCycle80Report: Codable, Hashable, Sendable {
     public let cycleStart: Int
     public let cycleEnd: Int

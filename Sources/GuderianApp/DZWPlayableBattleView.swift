@@ -1166,6 +1166,14 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     func scenarioTuningState() -> GuderianOrderDiceScenarioTuningRow? {
         GuderianOrderDiceFieldScenarioTuningCatalog.row(for: source.battleID)
     }
+
+    func lateCareerTuningState() -> GuderianOrderDiceLateCareerTuningRow? {
+        GuderianOrderDiceLateCareerTuningCatalog.row(for: source.battleID)
+    }
+
+    func activationScoringState() -> GuderianOrderDiceActivationScoringRow? {
+        GuderianOrderDiceActivationScoringCatalog.row(for: source.battleID)
+    }
 }
 
 private enum DZWPlayableBattlePanel: String, CaseIterable, Identifiable {
@@ -2297,10 +2305,39 @@ private struct DZWPlayableBattlePanelWindow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("order-dice-combat-tuning")
+            } else if let row = model.lateCareerTuningState() {
+                Text("\(row.set.rawValue) | \(row.scope.rawValue)")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("late-career-order-dice-tuning")
+                Text("Turns \(row.targetTurnRange.lowerBound)-\(row.targetTurnRange.upperBound) | Activations \(row.targetActivationRange.lowerBound)-\(row.targetActivationRange.upperBound)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-activation-tuning")
+                Text(row.caveatTuning)
+                    .font(.caption)
+                    .accessibilityIdentifier("order-dice-command-caveat-tuning")
+                Text(row.movementTuning)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-movement-tuning")
+                Text(row.combatTuning)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-combat-tuning")
             } else {
                 Text("Late-career tuning enters in cycles 121-125.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            if let scoring = model.activationScoringState() {
+                Divider()
+                Text("Score Pacing")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("activation-aware-score-panel")
+                Text(scoring.scoringSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-score-pacing-tuning")
             }
         }
         .padding(10)

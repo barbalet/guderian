@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-120")
+@Suite("Guderian order-dice migration cycles 1-140")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -349,6 +349,43 @@ struct GuderianOrderDiceMigrationTests {
         #expect(moscow.emphases.contains(.winterMovement))
         #expect(moscow.emphases.contains(.t34KVArmour))
         #expect(acceptance.isReadyThroughCycle120)
+        #expect(acceptance.missingSourceIdentifiers.isEmpty)
+        #expect(acceptance.blockers.isEmpty)
+    }
+
+    @Test("Cycles 121-140 expose late-career tuning and activation-aware scoring")
+    func lateCareerTuningAndActivationAwareScoringAreReady() throws {
+        let battleSource = try String(contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift", encoding: .utf8)
+        let guderianTestSource = try String(contentsOfFile: "Sources/GuderianTest/GuderianTestApp.swift", encoding: .utf8)
+        let lateRows = GuderianOrderDiceLateCareerTuningCatalog.allRows
+        let scoreRows = GuderianOrderDiceActivationScoringCatalog.allRows
+        let setARow = try #require(GuderianOrderDiceLateCareerTuningCatalog.row(for: .lateCareer(LateCareerStaffBattlefieldSetACatalog.battlefieldIDs[0])))
+        let setDRow = try #require(GuderianOrderDiceLateCareerTuningCatalog.row(for: .lateCareer(LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs[0])))
+        let fieldScore = try #require(GuderianOrderDiceActivationScoringCatalog.row(for: .fieldCommand(.tucholaForest)))
+        let lateScore = try #require(GuderianOrderDiceActivationScoringCatalog.row(for: .lateCareer(LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs[0])))
+        let acceptance = GuderianOrderDiceMigrationCycle140AcceptanceCatalog.report(
+            cycle80And100SourceText: battleSource,
+            guderianTestSourceText: guderianTestSource,
+            battleSourceText: battleSource
+        )
+
+        #expect(GuderianOrderDiceLateCareerTuningCatalog.acceptanceReadyThroughCycle125)
+        #expect(lateRows.count == 16)
+        #expect(lateRows.allSatisfy { $0.isReady })
+        #expect(setARow.emphases.contains(.staffInfluence))
+        #expect(setARow.emphases.contains(.armoredForcePressure))
+        #expect(setDRow.emphases.contains(.finalWarCompression))
+        #expect(setDRow.emphases.contains(.epilogueContext))
+        #expect(GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle130)
+        #expect(GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle135)
+        #expect(GuderianOrderDiceActivationScoringCatalog.acceptanceReadyThroughCycle140)
+        #expect(scoreRows.count == 35)
+        #expect(fieldScore.source == .fieldCommand)
+        #expect(lateScore.source == .lateCareer)
+        #expect(fieldScore.activationAdjustedScore(baseScore: fieldScore.parScore, activationSteps: fieldScore.fastActivationThreshold) >
+            fieldScore.activationAdjustedScore(baseScore: fieldScore.parScore, activationSteps: fieldScore.overBudgetActivationThreshold + 1))
+        #expect(lateScore.scoringSummary.localizedCaseInsensitiveContains("activation"))
+        #expect(acceptance.isReadyThroughCycle140)
         #expect(acceptance.missingSourceIdentifiers.isEmpty)
         #expect(acceptance.blockers.isEmpty)
     }
