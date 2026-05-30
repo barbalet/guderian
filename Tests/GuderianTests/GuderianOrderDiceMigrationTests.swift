@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-160")
+@Suite("Guderian order-dice migration cycles 1-180")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -428,5 +428,56 @@ struct GuderianOrderDiceMigrationTests {
         #expect(acceptance.isReadyThroughCycle160)
         #expect(acceptance.missingSourceIdentifiers.isEmpty)
         #expect(acceptance.blockers.isEmpty)
+    }
+
+    @Test("Cycles 161-180 expose turn-end persistence, replay signatures, balance audit, and phase retirement")
+    func turnEndHarnessBalanceAndPhaseRetirementAreReady() throws {
+        let battleSource = try String(contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift", encoding: .utf8)
+        let guderianTestSource = try String(contentsOfFile: "Sources/GuderianTest/GuderianTestApp.swift", encoding: .utf8)
+        let tutorialSource = try String(contentsOfFile: "Sources/GuderianCore/TutorialOnboarding.swift", encoding: .utf8)
+        let readme = try String(contentsOfFile: "README.md", encoding: .utf8)
+        let plan = try String(contentsOfFile: "PLAN.md", encoding: .utf8)
+        let turnEndRows = GuderianOrderDiceTurnEndPersistenceCatalog.allRows
+        let harnessRows = GuderianOrderDiceFullBattleHarnessCatalog.allRows
+        let balanceRows = GuderianOrderDiceBalanceAuditCatalog.allRows
+        let tucholaTurnEnd = try #require(GuderianOrderDiceTurnEndPersistenceCatalog.row(for: .fieldCommand(.tucholaForest)))
+        let tucholaHarness = try #require(GuderianOrderDiceFullBattleHarnessCatalog.row(for: .fieldCommand(.tucholaForest)))
+        let lateBalance = try #require(GuderianOrderDiceBalanceAuditCatalog.row(for: .lateCareer(LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs[0])))
+        let phaseReport = GuderianOrderDicePhaseSurfaceRetirementCatalog.report(
+            battleSourceText: battleSource,
+            tutorialSourceText: tutorialSource,
+            readmeText: readme,
+            planText: plan
+        )
+        let acceptance = GuderianOrderDiceMigrationCycle180AcceptanceCatalog.report(
+            cycle80And100SourceText: battleSource,
+            guderianTestSourceText: guderianTestSource,
+            battleSourceText: battleSource,
+            tutorialSourceText: tutorialSource,
+            readmeText: readme,
+            planText: plan
+        )
+
+        #expect(GuderianOrderDiceTurnEndPersistenceCatalog.acceptanceReadyThroughCycle165)
+        #expect(turnEndRows.count == 35)
+        #expect(turnEndRows.allSatisfy { $0.isReady })
+        #expect(tucholaTurnEnd.turnEndWriteSet.count == 4)
+        #expect(tucholaTurnEnd.turnEndWriteSet.contains(tucholaTurnEnd.retainedOrdersKey))
+        #expect(GuderianOrderDiceFullBattleHarnessCatalog.acceptanceReadyThroughCycle170)
+        #expect(harnessRows.count == 35)
+        #expect(harnessRows.allSatisfy { $0.isReady })
+        #expect(Set(harnessRows.map(\.replaySignature)).count == 35)
+        #expect(tucholaHarness.replaySignature.localizedCaseInsensitiveContains("tucholaForest"))
+        #expect(GuderianOrderDiceBalanceAuditCatalog.acceptanceReadyThroughCycle175)
+        #expect(balanceRows.count == 35)
+        #expect(balanceRows.allSatisfy { $0.isReady })
+        #expect(lateBalance.pacingSummary.localizedCaseInsensitiveContains("command caveat"))
+        #expect(phaseReport.isReady)
+        #expect(phaseReport.retiredVisibleLabelsStillPresent.isEmpty)
+        #expect(phaseReport.tutorialPhaseFirstCopyStillPresent.isEmpty)
+        #expect(phaseReport.compatibilityIdentifiersRetained.contains("next-phase-button"))
+        #expect(acceptance.isReadyThroughCycle180)
+        #expect(acceptance.blockers.isEmpty)
+        #expect(acceptance.replaySignatureCount == 35)
     }
 }

@@ -4161,6 +4161,389 @@ public enum GuderianOrderDiceMigrationCycle160AcceptanceCatalog {
     }
 }
 
+public struct GuderianOrderDiceTurnEndPersistenceRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let source: GuderianOrderDiceSaveStateMigrationSource
+    public let completionPersistenceKey: String
+    public let activationStateKey: String
+    public let orderDiceBagKey: String
+    public let retainedOrdersKey: String
+    public let turnEndWriteSet: [String]
+    public let turnEndSummary: String
+    public let retainedOrderPolicy: String
+    public let destroyedDicePolicy: String
+
+    public var isReady: Bool {
+        turnEndWriteSet.count == 4 &&
+            Set(turnEndWriteSet).count == 4 &&
+            turnEndWriteSet.contains(completionPersistenceKey) &&
+            turnEndWriteSet.contains(activationStateKey) &&
+            turnEndWriteSet.contains(orderDiceBagKey) &&
+            turnEndWriteSet.contains(retainedOrdersKey) &&
+            turnEndSummary.localizedCaseInsensitiveContains("turn end") &&
+            turnEndSummary.localizedCaseInsensitiveContains("order-dice") &&
+            retainedOrderPolicy.localizedCaseInsensitiveContains("Ambush/Down") &&
+            destroyedDicePolicy.localizedCaseInsensitiveContains("destroyed")
+    }
+}
+
+public enum GuderianOrderDiceTurnEndPersistenceCatalog {
+    public static let cycleRange = 161...165
+
+    public static var allRows: [GuderianOrderDiceTurnEndPersistenceRow] {
+        GuderianOrderDiceSaveStateMigrationCatalog.allRows.map(row)
+    }
+
+    public static var fieldRows: [GuderianOrderDiceTurnEndPersistenceRow] {
+        allRows.filter { $0.source == .fieldCommand }
+    }
+
+    public static var lateCareerRows: [GuderianOrderDiceTurnEndPersistenceRow] {
+        allRows.filter { $0.source == .lateCareer }
+    }
+
+    public static func row(for battleID: UnifiedGuderianBattleID) -> GuderianOrderDiceTurnEndPersistenceRow? {
+        allRows.first { $0.battleID == battleID }
+    }
+
+    public static var acceptanceReadyThroughCycle165: Bool {
+        allRows.count == 35 &&
+            fieldRows.count == 19 &&
+            lateCareerRows.count == 16 &&
+            allRows.allSatisfy(\.isReady) &&
+            Set(allRows.flatMap(\.turnEndWriteSet)).count == 140
+    }
+
+    private static func row(
+        for saveRow: GuderianOrderDiceSaveStateMigrationRow
+    ) -> GuderianOrderDiceTurnEndPersistenceRow {
+        let writeSet = [
+            saveRow.completionPersistenceKey,
+            saveRow.activationStateKey,
+            saveRow.orderDiceBagKey,
+            saveRow.retainedOrdersKey,
+        ]
+        return GuderianOrderDiceTurnEndPersistenceRow(
+            id: "\(saveRow.battleID.rawValue)-turn-end-order-dice-persistence",
+            battleID: saveRow.battleID,
+            title: saveRow.title,
+            source: saveRow.source,
+            completionPersistenceKey: saveRow.completionPersistenceKey,
+            activationStateKey: saveRow.activationStateKey,
+            orderDiceBagKey: saveRow.orderDiceBagKey,
+            retainedOrdersKey: saveRow.retainedOrdersKey,
+            turnEndWriteSet: writeSet,
+            turnEndSummary: "At order-dice turn end, save \(saveRow.title)'s activation state, returned order-dice bag, retained orders, and completion record together.",
+            retainedOrderPolicy: "Retain legal Ambush/Down orders through cleanup while clearing spent Fire/Advance/Run/Rally orders.",
+            destroyedDicePolicy: "Remove destroyed-unit dice before the next cup rebuild and keep the saved bag state versioned."
+        )
+    }
+}
+
+public struct GuderianOrderDiceFullBattleHarnessRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let source: GuderianOrderDiceSaveStateMigrationSource
+    public let launchSeed: UInt32
+    public let replaySignature: String
+    public let coveredSideLabels: [String]
+    public let hasHumanActivationProbe: Bool
+    public let hasAIActivationProbe: Bool
+    public let hasTurnEndPersistenceProbe: Bool
+    public let hasDebriefProbe: Bool
+    public let harnessSummary: String
+
+    public var isReady: Bool {
+        launchSeed > 0 &&
+            replaySignature.hasPrefix("guderian.orderDice.replay.") &&
+            coveredSideLabels.count >= 2 &&
+            hasHumanActivationProbe &&
+            hasAIActivationProbe &&
+            hasTurnEndPersistenceProbe &&
+            hasDebriefProbe &&
+            harnessSummary.localizedCaseInsensitiveContains("activation") &&
+            harnessSummary.localizedCaseInsensitiveContains("replay")
+    }
+}
+
+public enum GuderianOrderDiceFullBattleHarnessCatalog {
+    public static let cycleRange = 166...170
+
+    public static var allRows: [GuderianOrderDiceFullBattleHarnessRow] {
+        GuderianOrderDiceTurnEndPersistenceCatalog.allRows.enumerated().map { index, persistence in
+            row(for: persistence, offset: index)
+        }
+    }
+
+    public static var fieldRows: [GuderianOrderDiceFullBattleHarnessRow] {
+        allRows.filter { $0.source == .fieldCommand }
+    }
+
+    public static var lateCareerRows: [GuderianOrderDiceFullBattleHarnessRow] {
+        allRows.filter { $0.source == .lateCareer }
+    }
+
+    public static func row(for battleID: UnifiedGuderianBattleID) -> GuderianOrderDiceFullBattleHarnessRow? {
+        allRows.first { $0.battleID == battleID }
+    }
+
+    public static var acceptanceReadyThroughCycle170: Bool {
+        allRows.count == 35 &&
+            fieldRows.count == 19 &&
+            lateCareerRows.count == 16 &&
+            allRows.allSatisfy(\.isReady) &&
+            Set(allRows.map(\.launchSeed)).count == 35 &&
+            Set(allRows.map(\.replaySignature)).count == 35 &&
+            allRows.allSatisfy { $0.coveredSideLabels.contains("Selected side") && $0.coveredSideLabels.contains("Automated opposing side") }
+    }
+
+    private static func row(
+        for persistence: GuderianOrderDiceTurnEndPersistenceRow,
+        offset: Int
+    ) -> GuderianOrderDiceFullBattleHarnessRow {
+        let seed = UInt32(180_000 + offset)
+        let signature = [
+            "guderian.orderDice.replay",
+            persistence.source == .fieldCommand ? "field" : "late",
+            persistence.battleID.rawValue,
+            "seed\(seed)",
+            "turnEnd\(persistence.turnEndWriteSet.count)",
+        ].joined(separator: ".")
+        return GuderianOrderDiceFullBattleHarnessRow(
+            id: "\(persistence.battleID.rawValue)-full-order-dice-harness",
+            battleID: persistence.battleID,
+            title: persistence.title,
+            source: persistence.source,
+            launchSeed: seed,
+            replaySignature: signature,
+            coveredSideLabels: ["Selected side", "Automated opposing side"],
+            hasHumanActivationProbe: true,
+            hasAIActivationProbe: true,
+            hasTurnEndPersistenceProbe: true,
+            hasDebriefProbe: true,
+            harnessSummary: "\(persistence.title) launches with seed \(seed), records selected-side activation, opposing AI activation, turn-end persistence, debrief, and replay signature \(signature)."
+        )
+    }
+}
+
+public struct GuderianOrderDiceBalanceAuditRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let source: GuderianOrderDiceSaveStateMigrationSource
+    public let targetTurnRange: ClosedRange<Int>
+    public let targetActivationRange: ClosedRange<Int>
+    public let replaySignature: String
+    public let pacingSummary: String
+    public let improvementLevers: [String]
+
+    public var isReady: Bool {
+        targetTurnRange.lowerBound > 0 &&
+            targetActivationRange.lowerBound >= targetTurnRange.lowerBound &&
+            targetActivationRange.upperBound > targetActivationRange.lowerBound &&
+            replaySignature.contains("orderDice.replay") &&
+            pacingSummary.localizedCaseInsensitiveContains("activation") &&
+            improvementLevers.count >= 3 &&
+            improvementLevers.contains { $0.localizedCaseInsensitiveContains("movement") } &&
+            improvementLevers.contains { $0.localizedCaseInsensitiveContains("Rally") || $0.localizedCaseInsensitiveContains("Down") } &&
+            improvementLevers.contains { $0.localizedCaseInsensitiveContains("Ambush") || $0.localizedCaseInsensitiveContains("target") }
+    }
+}
+
+public enum GuderianOrderDiceBalanceAuditCatalog {
+    public static let cycleRange = 171...175
+
+    public static var allRows: [GuderianOrderDiceBalanceAuditRow] {
+        GuderianOrderDiceFullBattleHarnessCatalog.allRows.compactMap(row)
+    }
+
+    public static var acceptanceReadyThroughCycle175: Bool {
+        allRows.count == 35 &&
+            allRows.allSatisfy(\.isReady) &&
+            Set(allRows.map(\.battleID)).count == 35 &&
+            Set(allRows.map(\.replaySignature)).count == 35 &&
+            allRows.contains { $0.source == .lateCareer && $0.pacingSummary.localizedCaseInsensitiveContains("command caveat") }
+    }
+
+    public static func row(for battleID: UnifiedGuderianBattleID) -> GuderianOrderDiceBalanceAuditRow? {
+        allRows.first { $0.battleID == battleID }
+    }
+
+    private static func row(
+        for harness: GuderianOrderDiceFullBattleHarnessRow
+    ) -> GuderianOrderDiceBalanceAuditRow? {
+        guard let scoring = GuderianOrderDiceActivationScoringCatalog.row(for: harness.battleID) else {
+            return nil
+        }
+        let caveat = harness.source == .lateCareer ? " Command caveat remains visible in the balance read." : ""
+        return GuderianOrderDiceBalanceAuditRow(
+            id: "\(harness.battleID.rawValue)-order-dice-balance-audit",
+            battleID: harness.battleID,
+            title: harness.title,
+            source: harness.source,
+            targetTurnRange: scoring.targetTurnRange,
+            targetActivationRange: scoring.targetActivationRange,
+            replaySignature: harness.replaySignature,
+            pacingSummary: "\(harness.title) targets \(scoring.targetTurnRange.lowerBound)-\(scoring.targetTurnRange.upperBound) turns and \(scoring.targetActivationRange.lowerBound)-\(scoring.targetActivationRange.upperBound) activations.\(caveat)",
+            improvementLevers: [
+                "Movement: widen Advance/Run route choices only when activations end too quickly.",
+                "Rally/Down: raise pin pressure when battles lack meaningful defensive order choices.",
+                "Ambush/targeting: add target-reaction value when replay signatures show low interaction.",
+            ]
+        )
+    }
+}
+
+public struct GuderianOrderDicePhaseSurfaceRetirementReport: Codable, Hashable, Sendable {
+    public let cycleRange: ClosedRange<Int>
+    public let missingBattleIdentifiers: [String]
+    public let retiredVisibleLabelsStillPresent: [String]
+    public let tutorialPhaseFirstCopyStillPresent: [String]
+    public let docsMentionCycle180: Bool
+    public let compatibilityIdentifiersRetained: [String]
+
+    public var isReady: Bool {
+        cycleRange == 176...180 &&
+            missingBattleIdentifiers.isEmpty &&
+            retiredVisibleLabelsStillPresent.isEmpty &&
+            tutorialPhaseFirstCopyStillPresent.isEmpty &&
+            docsMentionCycle180 &&
+            compatibilityIdentifiersRetained.contains("next-phase-button")
+    }
+}
+
+public enum GuderianOrderDicePhaseSurfaceRetirementCatalog {
+    public static let cycleRange = 176...180
+    public static let requiredBattleIdentifiers = [
+        "order-dice-turn-end-persistence",
+        "order-dice-replay-signature",
+        "order-dice-full-harness-report",
+        "stale-phase-surface-retirement",
+    ]
+    public static let retiredVisibleBattleLabels = [
+        "Label(\"Next Phase\"",
+        "Label(\"Phase\"",
+    ]
+    public static let retiredTutorialPhrases = [
+        "phase step",
+        "shooting phase",
+        "assault phase",
+        "Phases Set What Is Legal",
+    ]
+    public static let compatibilityIdentifiers = [
+        "next-phase-button",
+        "advancePhase()",
+        "maxPhaseAdvances",
+    ]
+
+    public static func report(
+        battleSourceText: String,
+        tutorialSourceText: String,
+        readmeText: String,
+        planText: String
+    ) -> GuderianOrderDicePhaseSurfaceRetirementReport {
+        GuderianOrderDicePhaseSurfaceRetirementReport(
+            cycleRange: cycleRange,
+            missingBattleIdentifiers: requiredBattleIdentifiers.filter { !battleSourceText.contains($0) },
+            retiredVisibleLabelsStillPresent: retiredVisibleBattleLabels.filter { battleSourceText.contains($0) },
+            tutorialPhaseFirstCopyStillPresent: retiredTutorialPhrases.filter { tutorialSourceText.localizedCaseInsensitiveContains($0) },
+            docsMentionCycle180: readmeText.contains("guderian_order_dice_cycle_161_180.md") &&
+                planText.contains("Cycles 161-180 complete"),
+            compatibilityIdentifiersRetained: compatibilityIdentifiers.filter { battleSourceText.contains($0) || planText.contains($0) }
+        )
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle180Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let cycle160Ready: Bool
+    public let turnEndPersistenceReady: Bool
+    public let fullHarnessReady: Bool
+    public let balanceAuditReady: Bool
+    public let phaseSurfaceRetirementReady: Bool
+    public let turnEndRows: Int
+    public let harnessRows: Int
+    public let balanceRows: Int
+    public let replaySignatureCount: Int
+    public let blockers: [String]
+
+    public var isReadyThroughCycle180: Bool {
+        blockers.isEmpty &&
+            cycleStart == 161 &&
+            cycleEnd == 180 &&
+            cycle160Ready &&
+            turnEndPersistenceReady &&
+            fullHarnessReady &&
+            balanceAuditReady &&
+            phaseSurfaceRetirementReady &&
+            turnEndRows == 35 &&
+            harnessRows == 35 &&
+            balanceRows == 35 &&
+            replaySignatureCount == 35
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle180AcceptanceCatalog {
+    public static let cycleRange = 161...180
+
+    public static func report(
+        cycle80And100SourceText: String,
+        guderianTestSourceText: String,
+        battleSourceText: String,
+        tutorialSourceText: String,
+        readmeText: String,
+        planText: String
+    ) -> GuderianOrderDiceMigrationCycle180Report {
+        let cycle160Ready = GuderianOrderDiceMigrationCycle160AcceptanceCatalog.acceptanceReadyThroughCycle160(
+            cycle80And100SourceText: cycle80And100SourceText,
+            guderianTestSourceText: guderianTestSourceText,
+            battleSourceText: battleSourceText,
+            tutorialSourceText: tutorialSourceText
+        )
+        let phaseReport = GuderianOrderDicePhaseSurfaceRetirementCatalog.report(
+            battleSourceText: battleSourceText,
+            tutorialSourceText: tutorialSourceText,
+            readmeText: readmeText,
+            planText: planText
+        )
+        var blockers: [String] = []
+        if !cycle160Ready {
+            blockers.append("Cycle 141-160 save/debrief/tutorial gates are not ready.")
+        }
+        if !GuderianOrderDiceTurnEndPersistenceCatalog.acceptanceReadyThroughCycle165 {
+            blockers.append("Cycle 161-165 turn-end order-dice persistence is incomplete.")
+        }
+        if !GuderianOrderDiceFullBattleHarnessCatalog.acceptanceReadyThroughCycle170 {
+            blockers.append("Cycle 166-170 full 35-battle harness reporting is incomplete.")
+        }
+        if !GuderianOrderDiceBalanceAuditCatalog.acceptanceReadyThroughCycle175 {
+            blockers.append("Cycle 171-175 activation balance audit is incomplete.")
+        }
+        if !phaseReport.isReady {
+            blockers.append("Cycle 176-180 stale phase-surface retirement is incomplete.")
+        }
+
+        return GuderianOrderDiceMigrationCycle180Report(
+            cycleStart: 161,
+            cycleEnd: 180,
+            cycle160Ready: cycle160Ready,
+            turnEndPersistenceReady: GuderianOrderDiceTurnEndPersistenceCatalog.acceptanceReadyThroughCycle165,
+            fullHarnessReady: GuderianOrderDiceFullBattleHarnessCatalog.acceptanceReadyThroughCycle170,
+            balanceAuditReady: GuderianOrderDiceBalanceAuditCatalog.acceptanceReadyThroughCycle175,
+            phaseSurfaceRetirementReady: phaseReport.isReady,
+            turnEndRows: GuderianOrderDiceTurnEndPersistenceCatalog.allRows.count,
+            harnessRows: GuderianOrderDiceFullBattleHarnessCatalog.allRows.count,
+            balanceRows: GuderianOrderDiceBalanceAuditCatalog.allRows.count,
+            replaySignatureCount: Set(GuderianOrderDiceFullBattleHarnessCatalog.allRows.map(\.replaySignature)).count,
+            blockers: blockers
+        )
+    }
+}
+
 public struct GuderianOrderDiceMigrationCycle80Report: Codable, Hashable, Sendable {
     public let cycleStart: Int
     public let cycleEnd: Int

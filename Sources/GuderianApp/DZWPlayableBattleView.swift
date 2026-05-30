@@ -1182,6 +1182,18 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     func orderDiceDebriefCopyState() -> GuderianOrderDiceDebriefCopyRow? {
         GuderianOrderDiceDebriefCopyCatalog.row(for: source.battleID)
     }
+
+    func orderDiceTurnEndPersistenceState() -> GuderianOrderDiceTurnEndPersistenceRow? {
+        GuderianOrderDiceTurnEndPersistenceCatalog.row(for: source.battleID)
+    }
+
+    func orderDiceFullHarnessState() -> GuderianOrderDiceFullBattleHarnessRow? {
+        GuderianOrderDiceFullBattleHarnessCatalog.row(for: source.battleID)
+    }
+
+    func orderDiceBalanceAuditState() -> GuderianOrderDiceBalanceAuditRow? {
+        GuderianOrderDiceBalanceAuditCatalog.row(for: source.battleID)
+    }
 }
 
 private enum DZWPlayableBattlePanel: String, CaseIterable, Identifiable {
@@ -1849,7 +1861,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     markButtonCoachUsed(.nextPhase)
                     model.advancePhase()
                 } label: {
-                    Label("Next Phase", systemImage: "forward.end.fill")
+                    Label("Next Window", systemImage: "forward.end.fill")
                 }
                 .disabled(!model.canIssueHumanOrders)
                 .accessibilityIdentifier("next-phase-button")
@@ -2368,6 +2380,43 @@ private struct DZWPlayableBattlePanelWindow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(debriefCopy.persistenceSummary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if let turnEnd = model.orderDiceTurnEndPersistenceState() {
+                Divider()
+                Text("Turn End")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("order-dice-turn-end-persistence")
+                Text(turnEnd.turnEndSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(turnEnd.retainedOrderPolicy)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if let harness = model.orderDiceFullHarnessState() {
+                Divider()
+                Text("Replay")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("order-dice-replay-signature")
+                Text(harness.replaySignature)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                Text(harness.harnessSummary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-full-harness-report")
+            }
+            if let audit = model.orderDiceBalanceAuditState() {
+                Divider()
+                Text("Phase Retirement")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("stale-phase-surface-retirement")
+                Text(audit.pacingSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(audit.improvementLevers.joined(separator: " "))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -3254,7 +3303,7 @@ public struct DZWPlayableBattleView: View {
                     markButtonCoachUsed(.nextPhase)
                     model.advancePhase()
                 } label: {
-                    Label("Next Phase", systemImage: "forward.end.fill")
+                    Label("Next Window", systemImage: "forward.end.fill")
                 }
                 .disabled(!model.canIssueHumanOrders)
                 .accessibilityIdentifier("next-phase-button")
