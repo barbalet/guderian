@@ -612,20 +612,25 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         let before = "\(snapshot.activePlayer.rawValue) \(snapshot.phase.rawValue)"
         dzwPlayableLog.info("Automated active step started state=\(before, privacy: .public) turn=\(snapshot.turnNumber, privacy: .public)")
         let actionSucceeded: Bool
-        switch snapshot.phase {
-        case .movement:
-            let priorities = source.aiTargetPriorities(for: snapshot.activePlayer, phase: snapshot.phase)
-            if !priorities.isEmpty {
-                let distance = snapshot.activePlayer == .guderianAI ? 6.0 : 5.0
-                actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: distance) ?? false
-            } else {
-                actionSucceeded = session?.moveSelectedUnitTowardNearestObjective(maxDistance: 4) ?? false
+        if snapshot.activePlayer == .guderianAI,
+           let decision = guderianAIDecisionState(for: snapshot) {
+            actionSucceeded = runGuderianOrderDiceActivation(decision: decision, snapshot: snapshot)
+        } else {
+            switch snapshot.phase {
+            case .movement:
+                let priorities = source.aiTargetPriorities(for: snapshot.activePlayer, phase: snapshot.phase)
+                if !priorities.isEmpty {
+                    let distance = snapshot.activePlayer == .guderianAI ? 6.0 : 5.0
+                    actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: distance) ?? false
+                } else {
+                    actionSucceeded = session?.moveSelectedUnitTowardNearestObjective(maxDistance: 4) ?? false
+                }
+            case .shooting:
+                session?.selectNearestEnemyToSelectedUnit()
+                actionSucceeded = session?.shootSelectedTarget() ?? false
+            case .assault:
+                actionSucceeded = session?.resolveFirstPendingChoice() ?? false
             }
-        case .shooting:
-            session?.selectNearestEnemyToSelectedUnit()
-            actionSucceeded = session?.shootSelectedTarget() ?? false
-        case .assault:
-            actionSucceeded = session?.resolveFirstPendingChoice() ?? false
         }
         let actionDetail = session?.snapshot().lastAction.detail ?? "No action resolved."
         if !actionSucceeded {
@@ -634,6 +639,41 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         session?.advancePhase()
         refresh()
         recordAIEvent("\(before): \(actionDetail)")
+    }
+
+    private func runGuderianOrderDiceActivation(
+        decision: GuderianOrderDiceAIDecisionState,
+        snapshot: NativeBoardSnapshot
+    ) -> Bool {
+        session?.selectUnit(decision.chosenUnitID)
+        session?.selectNearestEnemyToSelectedUnit()
+        let orderIssued = session?.issueOrder(decision.chosenOrder, to: decision.chosenUnitID) ?? false
+        let priorities = source.aiTargetPriorities(for: .guderianAI, phase: snapshot.phase)
+        let actionSucceeded: Bool
+        switch decision.chosenOrder {
+        case .advance:
+            actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: 6) ??
+                session?.moveSelectedUnitTowardNearestObjective(maxDistance: 6) ?? false
+        case .run:
+            if snapshot.phase == .assault {
+                session?.selectNearestEnemyToSelectedUnit()
+                if let targetID = session?.snapshot().selectedTarget?.id {
+                    actionSucceeded = session?.assaultUnit(decision.chosenUnitID, targetID: targetID, advance: true) ?? false
+                } else {
+                    actionSucceeded = false
+                }
+            } else {
+                actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: 9) ??
+                    session?.moveSelectedUnitTowardNearestObjective(maxDistance: 9) ?? false
+            }
+        case .fire:
+            session?.selectNearestEnemyToSelectedUnit()
+            actionSucceeded = session?.shootSelectedTarget() ?? false
+        case .ambush, .rally, .down:
+            actionSucceeded = orderIssued
+        }
+        recordAIEvent("Order-dice AI chose \(decision.chosenUnitName): \(decision.chosenOrder.rawValue) toward \(decision.objectiveOrTargetName).")
+        return orderIssued || actionSucceeded
     }
 
     func runGermanTurn() {
@@ -1023,6 +1063,26 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     func movementPreviewState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceMovementPreviewState? {
         GuderianOrderDiceMovementPreviewPresenter.state(snapshot: snapshot, battleID: source.battleID)
+    }
+
+    func shootingState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceShootingState? {
+        GuderianOrderDiceShootingPresenter.state(snapshot: snapshot)
+    }
+
+    func vehicleState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceVehicleState? {
+        GuderianOrderDiceVehiclePresenter.state(snapshot: snapshot)
+    }
+
+    func closeQuartersState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceCloseQuartersState? {
+        GuderianOrderDiceCloseQuartersPresenter.state(snapshot: snapshot)
+    }
+
+    func guderianAIDecisionState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceAIDecisionState? {
+        GuderianOrderDiceGuderianAIActivationPlanner.decision(
+            snapshot: snapshot,
+            battleID: source.battleID,
+            priorityNames: source.aiTargetPriorities(for: .guderianAI, phase: snapshot.phase)
+        )
     }
 }
 
@@ -1595,6 +1655,10 @@ private struct DZWPlayableBattlePanelWindow: View {
             header(snapshot)
             orderPanelSection(snapshot)
             movementPreviewSection(snapshot)
+            shootingSection(snapshot)
+            vehicleStatusSection(snapshot)
+            closeQuartersSection(snapshot)
+            guderianAISection(snapshot)
             actionsSection(snapshot)
             resultSection(snapshot)
         case .inspector:
@@ -1947,6 +2011,146 @@ private struct DZWPlayableBattlePanelWindow: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("order-movement-preview")
+    }
+
+    private func shootingSection(_ snapshot: NativeBoardSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Shooting")
+                .font(.headline)
+            if let state = model.shootingState(for: snapshot) {
+                Text(state.fireChoiceSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("fire-shooting-choice")
+                Text(state.advanceChoiceSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("advance-shooting-choice")
+                Text(state.targetReactionSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("target-reaction-summary")
+                Text(state.hitModifierBreakdown)
+                    .font(.caption.monospaced())
+                    .accessibilityIdentifier("hit-modifier-breakdown")
+                Text(state.pinEffectSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("pin-effect-summary")
+                Text("\(state.damageSummary) \(state.moraleSummary)")
+                    .font(.caption)
+                    .accessibilityIdentifier("damage-morale-summary")
+                Text(state.battleLogSummary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("shooting-log-summary")
+            } else {
+                Text("Select a unit to inspect Fire and Advance shooting.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("order-shooting-panel")
+    }
+
+    private func vehicleStatusSection(_ snapshot: NativeBoardSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Vehicle")
+                .font(.headline)
+            if let state = model.vehicleState(for: snapshot) {
+                Text(state.armourFacingSummary)
+                    .font(.caption.monospaced())
+                    .accessibilityIdentifier("vehicle-armour-facing")
+                Text(state.penetrationModifierSummary)
+                    .font(.caption.monospaced())
+                    .accessibilityIdentifier("vehicle-penetration-modifiers")
+                Text(state.damageStateSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("vehicle-damage-state")
+                Text(state.wreckMarkerSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("vehicle-wreck-marker")
+                Text(state.downTransitionSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("vehicle-down-transition")
+            } else {
+                Text("No vehicle or assault-gun counter is visible in this battle.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("vehicle-status-panel")
+    }
+
+    private func closeQuartersSection(_ snapshot: NativeBoardSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Close Quarters")
+                .font(.headline)
+            if let state = model.closeQuartersState(for: snapshot) {
+                Text(state.runOrderAssaultSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("run-order-assault-flow")
+                Text(state.targetReactionSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("assault-target-reaction")
+                Text(state.roundResultsSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("assault-round-results")
+                Text(state.loserDestructionSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("assault-loser-destruction")
+                Text(state.regroupLogSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("assault-regroup-log")
+            } else {
+                Text("Select a unit to inspect Run-order assault flow.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("close-quarters-panel")
+    }
+
+    private func guderianAISection(_ snapshot: NativeBoardSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Guderian AI")
+                .font(.headline)
+            if let state = model.guderianAIDecisionState(for: snapshot) {
+                Text("Drawn unit: \(state.chosenUnitName)")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("ai-drawn-die-unit")
+                Text("Order: \(state.chosenOrder.rawValue)")
+                    .font(.caption)
+                    .accessibilityIdentifier("ai-order-choice")
+                Text("Target: \(state.objectiveOrTargetName)")
+                    .font(.caption)
+                    .accessibilityIdentifier("ai-objective-target")
+                Text(state.pathSummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("ai-path-summary")
+                Text(state.failedOrderTestPlan)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ai-failed-order-test-handling")
+            } else {
+                Text("No Guderian-command order-dice activation is currently available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("guderian-order-ai-panel")
     }
 
     private func orderInspectorSummary(for unit: NativeBoardUnitSnapshot) -> some View {

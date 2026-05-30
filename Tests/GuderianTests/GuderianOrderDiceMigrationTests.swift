@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-60")
+@Suite("Guderian order-dice migration cycles 1-80")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -242,6 +242,47 @@ struct GuderianOrderDiceMigrationTests {
         #expect(movementState.runMoveAllowance >= movementState.advanceMoveAllowance)
         #expect(movementState.terrainClasses.contains(.roadRunBonus))
         #expect(acceptance.isReadyThroughCycle60)
+        #expect(acceptance.missingUISourceIdentifiers.isEmpty)
+        #expect(acceptance.blockers.isEmpty)
+    }
+
+    @Test("Cycles 61-80 expose shooting, vehicle, close-quarters, and Guderian AI contracts")
+    func shootingVehicleAssaultAndGuderianAIContractsAreReady() throws {
+        let sourceText = try String(contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift", encoding: .utf8)
+        let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let session = try #require(NativeBoardSession(scenario: scenario, seed: 80_080))
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        let snapshot = session.snapshot()
+        let shooting = try #require(GuderianOrderDiceShootingPresenter.state(snapshot: snapshot))
+        let vehicle = try #require(GuderianOrderDiceVehiclePresenter.state(snapshot: snapshot))
+        let closeQuarters = try #require(GuderianOrderDiceCloseQuartersPresenter.state(snapshot: snapshot))
+        let aiDecision = try #require(GuderianOrderDiceGuderianAIActivationPlanner.decision(
+            snapshot: snapshot,
+            battleID: .fieldCommand(.tucholaForest),
+            priorityNames: ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities(for: .movement)
+        ))
+        let acceptance = GuderianOrderDiceMigrationCycle80AcceptanceCatalog.report(
+            cycle60SourceText: sourceText,
+            cycle80SourceText: sourceText
+        )
+
+        #expect(GuderianOrderDiceShootingPresenter.acceptanceReadyThroughCycle65)
+        #expect(GuderianOrderDiceVehiclePresenter.acceptanceReadyThroughCycle70)
+        #expect(GuderianOrderDiceCloseQuartersPresenter.acceptanceReadyThroughCycle75)
+        #expect(GuderianOrderDiceGuderianAIActivationPlanner.acceptanceReadyThroughCycle80)
+        #expect(shooting.isReady)
+        #expect(shooting.fireChoiceSummary.contains("Fire"))
+        #expect(shooting.advanceChoiceSummary.contains("Advance"))
+        #expect(shooting.hitModifierBreakdown.contains("Base"))
+        #expect(vehicle.isReady)
+        #expect(vehicle.armourFacingSummary.contains("F/S/R"))
+        #expect(vehicle.penetrationModifierSummary.localizedCaseInsensitiveContains("penetration"))
+        #expect(closeQuarters.isReady)
+        #expect(closeQuarters.runOrderAssaultSummary.contains("Run"))
+        #expect(aiDecision.isReady)
+        #expect(aiDecision.drawnSide == .guderianAI)
+        #expect(HistoricalBoardOrder.allCases.contains(aiDecision.chosenOrder))
+        #expect(acceptance.isReadyThroughCycle80)
         #expect(acceptance.missingUISourceIdentifiers.isEmpty)
         #expect(acceptance.blockers.isEmpty)
     }

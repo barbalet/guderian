@@ -1949,6 +1949,593 @@ public enum GuderianOrderDiceMovementPreviewPresenter {
     }
 }
 
+public struct GuderianOrderDiceShootingState: Codable, Hashable, Sendable {
+    public let unitID: Int
+    public let unitName: String
+    public let targetName: String
+    public let fireChoiceSummary: String
+    public let advanceChoiceSummary: String
+    public let targetReactionSummary: String
+    public let hitModifierBreakdown: String
+    public let pinEffectSummary: String
+    public let damageSummary: String
+    public let moraleSummary: String
+    public let battleLogSummary: String
+
+    public var isReady: Bool {
+        !unitName.isEmpty &&
+            !targetName.isEmpty &&
+            !fireChoiceSummary.isEmpty &&
+            !advanceChoiceSummary.isEmpty &&
+            !targetReactionSummary.isEmpty &&
+            !hitModifierBreakdown.isEmpty &&
+            !pinEffectSummary.isEmpty &&
+            !damageSummary.isEmpty &&
+            !moraleSummary.isEmpty &&
+            !battleLogSummary.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceShootingPresenter {
+    public static let cycleRange = 61...65
+
+    public static func state(snapshot: NativeBoardSnapshot) -> GuderianOrderDiceShootingState? {
+        guard let selected = snapshot.selectedUnit ?? snapshot.units.first(where: { !$0.destroyed }) else {
+            return nil
+        }
+        let target = selected.lastShootingTargetID.flatMap { targetID in
+            snapshot.units.first { $0.id == targetID }
+        } ?? snapshot.selectedTarget ?? nearestEnemy(to: selected, in: snapshot)
+        return GuderianOrderDiceShootingState(
+            unitID: selected.id,
+            unitName: selected.name,
+            targetName: target?.name ?? "No target selected",
+            fireChoiceSummary: orderChoiceSummary(.fire, for: selected),
+            advanceChoiceSummary: orderChoiceSummary(.advance, for: selected),
+            targetReactionSummary: targetReactionSummary(for: selected, target: target),
+            hitModifierBreakdown: hitModifierBreakdown(for: selected),
+            pinEffectSummary: pinEffectSummary(for: selected, target: target),
+            damageSummary: damageSummary(for: selected),
+            moraleSummary: moraleSummary(for: selected),
+            battleLogSummary: snapshot.lastAction.detail.isEmpty ? "No shooting result has been logged yet." : snapshot.lastAction.detail
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle65: Bool {
+        guard let scenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+              let session = NativeBoardSession(scenario: scenario, seed: 65_001) else {
+            return false
+        }
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        guard let state = state(snapshot: session.snapshot()) else {
+            return false
+        }
+        return cycleRange == 61...65 &&
+            state.isReady &&
+            state.fireChoiceSummary.contains("Fire") &&
+            state.advanceChoiceSummary.contains("Advance") &&
+            state.hitModifierBreakdown.contains("Base") &&
+            state.pinEffectSummary.localizedCaseInsensitiveContains("pin")
+    }
+
+    private static func orderChoiceSummary(_ order: HistoricalBoardOrder, for unit: NativeBoardUnitSnapshot) -> String {
+        let options = unit.availableOrders.isEmpty ? HistoricalBoardOrder.allCases : unit.availableOrders
+        let status = options.contains(order) ? "available" : "not currently available"
+        switch order {
+        case .fire:
+            return "Fire \(status): stationary shooting uses the full fire order."
+        case .advance:
+            return "Advance \(status): move then shoot with movement pressure."
+        default:
+            return "\(order.rawValue) \(status)."
+        }
+    }
+
+    private static func targetReactionSummary(
+        for unit: NativeBoardUnitSnapshot,
+        target: NativeBoardUnitSnapshot?
+    ) -> String {
+        let reaction = unit.lastShootingTargetReaction == "None" ? "No reaction recorded yet" : unit.lastShootingTargetReaction
+        return "\(target?.name ?? "Target") reaction: \(reaction). Down and Ambush reactions are surfaced here."
+    }
+
+    private static func hitModifierBreakdown(for unit: NativeBoardUnitSnapshot) -> String {
+        let modifiers = [
+            "PB \(signed(unit.lastShootingPointBlankModifier))",
+            "Pin \(signed(unit.lastShootingPinModifier))",
+            "Long \(signed(unit.lastShootingLongRangeModifier))",
+            "Inexp \(signed(unit.lastShootingInexperiencedModifier))",
+            "Move \(signed(unit.lastShootingMoveModifier))",
+            "Down \(signed(unit.lastShootingDownModifier))",
+            "Small \(signed(unit.lastShootingSmallUnitModifier))",
+            "Cover \(signed(unit.lastShootingCoverModifier))",
+        ]
+        let needed = unit.lastShootingNeededToHit > 0 ? "\(unit.lastShootingNeededToHit)+" : "pending"
+        return "Base \(unit.lastShootingBaseToHit), modifiers \(modifiers.joined(separator: ", ")), total \(signed(unit.lastShootingToHitModifier)), need \(needed)."
+    }
+
+    private static func pinEffectSummary(
+        for unit: NativeBoardUnitSnapshot,
+        target: NativeBoardUnitSnapshot?
+    ) -> String {
+        if unit.lastShootingPinsAdded > 0 {
+            return "\(unit.lastShootingPinsAdded) pin marker\(unit.lastShootingPinsAdded == 1 ? "" : "s") added to \(target?.name ?? "the target")."
+        }
+        return "No new shooting pins recorded; \(target?.name ?? "the target") currently shows \(target?.pinCount ?? 0) pin marker\(target?.pinCount == 1 ? "" : "s")."
+    }
+
+    private static func damageSummary(for unit: NativeBoardUnitSnapshot) -> String {
+        if unit.lastShootingDamageRoll > 0 {
+            let success = unit.lastShootingDamageSuccess ? "succeeded" : "failed"
+            return "Damage \(success): value \(unit.lastShootingDamageValue), penetration \(signed(unit.lastShootingPenetrationModifier)), roll \(unit.lastShootingDamageRoll), models removed \(unit.lastShootingModelsRemoved)."
+        }
+        return "No shooting damage roll resolved yet."
+    }
+
+    private static func moraleSummary(for unit: NativeBoardUnitSnapshot) -> String {
+        guard unit.lastShootingMoraleChecked else {
+            return "No shooting morale check resolved yet."
+        }
+        let result = unit.lastShootingMoraleFailed ? "failed" : "passed"
+        return "Morale \(result): roll \(unit.lastShootingMoraleRoll) vs \(unit.lastShootingMoraleTarget), pins \(signed(unit.lastShootingMoralePinModifier)), officer \(signed(unit.lastShootingMoraleOfficerModifier))."
+    }
+
+    private static func signed(_ value: Int) -> String {
+        value >= 0 ? "+\(value)" : "\(value)"
+    }
+}
+
+public struct GuderianOrderDiceVehicleState: Codable, Hashable, Sendable {
+    public let unitID: Int
+    public let unitName: String
+    public let isVehicle: Bool
+    public let armourFacingSummary: String
+    public let penetrationModifierSummary: String
+    public let damageStateSummary: String
+    public let wreckMarkerSummary: String
+    public let downTransitionSummary: String
+    public let renderingSummary: String
+
+    public var isReady: Bool {
+        isVehicle &&
+            !unitName.isEmpty &&
+            !armourFacingSummary.isEmpty &&
+            !penetrationModifierSummary.isEmpty &&
+            !damageStateSummary.isEmpty &&
+            !wreckMarkerSummary.isEmpty &&
+            !downTransitionSummary.isEmpty &&
+            !renderingSummary.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceVehiclePresenter {
+    public static let cycleRange = 66...70
+
+    public static func state(snapshot: NativeBoardSnapshot) -> GuderianOrderDiceVehicleState? {
+        let unit = vehicleCandidate(in: snapshot)
+        guard let unit else {
+            return nil
+        }
+        let isVehicle = usesVehicleRules(unit)
+        return GuderianOrderDiceVehicleState(
+            unitID: unit.id,
+            unitName: unit.name,
+            isVehicle: isVehicle,
+            armourFacingSummary: "Armour F/S/R \(unit.frontArmour)/\(unit.sideArmour)/\(unit.rearArmour), facing \(Int(unit.facingDegrees)) degrees, defensive to-hit \(signed(unit.defensiveToHitModifier)).",
+            penetrationModifierSummary: "Penetration \(signed(unit.lastShootingPenetrationModifier)), armour facing \(signed(unit.lastShootingVehicleArmourModifier)), long range \(signed(unit.lastShootingVehicleLongRangePenalty)), open-topped indirect \(signed(unit.lastShootingVehicleOpenToppedIndirectModifier)), class \(unit.lastShootingVehicleDamageClass).",
+            damageStateSummary: damageStateSummary(for: unit),
+            wreckMarkerSummary: unit.wrecked ? "Wreck marker shown\(unit.wreckBlocksMovement ? " and blocks movement" : "")." : "No wreck marker currently shown.",
+            downTransitionSummary: downTransitionSummary(for: unit),
+            renderingSummary: "Render armour traits: \(unit.fastVehicle ? "fast " : "")\(unit.reconVehicle ? "recon " : "")\(unit.openToppedVehicle ? "open-topped " : "")\(unit.smokeActive ? "smoke-active" : "smoke-ready \(unit.smokeAvailable ? "yes" : "no")")."
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle70: Bool {
+        guard let scenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+              let session = NativeBoardSession(scenario: scenario, seed: 70_001) else {
+            return false
+        }
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        guard let state = state(snapshot: session.snapshot()) else {
+            return false
+        }
+        return cycleRange == 66...70 &&
+            state.isReady &&
+            state.armourFacingSummary.contains("F/S/R") &&
+            state.penetrationModifierSummary.localizedCaseInsensitiveContains("penetration") &&
+            state.downTransitionSummary.localizedCaseInsensitiveContains("Down")
+    }
+
+    private static func vehicleCandidate(in snapshot: NativeBoardSnapshot) -> NativeBoardUnitSnapshot? {
+        if let selected = snapshot.selectedUnit, usesVehicleRules(selected) {
+            return selected
+        }
+        return snapshot.units.first(where: usesVehicleRules)
+    }
+
+    private static func usesVehicleRules(_ unit: NativeBoardUnitSnapshot) -> Bool {
+        unit.frontArmour > 0 ||
+            unit.sideArmour > 0 ||
+            unit.rearArmour > 0 ||
+            unit.kind.localizedCaseInsensitiveContains("vehicle") ||
+            unit.kind.localizedCaseInsensitiveContains("assault gun") ||
+            unit.mobility.localizedCaseInsensitiveContains("armor") ||
+            unit.mobility.localizedCaseInsensitiveContains("armored")
+    }
+
+    private static func damageStateSummary(for unit: NativeBoardUnitSnapshot) -> String {
+        var parts: [String] = []
+        if unit.crewShaken { parts.append("crew shaken") }
+        if unit.crewStunned { parts.append("crew stunned") }
+        if unit.immobilized { parts.append("immobilized") }
+        if unit.destroyed { parts.append("knocked out") }
+        if unit.lastVehicleDamageResult != "None" { parts.append("last result \(unit.lastVehicleDamageResult)") }
+        return parts.isEmpty ? "Operational; no current vehicle damage state is recorded." : parts.joined(separator: ", ")
+    }
+
+    private static func downTransitionSummary(for unit: NativeBoardUnitSnapshot) -> String {
+        if unit.lastVehicleDamageResult == "Crew Stunned" ||
+            unit.lastVehicleDamageResult == "Immobilized" ||
+            unit.lastVehicleDamageResult == "On Fire" {
+            return "\(unit.lastVehicleDamageResult) routes the vehicle to Down after damage."
+        }
+        if unit.downOrderActive {
+            return "Down order active on this vehicle."
+        }
+        return "No Down transition has been triggered yet."
+    }
+
+    private static func signed(_ value: Int) -> String {
+        value >= 0 ? "+\(value)" : "\(value)"
+    }
+}
+
+public struct GuderianOrderDiceCloseQuartersState: Codable, Hashable, Sendable {
+    public let unitID: Int
+    public let unitName: String
+    public let targetName: String
+    public let runOrderAssaultSummary: String
+    public let targetReactionSummary: String
+    public let roundResultsSummary: String
+    public let loserDestructionSummary: String
+    public let regroupLogSummary: String
+
+    public var isReady: Bool {
+        !unitName.isEmpty &&
+            !targetName.isEmpty &&
+            !runOrderAssaultSummary.isEmpty &&
+            !targetReactionSummary.isEmpty &&
+            !roundResultsSummary.isEmpty &&
+            !loserDestructionSummary.isEmpty &&
+            !regroupLogSummary.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceCloseQuartersPresenter {
+    public static let cycleRange = 71...75
+
+    public static func state(snapshot: NativeBoardSnapshot) -> GuderianOrderDiceCloseQuartersState? {
+        guard let selected = snapshot.selectedUnit ?? snapshot.units.first(where: { !$0.destroyed }) else {
+            return nil
+        }
+        let target = selected.lastAssaultTargetID.flatMap { targetID in
+            snapshot.units.first { $0.id == targetID }
+        } ?? snapshot.selectedTarget ?? nearestEnemy(to: selected, in: snapshot)
+        return GuderianOrderDiceCloseQuartersState(
+            unitID: selected.id,
+            unitName: selected.name,
+            targetName: target?.name ?? "No target selected",
+            runOrderAssaultSummary: runOrderSummary(for: selected),
+            targetReactionSummary: "Assault reaction: \(selected.lastAssaultTargetReaction == "None" ? "No reaction recorded yet" : selected.lastAssaultTargetReaction).",
+            roundResultsSummary: roundResultsSummary(for: selected),
+            loserDestructionSummary: loserDestructionSummary(for: selected, snapshot: snapshot),
+            regroupLogSummary: regroupSummary(for: selected)
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle75: Bool {
+        guard let scenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+              let session = NativeBoardSession(scenario: scenario, seed: 75_001) else {
+            return false
+        }
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        guard let state = state(snapshot: session.snapshot()) else {
+            return false
+        }
+        return cycleRange == 71...75 &&
+            state.isReady &&
+            state.runOrderAssaultSummary.contains("Run") &&
+            state.targetReactionSummary.localizedCaseInsensitiveContains("reaction") &&
+            state.regroupLogSummary.localizedCaseInsensitiveContains("regroup")
+    }
+
+    private static func runOrderSummary(for unit: NativeBoardUnitSnapshot) -> String {
+        let options = unit.availableOrders.isEmpty ? HistoricalBoardOrder.allCases : unit.availableOrders
+        let status = options.contains(.run) ? "available" : "not currently available"
+        return "Run-order assault \(status): charge allowance \(String(format: "%.1f", unit.assaultMoveAllowance))."
+    }
+
+    private static func roundResultsSummary(for unit: NativeBoardUnitSnapshot) -> String {
+        if unit.lastAssaultTargetID != nil {
+            return "Assault round: attacker wounds \(unit.lastAssaultAttackerWounds), defender wounds \(unit.lastAssaultDefenderWounds), draw rounds \(unit.lastAssaultDrawRounds)."
+        }
+        return "No close-quarters round has been resolved yet."
+    }
+
+    private static func loserDestructionSummary(
+        for unit: NativeBoardUnitSnapshot,
+        snapshot: NativeBoardSnapshot
+    ) -> String {
+        guard let loserID = unit.lastAssaultLoserID else {
+            return "No assault loser has been recorded yet."
+        }
+        let loserName = snapshot.units.first { $0.id == loserID }?.name ?? "Unit \(loserID)"
+        return unit.lastAssaultLoserDestroyed ? "\(loserName) was destroyed as the assault loser." : "\(loserName) lost the assault but remains on the board."
+    }
+
+    private static func regroupSummary(for unit: NativeBoardUnitSnapshot) -> String {
+        if unit.lastAssaultRegroupDistance > 0 {
+            return "Regroup distance \(String(format: "%.1f", unit.lastAssaultRegroupDistance)); vehicle target \(unit.lastAssaultVehicleTarget ? "yes" : "no"), anti-tank equipped \(unit.lastAssaultAntitankEquipped ? "yes" : "no")."
+        }
+        return "Regroup log pending until a Run-order assault resolves."
+    }
+}
+
+public struct GuderianOrderDiceAIDecisionState: Codable, Hashable, Sendable {
+    public let battleID: UnifiedGuderianBattleID
+    public let drawnSide: NativeBoardPlayer
+    public let chosenUnitID: Int
+    public let chosenUnitName: String
+    public let chosenOrder: HistoricalBoardOrder
+    public let objectiveOrTargetName: String
+    public let pathSummary: String
+    public let failedOrderTestPlan: String
+    public let reasoningSummary: String
+
+    public var isReady: Bool {
+        drawnSide == .guderianAI &&
+            chosenUnitID > 0 &&
+            !chosenUnitName.isEmpty &&
+            !objectiveOrTargetName.isEmpty &&
+            !pathSummary.isEmpty &&
+            !failedOrderTestPlan.isEmpty &&
+            !reasoningSummary.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceGuderianAIActivationPlanner {
+    public static let cycleRange = 76...80
+
+    public static func decision(
+        snapshot: NativeBoardSnapshot,
+        battleID: UnifiedGuderianBattleID,
+        priorityNames: [String] = []
+    ) -> GuderianOrderDiceAIDecisionState? {
+        let candidates = snapshot.units
+            .filter { $0.owner == .guderianAI && !$0.destroyed && !$0.retainedOrder && $0.currentOrder == nil }
+            .sorted { score($0) > score($1) }
+        guard let unit = candidates.first else {
+            return nil
+        }
+        let target = nearestEnemy(to: unit, in: snapshot)
+        let objective = priorityObjective(in: snapshot, matching: priorityNames) ?? nearestObjective(to: unit, in: snapshot)
+        let order = chosenOrder(for: unit, target: target)
+        return GuderianOrderDiceAIDecisionState(
+            battleID: battleID,
+            drawnSide: .guderianAI,
+            chosenUnitID: unit.id,
+            chosenUnitName: unit.name,
+            chosenOrder: order,
+            objectiveOrTargetName: targetName(for: order, target: target, objective: objective),
+            pathSummary: pathSummary(for: order, unit: unit, target: target, objective: objective),
+            failedOrderTestPlan: failedOrderTestPlan(for: unit),
+            reasoningSummary: "Choose \(unit.name) for \(order.rawValue) because it has \(unit.pinCount) pins, \(unit.moraleQuality) morale, and \(unit.availableOrders.isEmpty ? "default" : "engine-filtered") order options."
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle80: Bool {
+        guard let scenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+              let session = NativeBoardSession(scenario: scenario, seed: 80_001) else {
+            return false
+        }
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        guard let state = decision(
+            snapshot: session.snapshot(),
+            battleID: .fieldCommand(.tucholaForest),
+            priorityNames: ScenarioContentCatalog.bundle(for: scenario).aiPlan.targetPriorities(for: .movement)
+        ) else {
+            return false
+        }
+        return cycleRange == 76...80 &&
+            state.isReady &&
+            state.drawnSide == .guderianAI &&
+            HistoricalBoardOrder.allCases.contains(state.chosenOrder) &&
+            state.failedOrderTestPlan.localizedCaseInsensitiveContains("order test")
+    }
+
+    private static func chosenOrder(
+        for unit: NativeBoardUnitSnapshot,
+        target: NativeBoardUnitSnapshot?
+    ) -> HistoricalBoardOrder {
+        let options = unit.availableOrders.isEmpty ? HistoricalBoardOrder.allCases : unit.availableOrders
+        if unit.pinCount >= 2, options.contains(.rally) {
+            return .rally
+        }
+        if target != nil, unit.canAssaultNow, options.contains(.run) {
+            return .run
+        }
+        if target != nil, unit.canShootNow, options.contains(.fire) {
+            return .fire
+        }
+        if options.contains(.advance) {
+            return .advance
+        }
+        if options.contains(.fire) {
+            return .fire
+        }
+        return options.first ?? .down
+    }
+
+    private static func score(_ unit: NativeBoardUnitSnapshot) -> Int {
+        var value = 0
+        if unit.canShootNow { value += 20 }
+        if unit.canAssaultNow { value += 12 }
+        if unit.canMoveNow { value += 10 }
+        if unit.pinCount >= 2 { value += 8 }
+        if unit.frontArmour > 0 || unit.mobility.localizedCaseInsensitiveContains("armor") { value += 6 }
+        value -= unit.pinCount
+        return value
+    }
+
+    private static func targetName(
+        for order: HistoricalBoardOrder,
+        target: NativeBoardUnitSnapshot?,
+        objective: NativeBoardObjectiveSnapshot?
+    ) -> String {
+        switch order {
+        case .fire, .run:
+            return target?.name ?? objective?.name ?? "nearest enemy"
+        case .advance:
+            return objective?.name ?? target?.name ?? "nearest objective"
+        case .rally, .down, .ambush:
+            return "self-preservation"
+        }
+    }
+
+    private static func pathSummary(
+        for order: HistoricalBoardOrder,
+        unit: NativeBoardUnitSnapshot,
+        target: NativeBoardUnitSnapshot?,
+        objective: NativeBoardObjectiveSnapshot?
+    ) -> String {
+        switch order {
+        case .advance:
+            return "Advance toward \(objective?.name ?? "the nearest objective") with \(String(format: "%.1f", unit.advanceMoveAllowance)) movement."
+        case .run:
+            return target == nil
+                ? "Run toward \(objective?.name ?? "a priority objective") with \(String(format: "%.1f", unit.runMoveAllowance)) movement."
+                : "Run-order assault pressure toward \(target?.name ?? "nearest enemy")."
+        case .fire:
+            return "Fire at \(target?.name ?? "nearest enemy") before moving."
+        case .ambush:
+            return "Hold Ambush and retain the die for reaction fire."
+        case .rally:
+            return "Rally before further manoeuvre because pin pressure is high."
+        case .down:
+            return "Go Down to preserve the unit after a failed activation window."
+        }
+    }
+
+    private static func failedOrderTestPlan(for unit: NativeBoardUnitSnapshot) -> String {
+        if unit.pinCount > 0 {
+            return "Order test risk: \(unit.pinCount) pin marker\(unit.pinCount == 1 ? "" : "s"); failed order test falls back to Down/FUBAR handling from DZW."
+        }
+        return "Order test risk: none expected; failed order test handling remains ready for later pin pressure."
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle80Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let cycle60Ready: Bool
+    public let shootingReady: Bool
+    public let vehicleReady: Bool
+    public let closeQuartersReady: Bool
+    public let guderianAIReady: Bool
+    public let missingUISourceIdentifiers: [String]
+    public let blockers: [String]
+
+    public var isReadyThroughCycle80: Bool {
+        blockers.isEmpty &&
+            cycleStart == 61 &&
+            cycleEnd == 80 &&
+            cycle60Ready &&
+            shootingReady &&
+            vehicleReady &&
+            closeQuartersReady &&
+            guderianAIReady &&
+            missingUISourceIdentifiers.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle80AcceptanceCatalog {
+    public static let cycleRange = 61...80
+    public static let requiredUISourceIdentifiers = [
+        "order-shooting-panel",
+        "fire-shooting-choice",
+        "advance-shooting-choice",
+        "target-reaction-summary",
+        "hit-modifier-breakdown",
+        "pin-effect-summary",
+        "damage-morale-summary",
+        "shooting-log-summary",
+        "vehicle-status-panel",
+        "vehicle-armour-facing",
+        "vehicle-penetration-modifiers",
+        "vehicle-damage-state",
+        "vehicle-wreck-marker",
+        "vehicle-down-transition",
+        "close-quarters-panel",
+        "run-order-assault-flow",
+        "assault-target-reaction",
+        "assault-round-results",
+        "assault-loser-destruction",
+        "assault-regroup-log",
+        "guderian-order-ai-panel",
+        "ai-drawn-die-unit",
+        "ai-order-choice",
+        "ai-objective-target",
+        "ai-path-summary",
+        "ai-failed-order-test-handling",
+    ]
+
+    public static func acceptanceReadyThroughCycle80(
+        cycle60SourceText: String,
+        cycle80SourceText: String
+    ) -> Bool {
+        report(cycle60SourceText: cycle60SourceText, cycle80SourceText: cycle80SourceText).isReadyThroughCycle80
+    }
+
+    public static func report(
+        cycle60SourceText: String,
+        cycle80SourceText: String
+    ) -> GuderianOrderDiceMigrationCycle80Report {
+        let missingIdentifiers = requiredUISourceIdentifiers.filter { !cycle80SourceText.contains($0) }
+        var blockers: [String] = []
+        let cycle60Ready = GuderianOrderDiceMigrationCycle60AcceptanceCatalog.acceptanceReadyThroughCycle60(sourceText: cycle60SourceText)
+        if !cycle60Ready {
+            blockers.append("Cycle 41-60 order panel, inspector, and movement preview gates are not ready.")
+        }
+        if !GuderianOrderDiceShootingPresenter.acceptanceReadyThroughCycle65 {
+            blockers.append("Cycle 61-65 shooting presenter is incomplete.")
+        }
+        if !GuderianOrderDiceVehiclePresenter.acceptanceReadyThroughCycle70 {
+            blockers.append("Cycle 66-70 vehicle presenter is incomplete.")
+        }
+        if !GuderianOrderDiceCloseQuartersPresenter.acceptanceReadyThroughCycle75 {
+            blockers.append("Cycle 71-75 close-quarters presenter is incomplete.")
+        }
+        if !GuderianOrderDiceGuderianAIActivationPlanner.acceptanceReadyThroughCycle80 {
+            blockers.append("Cycle 76-80 Guderian-command AI activation planner is incomplete.")
+        }
+        if !missingIdentifiers.isEmpty {
+            blockers.append("DZWPlayableBattleView is missing cycle 61-80 UI identifiers: \(missingIdentifiers.joined(separator: ", ")).")
+        }
+
+        return GuderianOrderDiceMigrationCycle80Report(
+            cycleStart: 61,
+            cycleEnd: 80,
+            cycle60Ready: cycle60Ready,
+            shootingReady: GuderianOrderDiceShootingPresenter.acceptanceReadyThroughCycle65,
+            vehicleReady: GuderianOrderDiceVehiclePresenter.acceptanceReadyThroughCycle70,
+            closeQuartersReady: GuderianOrderDiceCloseQuartersPresenter.acceptanceReadyThroughCycle75,
+            guderianAIReady: GuderianOrderDiceGuderianAIActivationPlanner.acceptanceReadyThroughCycle80,
+            missingUISourceIdentifiers: missingIdentifiers,
+            blockers: blockers
+        )
+    }
+}
+
 public struct GuderianOrderDiceMigrationCycle60Report: Codable, Hashable, Sendable {
     public let cycleStart: Int
     public let cycleEnd: Int
@@ -2025,6 +2612,42 @@ public enum GuderianOrderDiceMigrationCycle60AcceptanceCatalog {
             blockers: blockers
         )
     }
+}
+
+private func nearestEnemy(
+    to unit: NativeBoardUnitSnapshot,
+    in snapshot: NativeBoardSnapshot
+) -> NativeBoardUnitSnapshot? {
+    snapshot.units
+        .filter { $0.owner != unit.owner && $0.owner != .none && !$0.destroyed }
+        .min { orderDiceDistance(unit.x, unit.y, $0.x, $0.y) < orderDiceDistance(unit.x, unit.y, $1.x, $1.y) }
+}
+
+private func nearestObjective(
+    to unit: NativeBoardUnitSnapshot,
+    in snapshot: NativeBoardSnapshot
+) -> NativeBoardObjectiveSnapshot? {
+    snapshot.objectives
+        .min { orderDiceDistance(unit.x, unit.y, $0.x, $0.y) < orderDiceDistance(unit.x, unit.y, $1.x, $1.y) }
+}
+
+private func priorityObjective(
+    in snapshot: NativeBoardSnapshot,
+    matching priorityNames: [String]
+) -> NativeBoardObjectiveSnapshot? {
+    let normalizedPriorities = priorityNames.map { $0.lowercased() }
+    return snapshot.objectives.first { objective in
+        let name = objective.name.lowercased()
+        return normalizedPriorities.contains { priority in
+            name.contains(priority) || priority.contains(name)
+        }
+    }
+}
+
+private func orderDiceDistance(_ x1: Double, _ y1: Double, _ x2: Double, _ y2: Double) -> Double {
+    let dx = x1 - x2
+    let dy = y1 - y2
+    return sqrt(dx * dx + dy * dy)
 }
 
 private func guderianCString(_ pointer: UnsafePointer<CChar>?) -> String {

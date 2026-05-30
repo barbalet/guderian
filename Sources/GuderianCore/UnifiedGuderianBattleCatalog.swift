@@ -1976,7 +1976,79 @@ public final class LateCareerNativeBoardSession {
                 canReverseNow: unit.can_reverse_now,
                 pivotBudget: Int(unit.pivot_budget),
                 pivotCountUsed: Int(unit.pivot_count_used),
-                movementRejectionReason: unifiedCString(unit.movement_rejection_reason)
+                movementRejectionReason: unifiedCString(unit.movement_rejection_reason),
+                assaultMoveAllowance: Double(unit.assault_move_allowance),
+                frontArmour: Int(unit.front_armour),
+                sideArmour: Int(unit.side_armour),
+                rearArmour: Int(unit.rear_armour),
+                defensiveToHitModifier: Int(unit.defensive_to_hit_modifier),
+                fastVehicle: unit.fast,
+                reconVehicle: unit.recon,
+                openToppedVehicle: unit.open_topped,
+                smokeAvailable: unit.smoke_available,
+                smokeActive: unit.smoke_active,
+                crewShaken: unit.crew_shaken,
+                crewStunned: unit.crew_stunned,
+                immobilized: unit.immobilized,
+                wrecked: unit.wrecked,
+                wreckBlocksMovement: unit.wreck_blocks_movement,
+                lastShootingTargetID: unifiedOptionalID(unit.last_shooting_target_id),
+                lastShootingRange: Double(unit.last_shooting_range),
+                lastShootingTargetReaction: unifiedCString(game_target_reaction_name(unit.last_shooting_target_reaction)),
+                lastShootingBaseToHit: Int(unit.last_shooting_base_to_hit),
+                lastShootingPointBlankModifier: Int(unit.last_shooting_point_blank_modifier),
+                lastShootingPinModifier: Int(unit.last_shooting_pin_modifier),
+                lastShootingLongRangeModifier: Int(unit.last_shooting_long_range_modifier),
+                lastShootingInexperiencedModifier: Int(unit.last_shooting_inexperienced_modifier),
+                lastShootingMoveModifier: Int(unit.last_shooting_move_modifier),
+                lastShootingDownModifier: Int(unit.last_shooting_down_modifier),
+                lastShootingSmallUnitModifier: Int(unit.last_shooting_small_unit_modifier),
+                lastShootingCoverModifier: Int(unit.last_shooting_cover_modifier),
+                lastShootingToHitModifier: Int(unit.last_shooting_to_hit_modifier),
+                lastShootingNeededToHit: Int(unit.last_shooting_needed_to_hit),
+                lastShootingDamageValue: Int(unit.last_shooting_damage_value),
+                lastShootingPenetrationModifier: Int(unit.last_shooting_penetration_modifier),
+                lastShootingDamageRoll: Int(unit.last_shooting_damage_roll),
+                lastShootingDamageSuccess: unit.last_shooting_damage_success,
+                lastShootingVehicleArmourModifier: Int(unit.last_shooting_vehicle_armour_modifier),
+                lastShootingVehicleLongRangePenalty: Int(unit.last_shooting_vehicle_long_range_penalty),
+                lastShootingVehicleOpenToppedIndirectModifier: Int(unit.last_shooting_vehicle_open_topped_indirect_modifier),
+                lastShootingVehicleDamageClass: unifiedVehicleDamageClassName(unit.last_shooting_vehicle_damage_class),
+                lastVehicleDamageTableRoll: Int(unit.last_vehicle_damage_table_roll),
+                lastVehicleDamageResult: unifiedCString(game_vehicle_damage_result_name(unit.last_vehicle_damage_result)),
+                lastVehicleDamageMoraleRoll: Int(unit.last_vehicle_damage_morale_roll),
+                lastVehicleDamageMoraleTarget: Int(unit.last_vehicle_damage_morale_target),
+                lastVehicleDamageMoraleFailed: unit.last_vehicle_damage_morale_failed,
+                lastShootingModelsRemoved: Int(unit.last_shooting_models_removed),
+                lastShootingPinsAdded: Int(unit.last_shooting_pins_added),
+                lastShootingMoraleChecked: unit.last_shooting_morale_checked,
+                lastShootingMoraleRoll: Int(unit.last_shooting_morale_roll),
+                lastShootingMoraleTarget: Int(unit.last_shooting_morale_target),
+                lastShootingMoralePinModifier: Int(unit.last_shooting_morale_pin_modifier),
+                lastShootingMoraleOfficerModifier: Int(unit.last_shooting_morale_officer_modifier),
+                lastShootingMoraleFailed: unit.last_shooting_morale_failed,
+                lastAssaultTargetID: unifiedOptionalID(unit.last_assault_target_id),
+                lastAssaultRange: Double(unit.last_assault_range),
+                lastAssaultTargetReaction: unifiedCString(game_target_reaction_name(unit.last_assault_target_reaction)),
+                lastAssaultAttackerWounds: Int(unit.last_assault_attacker_wounds),
+                lastAssaultDefenderWounds: Int(unit.last_assault_defender_wounds),
+                lastAssaultDrawRounds: Int(unit.last_assault_draw_rounds),
+                lastAssaultWinnerID: unifiedOptionalID(unit.last_assault_winner_id),
+                lastAssaultLoserID: unifiedOptionalID(unit.last_assault_loser_id),
+                lastAssaultLoserDestroyed: unit.last_assault_loser_destroyed,
+                lastAssaultRegroupDistance: Double(unit.last_assault_regroup_distance),
+                lastAssaultVehicleTarget: unit.last_assault_vehicle_target,
+                lastAssaultAntitankEquipped: unit.last_assault_antitank_equipped,
+                lastAssaultEnclosedArmourOrderTestRequired: unit.last_assault_enclosed_armour_order_test_required,
+                lastAssaultEnclosedArmourOrderTestRoll: Int(unit.last_assault_enclosed_armour_order_test_roll),
+                lastAssaultEnclosedArmourOrderTestTarget: Int(unit.last_assault_enclosed_armour_order_test_target),
+                lastAssaultEnclosedArmourOrderTestFailed: unit.last_assault_enclosed_armour_order_test_failed,
+                lastAssaultVehicleDefensiveFireResolved: unit.last_assault_vehicle_defensive_fire_resolved,
+                lastAssaultVehicleHits: Int(unit.last_assault_vehicle_hits),
+                lastAssaultVehicleDamageValue: Int(unit.last_assault_vehicle_damage_value),
+                lastAssaultVehiclePenetrationModifier: Int(unit.last_assault_vehicle_penetration_modifier),
+                lastAssaultVehicleDamageRoll: Int(unit.last_assault_vehicle_damage_roll),
+                lastAssaultVehicleDamageClass: unifiedVehicleDamageClassName(unit.last_assault_vehicle_damage_class)
             )
         }
     }
@@ -4156,6 +4228,23 @@ private func unifiedCString(_ pointer: UnsafePointer<CChar>?) -> String {
         return ""
     }
     return String(cString: pointer)
+}
+
+private func unifiedOptionalID(_ id: Int32) -> Int? {
+    id > 0 ? Int(id) : nil
+}
+
+private func unifiedVehicleDamageClassName(_ damageClass: dzw_vehicle_damage_class_t) -> String {
+    switch damageClass {
+    case DZW_VEHICLE_DAMAGE_SUPERFICIAL:
+        return "Superficial"
+    case DZW_VEHICLE_DAMAGE_FULL:
+        return "Full"
+    case DZW_VEHICLE_DAMAGE_MASSIVE:
+        return "Massive"
+    default:
+        return "None"
+    }
 }
 
 private func unifiedContainsAny(_ text: String, _ needles: [String]) -> Bool {
