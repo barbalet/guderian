@@ -2434,6 +2434,572 @@ public enum GuderianOrderDiceGuderianAIActivationPlanner {
     }
 }
 
+public struct GuderianOrderDiceOpposingAIDecisionState: Codable, Hashable, Sendable {
+    public let battleID: UnifiedGuderianBattleID
+    public let drawnSide: NativeBoardPlayer
+    public let armyFamily: OpposingForceAIArmyFamily
+    public let behaviorProfile: OpposingForceAIBehaviorProfile
+    public let chosenUnitID: Int
+    public let chosenUnitName: String
+    public let chosenOrder: HistoricalBoardOrder
+    public let objectiveOrTargetName: String
+    public let pathSummary: String
+    public let orderPrioritySummary: String
+    public let failedOrderTestPlan: String
+    public let reasoningSummary: String
+
+    public var isReady: Bool {
+        drawnSide == .player &&
+            armyFamily != .generic &&
+            chosenUnitID > 0 &&
+            !chosenUnitName.isEmpty &&
+            !objectiveOrTargetName.isEmpty &&
+            !pathSummary.isEmpty &&
+            !orderPrioritySummary.isEmpty &&
+            !failedOrderTestPlan.isEmpty &&
+            !reasoningSummary.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceOpposingAIActivationPlanner {
+    public static let cycleRange = 81...85
+
+    public static func decision(
+        snapshot: NativeBoardSnapshot,
+        battleID: UnifiedGuderianBattleID,
+        plan: OpposingForceAIPlan
+    ) -> GuderianOrderDiceOpposingAIDecisionState? {
+        decision(
+            snapshot: snapshot,
+            battleID: battleID,
+            armyFamily: plan.armyFamily,
+            behaviorProfile: plan.behaviorProfile,
+            priorityNames: plan.targetPriorities(for: snapshot.phase),
+            strategicGoal: plan.strategicGoal
+        )
+    }
+
+    public static func decision(
+        snapshot: NativeBoardSnapshot,
+        battleID: UnifiedGuderianBattleID,
+        armyFamily: OpposingForceAIArmyFamily,
+        behaviorProfile: OpposingForceAIBehaviorProfile,
+        priorityNames: [String],
+        strategicGoal: String
+    ) -> GuderianOrderDiceOpposingAIDecisionState? {
+        let candidates = snapshot.units
+            .filter { $0.owner == .player && !$0.destroyed && !$0.retainedOrder && $0.currentOrder == nil }
+            .sorted { score($0, phase: snapshot.phase) > score($1, phase: snapshot.phase) }
+        guard let unit = candidates.first else {
+            return nil
+        }
+        let standing = GuderianOrderDiceStandingOrderPlanner.recommendation(for: unit, phase: snapshot.phase)
+        let morale = GuderianOrderDicePinsMoraleAIPlanner.state(for: unit)
+        let target = nearestEnemy(to: unit, in: snapshot)
+        let objective = priorityObjective(in: snapshot, matching: priorityNames) ?? nearestObjective(to: unit, in: snapshot)
+        let order = chosenOrder(for: unit, phase: snapshot.phase, standing: standing, morale: morale, target: target)
+        return GuderianOrderDiceOpposingAIDecisionState(
+            battleID: battleID,
+            drawnSide: .player,
+            armyFamily: armyFamily,
+            behaviorProfile: behaviorProfile,
+            chosenUnitID: unit.id,
+            chosenUnitName: unit.name,
+            chosenOrder: order,
+            objectiveOrTargetName: targetName(for: order, target: target, objective: objective),
+            pathSummary: pathSummary(for: order, unit: unit, target: target, objective: objective),
+            orderPrioritySummary: "\(armyFamily.rawValue) \(behaviorProfile.rawValue): \(priorityNames.prefix(3).joined(separator: ", ")).",
+            failedOrderTestPlan: morale.failedOrderTestPlan,
+            reasoningSummary: "\(strategicGoal) \(standing.reason) \(morale.riskSummary)"
+        )
+    }
+
+    public static var allDecisionStates: [GuderianOrderDiceOpposingAIDecisionState] {
+        fieldCommandDecisionStates + lateCareerDecisionStates
+    }
+
+    public static var fieldCommandDecisionStates: [GuderianOrderDiceOpposingAIDecisionState] {
+        GuderianCampaignCatalog.all.compactMap { scenario in
+            guard let session = NativeBoardSession(scenario: scenario, seed: UInt32(85_000 + scenario.order)) else {
+                return nil
+            }
+            _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+            return decision(
+                snapshot: session.snapshot(),
+                battleID: .fieldCommand(scenario.id),
+                plan: OpposingForceAIPlanCatalog.plan(for: scenario)
+            )
+        }
+    }
+
+    public static var lateCareerDecisionStates: [GuderianOrderDiceOpposingAIDecisionState] {
+        LateCareerGuderianPresentationCatalog.allEntries.compactMap { entry in
+            guard let session = LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(85_500 + entry.order)) else {
+                return nil
+            }
+            _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+            return decision(
+                snapshot: session.snapshot(),
+                battleID: .lateCareer(entry.id),
+                armyFamily: .lateWarSovietAllied,
+                behaviorProfile: lateCareerBehaviorProfile(for: entry),
+                priorityNames: UnifiedGuderianBattleSideSelectionCatalog.objectivePriorityNames(for: .player, in: entry),
+                strategicGoal: entry.visibleCommandCaveatLabel
+            )
+        }
+    }
+
+    public static var acceptanceReadyThroughCycle85: Bool {
+        let decisions = allDecisionStates
+        let families = Set(decisions.map(\.armyFamily))
+        return cycleRange == 81...85 &&
+            decisions.count == 35 &&
+            decisions.allSatisfy(\.isReady) &&
+            [.polish, .french, .alliedPortDefense, .soviet1941, .sovietWinter, .lateWarSovietAllied].allSatisfy { families.contains($0) } &&
+            Set(decisions.map(\.chosenOrder)).isSubset(of: Set(HistoricalBoardOrder.allCases))
+    }
+
+    private static func chosenOrder(
+        for unit: NativeBoardUnitSnapshot,
+        phase: NativeBoardPhase,
+        standing: GuderianOrderDiceStandingOrderDecision,
+        morale: GuderianOrderDicePinsMoraleAIState,
+        target: NativeBoardUnitSnapshot?
+    ) -> HistoricalBoardOrder {
+        let options = unit.availableOrders.isEmpty ? HistoricalBoardOrder.allCases : unit.availableOrders
+        if standing.intent != .consumeDie, options.contains(standing.recommendedOrder) {
+            return standing.recommendedOrder
+        }
+        if morale.rallyPriority, options.contains(.rally) {
+            return .rally
+        }
+        switch phase {
+        case .shooting where target != nil && options.contains(.fire):
+            return .fire
+        case .assault where target != nil && options.contains(.run):
+            return .run
+        default:
+            if options.contains(.advance) {
+                return .advance
+            }
+            return options.first ?? .down
+        }
+    }
+
+    private static func score(_ unit: NativeBoardUnitSnapshot, phase: NativeBoardPhase) -> Int {
+        var value = 0
+        switch phase {
+        case .movement:
+            if unit.canMoveNow { value += 20 }
+        case .shooting:
+            if unit.canShootNow { value += 20 }
+        case .assault:
+            if unit.canAssaultNow { value += 20 }
+        }
+        if unit.pinCount >= 2 { value += 7 }
+        if unit.inCover || unit.hullDown { value += 3 }
+        if unit.moraleQuality == GuderianOrderDiceMoraleQuality.veteran.rawValue { value += 2 }
+        return value - unit.pinCount
+    }
+
+    private static func targetName(
+        for order: HistoricalBoardOrder,
+        target: NativeBoardUnitSnapshot?,
+        objective: NativeBoardObjectiveSnapshot?
+    ) -> String {
+        switch order {
+        case .fire, .run:
+            return target?.name ?? objective?.name ?? "nearest German-command unit"
+        case .advance:
+            return objective?.name ?? target?.name ?? "nearest objective"
+        case .ambush:
+            return target?.name ?? "reaction lane"
+        case .rally, .down:
+            return "unit preservation"
+        }
+    }
+
+    private static func pathSummary(
+        for order: HistoricalBoardOrder,
+        unit: NativeBoardUnitSnapshot,
+        target: NativeBoardUnitSnapshot?,
+        objective: NativeBoardObjectiveSnapshot?
+    ) -> String {
+        switch order {
+        case .advance:
+            return "Advance toward \(objective?.name ?? "the nearest objective") with \(String(format: "%.1f", unit.advanceMoveAllowance)) movement."
+        case .run:
+            return target == nil
+                ? "Run toward \(objective?.name ?? "the priority objective") with \(String(format: "%.1f", unit.runMoveAllowance)) movement."
+                : "Run-order assault toward \(target?.name ?? "nearest German-command unit")."
+        case .fire:
+            return "Fire at \(target?.name ?? "nearest German-command unit") while protecting the opposing-force priority."
+        case .ambush:
+            return "Retain Ambush on the likely German-command approach lane."
+        case .rally:
+            return "Rally before movement or fire because pin pressure threatens the order test."
+        case .down:
+            return "Go Down to preserve the unit under incoming fire."
+        }
+    }
+
+    private static func lateCareerBehaviorProfile(
+        for entry: LateCareerGuderianPresentation
+    ) -> OpposingForceAIBehaviorProfile {
+        let text = [entry.id, entry.title, entry.scope.rawValue].joined(separator: " ").lowercased()
+        if text.contains("bridge") || text.contains("dnieper") || text.contains("oder") {
+            return .fortifiedDelay
+        }
+        if text.contains("pocket") || text.contains("withdrawal") || text.contains("corridor") {
+            return .breakout
+        }
+        if text.contains("kustrin") || text.contains("berlin") || text.contains("poznan") || text.contains("seelow") {
+            return .urbanDefense
+        }
+        if text.contains("kursk") || text.contains("solstice") {
+            return .counterattack
+        }
+        return .mobileDelay
+    }
+}
+
+public enum GuderianOrderDiceStandingOrderIntent: String, CaseIterable, Codable, Hashable, Sendable {
+    case retainAmbush = "Retain Ambush"
+    case goDown = "Go Down"
+    case rally = "Rally"
+    case consumeDie = "Consume Die"
+}
+
+public struct GuderianOrderDiceStandingOrderDecision: Codable, Hashable, Sendable {
+    public let unitID: Int
+    public let unitName: String
+    public let intent: GuderianOrderDiceStandingOrderIntent
+    public let recommendedOrder: HistoricalBoardOrder
+    public let reason: String
+
+    public var isReady: Bool {
+        unitID > 0 &&
+            !unitName.isEmpty &&
+            !reason.isEmpty &&
+            HistoricalBoardOrder.allCases.contains(recommendedOrder)
+    }
+}
+
+public enum GuderianOrderDiceStandingOrderPlanner {
+    public static let cycleRange = 86...90
+
+    public static func recommendation(
+        for unit: NativeBoardUnitSnapshot,
+        phase: NativeBoardPhase = .movement
+    ) -> GuderianOrderDiceStandingOrderDecision {
+        let options = unit.availableOrders.isEmpty ? HistoricalBoardOrder.allCases : unit.availableOrders
+        let morale = GuderianOrderDicePinsMoraleAIPlanner.state(for: unit)
+        if morale.rallyPriority, options.contains(.rally) {
+            return decision(unit, .rally, .rally, "\(unit.pinCount) pins exceed the \(unit.moraleQuality) rally threshold.")
+        }
+        if (unit.ambushOrderActive || unit.retainedOrder), options.contains(.ambush), phase != .assault {
+            return decision(unit, .retainAmbush, .ambush, "Ambush is already retained and should hold for opportunity fire.")
+        }
+        if unit.pinCount > 0,
+           !unit.inCover,
+           !unit.hullDown,
+           options.contains(.down),
+           (phase == .shooting || !unit.canMoveNow) {
+            return decision(unit, .goDown, .down, "Pinned and exposed units prefer Down before spending a risky activation.")
+        }
+        let order: HistoricalBoardOrder
+        if phase == .shooting, options.contains(.fire) {
+            order = .fire
+        } else if phase == .assault, options.contains(.run) {
+            order = .run
+        } else if options.contains(.advance) {
+            order = .advance
+        } else {
+            order = options.first ?? .down
+        }
+        return decision(unit, .consumeDie, order, "No standing-order hold is better than consuming the die for \(order.rawValue).")
+    }
+
+    public static var deterministicRecommendations: [GuderianOrderDiceStandingOrderDecision] {
+        [
+            recommendation(for: sampleUnit(id: 901, name: "Pinned rifle section", pinCount: 3, inCover: true, availableOrders: [.rally, .down, .advance])),
+            recommendation(for: sampleUnit(id: 902, name: "Ambush anti-tank gun", availableOrders: [.ambush, .fire, .down], ambushOrderActive: true)),
+            recommendation(for: sampleUnit(id: 903, name: "Exposed platoon", pinCount: 1, inCover: false, canMoveNow: false, availableOrders: [.down, .advance]), phase: .shooting),
+            recommendation(for: sampleUnit(id: 904, name: "Mobile reserve", availableOrders: [.advance, .run, .fire])),
+        ]
+    }
+
+    public static var acceptanceReadyThroughCycle90: Bool {
+        let recommendations = deterministicRecommendations
+        return cycleRange == 86...90 &&
+            recommendations.count == 4 &&
+            recommendations.allSatisfy(\.isReady) &&
+            Set(recommendations.map(\.intent)) == Set(GuderianOrderDiceStandingOrderIntent.allCases)
+    }
+
+    private static func decision(
+        _ unit: NativeBoardUnitSnapshot,
+        _ intent: GuderianOrderDiceStandingOrderIntent,
+        _ order: HistoricalBoardOrder,
+        _ reason: String
+    ) -> GuderianOrderDiceStandingOrderDecision {
+        GuderianOrderDiceStandingOrderDecision(
+            unitID: unit.id,
+            unitName: unit.name,
+            intent: intent,
+            recommendedOrder: order,
+            reason: reason
+        )
+    }
+}
+
+public struct GuderianOrderDicePinsMoraleAIState: Codable, Hashable, Sendable {
+    public let unitID: Int
+    public let unitName: String
+    public let moraleQuality: String
+    public let moraleTarget: Int
+    public let pinCount: Int
+    public let pinThreshold: Int
+    public let officerModifier: Int
+    public let rallyPriority: Bool
+    public let fubarRisk: String
+    public let recommendedOrder: HistoricalBoardOrder
+    public let failedOrderTestPlan: String
+    public let riskSummary: String
+
+    public var isReady: Bool {
+        unitID > 0 &&
+            !unitName.isEmpty &&
+            !moraleQuality.isEmpty &&
+            moraleTarget > 0 &&
+            pinThreshold > 0 &&
+            !fubarRisk.isEmpty &&
+            !failedOrderTestPlan.isEmpty &&
+            !riskSummary.isEmpty
+    }
+}
+
+public enum GuderianOrderDicePinsMoraleAIPlanner {
+    public static let cycleRange = 91...95
+
+    public static func state(for unit: NativeBoardUnitSnapshot) -> GuderianOrderDicePinsMoraleAIState {
+        let moraleTarget = moraleTarget(for: unit.moraleQuality)
+        let officerModifier = unit.lastOrderTestOfficerModifier
+        let effectiveTarget = max(2, moraleTarget + officerModifier - unit.pinCount)
+        let pinThreshold = max(1, moraleTarget / 3)
+        let rallyPriority = unit.pinCount >= pinThreshold + 1 || effectiveTarget <= 6
+        let fubarRisk = unit.pinCount >= pinThreshold + 2 || unit.lastFubarResult != "None" ? "Elevated FUBAR risk" : "Normal FUBAR risk"
+        let recommendedOrder: HistoricalBoardOrder = rallyPriority ? .rally : (unit.pinCount > 0 ? .down : .advance)
+        return GuderianOrderDicePinsMoraleAIState(
+            unitID: unit.id,
+            unitName: unit.name,
+            moraleQuality: unit.moraleQuality,
+            moraleTarget: moraleTarget,
+            pinCount: unit.pinCount,
+            pinThreshold: pinThreshold,
+            officerModifier: officerModifier,
+            rallyPriority: rallyPriority,
+            fubarRisk: fubarRisk,
+            recommendedOrder: recommendedOrder,
+            failedOrderTestPlan: "Order test target \(effectiveTarget)+ after pins \(unit.pinCount) and officer \(orderDiceSigned(officerModifier)); failure falls back to Down/FUBAR handling.",
+            riskSummary: "\(unit.moraleQuality) morale target \(moraleTarget), pins \(unit.pinCount), officer \(orderDiceSigned(officerModifier)), \(fubarRisk)."
+        )
+    }
+
+    public static var deterministicStates: [GuderianOrderDicePinsMoraleAIState] {
+        [
+            state(for: sampleUnit(id: 951, name: "Inexperienced pinned section", moraleQuality: "Inexperienced", pinCount: 3, lastOrderTestOfficerModifier: 0)),
+            state(for: sampleUnit(id: 952, name: "Regular officer-supported section", moraleQuality: "Regular", pinCount: 1, lastOrderTestOfficerModifier: 1)),
+            state(for: sampleUnit(id: 953, name: "Veteran steady section", moraleQuality: "Veteran", pinCount: 0, lastOrderTestOfficerModifier: 0)),
+        ]
+    }
+
+    public static var acceptanceReadyThroughCycle95: Bool {
+        let states = deterministicStates
+        return cycleRange == 91...95 &&
+            states.count == 3 &&
+            states.allSatisfy(\.isReady) &&
+            states.contains { $0.rallyPriority && $0.recommendedOrder == .rally } &&
+            states.contains { $0.officerModifier > 0 && $0.failedOrderTestPlan.localizedCaseInsensitiveContains("officer") } &&
+            states.contains { $0.fubarRisk.localizedCaseInsensitiveContains("FUBAR") }
+    }
+
+    private static func moraleTarget(for quality: String) -> Int {
+        if quality.localizedCaseInsensitiveContains("Inexperienced") {
+            return 8
+        }
+        if quality.localizedCaseInsensitiveContains("Veteran") {
+            return 10
+        }
+        return 9
+    }
+}
+
+public enum GuderianOrderDiceTargetReactionIntent: String, Codable, Hashable, Sendable {
+    case hold = "Hold"
+    case down = "Down"
+    case ambushOpportunity = "Ambush Opportunity"
+}
+
+public struct GuderianOrderDiceTargetReactionDecisionState: Codable, Hashable, Sendable {
+    public let attackerSide: NativeBoardPlayer
+    public let targetSide: NativeBoardPlayer
+    public let targetUnitID: Int
+    public let targetUnitName: String
+    public let incomingAction: HistoricalBoardOrder
+    public let recommendedReaction: GuderianOrderDiceTargetReactionIntent
+    public let downSummary: String
+    public let ambushSummary: String
+    public let opportunitySummary: String
+    public let reasoningSummary: String
+
+    public var isReady: Bool {
+        attackerSide != .none &&
+            targetSide != .none &&
+            attackerSide != targetSide &&
+            targetUnitID > 0 &&
+            !targetUnitName.isEmpty &&
+            !downSummary.isEmpty &&
+            !ambushSummary.isEmpty &&
+            !opportunitySummary.isEmpty &&
+            !reasoningSummary.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceTargetReactionAIPlanner {
+    public static let cycleRange = 96...100
+
+    public static func decision(
+        attacker: NativeBoardUnitSnapshot,
+        target: NativeBoardUnitSnapshot,
+        incomingAction: HistoricalBoardOrder
+    ) -> GuderianOrderDiceTargetReactionDecisionState {
+        let reaction: GuderianOrderDiceTargetReactionIntent
+        if target.ambushOrderActive && target.canShootNow && incomingAction == .run {
+            reaction = .ambushOpportunity
+        } else if target.pinCount > 0 || target.defensiveToHitModifier < 0 || incomingAction == .fire {
+            reaction = .down
+        } else {
+            reaction = .hold
+        }
+        return GuderianOrderDiceTargetReactionDecisionState(
+            attackerSide: attacker.owner,
+            targetSide: target.owner,
+            targetUnitID: target.id,
+            targetUnitName: target.name,
+            incomingAction: incomingAction,
+            recommendedReaction: reaction,
+            downSummary: target.downOrderActive ? "Already Down." : "Down available when incoming fire or pin pressure outweighs acting later.",
+            ambushSummary: target.ambushOrderActive ? "Ambush is retained and can answer a Run-order assault opportunity." : "No retained Ambush opportunity currently shown.",
+            opportunitySummary: "\(attacker.name) threatens \(target.name) with \(incomingAction.rawValue); recommended reaction is \(reaction.rawValue).",
+            reasoningSummary: "\(target.name) pins \(target.pinCount), defensive modifier \(target.defensiveToHitModifier), can shoot \(target.canShootNow ? "yes" : "no")."
+        )
+    }
+
+    public static var deterministicDecisions: [GuderianOrderDiceTargetReactionDecisionState] {
+        let human = sampleUnit(id: 981, name: "Human panzergrenadiers", owner: .guderianAI)
+        let aiTarget = sampleUnit(id: 982, name: "AI infantry in the open", owner: .player, pinCount: 1, inCover: false, defensiveToHitModifier: 0)
+        let aiAttacker = sampleUnit(id: 983, name: "AI rifle section", owner: .player)
+        let humanTarget = sampleUnit(id: 984, name: "Human anti-tank gun", owner: .guderianAI, canShootNow: true, ambushOrderActive: true)
+        return [
+            decision(attacker: human, target: aiTarget, incomingAction: .fire),
+            decision(attacker: aiAttacker, target: humanTarget, incomingAction: .run),
+        ]
+    }
+
+    public static var acceptanceReadyThroughCycle100: Bool {
+        let decisions = deterministicDecisions
+        return cycleRange == 96...100 &&
+            decisions.count == 2 &&
+            decisions.allSatisfy(\.isReady) &&
+            decisions.contains { $0.attackerSide == .guderianAI && $0.targetSide == .player && $0.recommendedReaction == .down } &&
+            decisions.contains { $0.attackerSide == .player && $0.targetSide == .guderianAI && $0.recommendedReaction == .ambushOpportunity }
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle100Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let cycle80Ready: Bool
+    public let opposingAIReady: Bool
+    public let standingOrderAIReady: Bool
+    public let pinsMoraleAIReady: Bool
+    public let targetReactionAIReady: Bool
+    public let missingUISourceIdentifiers: [String]
+    public let blockers: [String]
+
+    public var isReadyThroughCycle100: Bool {
+        blockers.isEmpty &&
+            cycleStart == 81 &&
+            cycleEnd == 100 &&
+            cycle80Ready &&
+            opposingAIReady &&
+            standingOrderAIReady &&
+            pinsMoraleAIReady &&
+            targetReactionAIReady &&
+            missingUISourceIdentifiers.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle100AcceptanceCatalog {
+    public static let cycleRange = 81...100
+    public static let requiredUISourceIdentifiers = [
+        "opposing-order-ai-panel",
+        "opposing-ai-army-family",
+        "opposing-ai-order-choice",
+        "opposing-ai-standing-order",
+        "opposing-ai-morale-risk",
+        "target-reaction-ai-summary",
+    ]
+
+    public static func acceptanceReadyThroughCycle100(
+        cycle80SourceText: String
+    ) -> Bool {
+        report(cycle80SourceText: cycle80SourceText).isReadyThroughCycle100
+    }
+
+    public static func report(
+        cycle80SourceText: String
+    ) -> GuderianOrderDiceMigrationCycle100Report {
+        let cycle80Ready = GuderianOrderDiceMigrationCycle80AcceptanceCatalog.acceptanceReadyThroughCycle80(
+            cycle60SourceText: cycle80SourceText,
+            cycle80SourceText: cycle80SourceText
+        )
+        let missingIdentifiers = requiredUISourceIdentifiers.filter { !cycle80SourceText.contains($0) }
+        var blockers: [String] = []
+        if !cycle80Ready {
+            blockers.append("Cycle 61-80 shooting, vehicle, close-quarters, and Guderian-command AI gates are not ready.")
+        }
+        if !GuderianOrderDiceOpposingAIActivationPlanner.acceptanceReadyThroughCycle85 {
+            blockers.append("Cycle 81-85 opposing-army order-dice AI is incomplete.")
+        }
+        if !GuderianOrderDiceStandingOrderPlanner.acceptanceReadyThroughCycle90 {
+            blockers.append("Cycle 86-90 Ambush/Down/Rally AI is incomplete.")
+        }
+        if !GuderianOrderDicePinsMoraleAIPlanner.acceptanceReadyThroughCycle95 {
+            blockers.append("Cycle 91-95 pins and morale AI is incomplete.")
+        }
+        if !GuderianOrderDiceTargetReactionAIPlanner.acceptanceReadyThroughCycle100 {
+            blockers.append("Cycle 96-100 target reaction AI is incomplete.")
+        }
+        if !missingIdentifiers.isEmpty {
+            blockers.append("DZWPlayableBattleView is missing cycle 81-100 UI identifiers: \(missingIdentifiers.joined(separator: ", ")).")
+        }
+
+        return GuderianOrderDiceMigrationCycle100Report(
+            cycleStart: 81,
+            cycleEnd: 100,
+            cycle80Ready: cycle80Ready,
+            opposingAIReady: GuderianOrderDiceOpposingAIActivationPlanner.acceptanceReadyThroughCycle85,
+            standingOrderAIReady: GuderianOrderDiceStandingOrderPlanner.acceptanceReadyThroughCycle90,
+            pinsMoraleAIReady: GuderianOrderDicePinsMoraleAIPlanner.acceptanceReadyThroughCycle95,
+            targetReactionAIReady: GuderianOrderDiceTargetReactionAIPlanner.acceptanceReadyThroughCycle100,
+            missingUISourceIdentifiers: missingIdentifiers,
+            blockers: blockers
+        )
+    }
+}
+
 public struct GuderianOrderDiceMigrationCycle80Report: Codable, Hashable, Sendable {
     public let cycleStart: Int
     public let cycleEnd: Int
@@ -2648,6 +3214,68 @@ private func orderDiceDistance(_ x1: Double, _ y1: Double, _ x2: Double, _ y2: D
     let dx = x1 - x2
     let dy = y1 - y2
     return sqrt(dx * dx + dy * dy)
+}
+
+private func orderDiceSigned(_ value: Int) -> String {
+    value >= 0 ? "+\(value)" : "\(value)"
+}
+
+private func sampleUnit(
+    id: Int,
+    name: String,
+    owner: NativeBoardPlayer = .player,
+    moraleQuality: String = "Regular",
+    pinCount: Int = 0,
+    inCover: Bool = true,
+    hullDown: Bool = false,
+    canMoveNow: Bool = true,
+    canShootNow: Bool = true,
+    canAssaultNow: Bool = false,
+    availableOrders: [HistoricalBoardOrder] = HistoricalBoardOrder.allCases,
+    retainedOrder: Bool = false,
+    downOrderActive: Bool = false,
+    ambushOrderActive: Bool = false,
+    defensiveToHitModifier: Int = 0,
+    lastOrderTestOfficerModifier: Int = 0,
+    lastFubarResult: String = "None"
+) -> NativeBoardUnitSnapshot {
+    NativeBoardUnitSnapshot(
+        id: id,
+        name: name,
+        engineName: name,
+        nativeUnitID: nil,
+        owner: owner,
+        kind: "Infantry",
+        mobility: "Infantry",
+        role: "Rifle section",
+        historicalNote: "",
+        x: Double(id % 10) + 1,
+        y: Double(id % 7) + 1,
+        facingDegrees: 0,
+        totalWoundsRemaining: 5,
+        destroyed: false,
+        inCover: inCover,
+        hullDown: hullDown,
+        pinned: pinCount > 0,
+        canMoveNow: canMoveNow,
+        canShootNow: canShootNow,
+        canAssaultNow: canAssaultNow,
+        selected: false,
+        targeted: false,
+        availableOrders: availableOrders,
+        pinCount: pinCount,
+        moraleQuality: moraleQuality,
+        lastOrderTestOfficerModifier: lastOrderTestOfficerModifier,
+        lastFubarResult: lastFubarResult,
+        retainedOrder: retainedOrder,
+        downOrderActive: downOrderActive,
+        ambushOrderActive: ambushOrderActive,
+        advanceMoveAllowance: 6,
+        runMoveAllowance: 12,
+        currentOrderMoveAllowance: 6,
+        assaultMoveAllowance: 12,
+        defensiveToHitModifier: defensiveToHitModifier
+    )
 }
 
 private func guderianCString(_ pointer: UnsafePointer<CChar>?) -> String {

@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-80")
+@Suite("Guderian order-dice migration cycles 1-100")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -283,6 +283,37 @@ struct GuderianOrderDiceMigrationTests {
         #expect(aiDecision.drawnSide == .guderianAI)
         #expect(HistoricalBoardOrder.allCases.contains(aiDecision.chosenOrder))
         #expect(acceptance.isReadyThroughCycle80)
+        #expect(acceptance.missingUISourceIdentifiers.isEmpty)
+        #expect(acceptance.blockers.isEmpty)
+    }
+
+    @Test("Cycles 81-100 expose opposing AI, standing-order, morale, and reaction contracts")
+    func opposingAIStandingOrderMoraleAndReactionContractsAreReady() throws {
+        let sourceText = try String(contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift", encoding: .utf8)
+        let decisions = GuderianOrderDiceOpposingAIActivationPlanner.allDecisionStates
+        let tuchola = try #require(decisions.first { $0.battleID == .fieldCommand(.tucholaForest) })
+        let lateCareer = try #require(decisions.first { $0.battleID.kind == .lateCareer })
+        let standing = GuderianOrderDiceStandingOrderPlanner.deterministicRecommendations
+        let morale = GuderianOrderDicePinsMoraleAIPlanner.deterministicStates
+        let reactions = GuderianOrderDiceTargetReactionAIPlanner.deterministicDecisions
+        let acceptance = GuderianOrderDiceMigrationCycle100AcceptanceCatalog.report(cycle80SourceText: sourceText)
+        let allOpposingDecisionsReady = decisions.allSatisfy(\.isReady)
+
+        #expect(GuderianOrderDiceOpposingAIActivationPlanner.acceptanceReadyThroughCycle85)
+        #expect(GuderianOrderDiceStandingOrderPlanner.acceptanceReadyThroughCycle90)
+        #expect(GuderianOrderDicePinsMoraleAIPlanner.acceptanceReadyThroughCycle95)
+        #expect(GuderianOrderDiceTargetReactionAIPlanner.acceptanceReadyThroughCycle100)
+        #expect(decisions.count == 35)
+        #expect(allOpposingDecisionsReady)
+        #expect(tuchola.armyFamily == .polish)
+        #expect(tuchola.orderPrioritySummary.contains("Polish"))
+        #expect(lateCareer.armyFamily == .lateWarSovietAllied)
+        #expect(Set(standing.map(\.intent)) == Set(GuderianOrderDiceStandingOrderIntent.allCases))
+        #expect(morale.contains { $0.rallyPriority && $0.recommendedOrder == .rally })
+        #expect(morale.contains { $0.officerModifier > 0 && $0.failedOrderTestPlan.localizedCaseInsensitiveContains("officer") })
+        #expect(reactions.contains { $0.recommendedReaction == .down && $0.attackerSide == .guderianAI })
+        #expect(reactions.contains { $0.recommendedReaction == .ambushOpportunity && $0.attackerSide == .player })
+        #expect(acceptance.isReadyThroughCycle100)
         #expect(acceptance.missingUISourceIdentifiers.isEmpty)
         #expect(acceptance.blockers.isEmpty)
     }

@@ -615,6 +615,9 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         if snapshot.activePlayer == .guderianAI,
            let decision = guderianAIDecisionState(for: snapshot) {
             actionSucceeded = runGuderianOrderDiceActivation(decision: decision, snapshot: snapshot)
+        } else if snapshot.activePlayer == .player,
+                  let decision = opposingAIDecisionState(for: snapshot) {
+            actionSucceeded = runOpposingOrderDiceActivation(decision: decision, snapshot: snapshot)
         } else {
             switch snapshot.phase {
             case .movement:
@@ -673,6 +676,41 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             actionSucceeded = orderIssued
         }
         recordAIEvent("Order-dice AI chose \(decision.chosenUnitName): \(decision.chosenOrder.rawValue) toward \(decision.objectiveOrTargetName).")
+        return orderIssued || actionSucceeded
+    }
+
+    private func runOpposingOrderDiceActivation(
+        decision: GuderianOrderDiceOpposingAIDecisionState,
+        snapshot: NativeBoardSnapshot
+    ) -> Bool {
+        session?.selectUnit(decision.chosenUnitID)
+        session?.selectNearestEnemyToSelectedUnit()
+        let orderIssued = session?.issueOrder(decision.chosenOrder, to: decision.chosenUnitID) ?? false
+        let priorities = source.aiTargetPriorities(for: .player, phase: snapshot.phase)
+        let actionSucceeded: Bool
+        switch decision.chosenOrder {
+        case .advance:
+            actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: 5) ??
+                session?.moveSelectedUnitTowardNearestObjective(maxDistance: 5) ?? false
+        case .run:
+            if snapshot.phase == .assault {
+                session?.selectNearestEnemyToSelectedUnit()
+                if let targetID = session?.snapshot().selectedTarget?.id {
+                    actionSucceeded = session?.assaultUnit(decision.chosenUnitID, targetID: targetID, advance: true) ?? false
+                } else {
+                    actionSucceeded = false
+                }
+            } else {
+                actionSucceeded = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: 8) ??
+                    session?.moveSelectedUnitTowardNearestObjective(maxDistance: 8) ?? false
+            }
+        case .fire:
+            session?.selectNearestEnemyToSelectedUnit()
+            actionSucceeded = session?.shootSelectedTarget() ?? false
+        case .ambush, .rally, .down:
+            actionSucceeded = orderIssued
+        }
+        recordAIEvent("Opposing order-dice AI chose \(decision.chosenUnitName): \(decision.chosenOrder.rawValue) toward \(decision.objectiveOrTargetName).")
         return orderIssued || actionSucceeded
     }
 
@@ -1082,6 +1120,46 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             snapshot: snapshot,
             battleID: source.battleID,
             priorityNames: source.aiTargetPriorities(for: .guderianAI, phase: snapshot.phase)
+        )
+    }
+
+    func opposingAIDecisionState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceOpposingAIDecisionState? {
+        switch source {
+        case .fieldCommand(let scenario, _):
+            return GuderianOrderDiceOpposingAIActivationPlanner.decision(
+                snapshot: snapshot,
+                battleID: source.battleID,
+                plan: OpposingForceAIPlanCatalog.plan(for: scenario)
+            )
+        case .lateCareer(let entry, _):
+            return GuderianOrderDiceOpposingAIActivationPlanner.decision(
+                snapshot: snapshot,
+                battleID: source.battleID,
+                armyFamily: .lateWarSovietAllied,
+                behaviorProfile: .mobileDelay,
+                priorityNames: source.aiTargetPriorities(for: .player, phase: snapshot.phase),
+                strategicGoal: entry.visibleCommandCaveatLabel
+            )
+        }
+    }
+
+    func standingOrderDecisionState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceStandingOrderDecision? {
+        snapshot.selectedUnit.map { GuderianOrderDiceStandingOrderPlanner.recommendation(for: $0, phase: snapshot.phase) }
+    }
+
+    func pinsMoraleAIState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDicePinsMoraleAIState? {
+        snapshot.selectedUnit.map(GuderianOrderDicePinsMoraleAIPlanner.state(for:))
+    }
+
+    func targetReactionAIState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceTargetReactionDecisionState? {
+        guard let attacker = snapshot.selectedUnit,
+              let target = snapshot.selectedTarget else {
+            return nil
+        }
+        return GuderianOrderDiceTargetReactionAIPlanner.decision(
+            attacker: attacker,
+            target: target,
+            incomingAction: attacker.currentOrder ?? .fire
         )
     }
 }
@@ -1659,6 +1737,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             vehicleStatusSection(snapshot)
             closeQuartersSection(snapshot)
             guderianAISection(snapshot)
+            opposingAISection(snapshot)
             actionsSection(snapshot)
             resultSection(snapshot)
         case .inspector:
@@ -2151,6 +2230,43 @@ private struct DZWPlayableBattlePanelWindow: View {
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("guderian-order-ai-panel")
+    }
+
+    private func opposingAISection(_ snapshot: NativeBoardSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Opposing AI")
+                .font(.headline)
+            if let state = model.opposingAIDecisionState(for: snapshot) {
+                Text("\(state.armyFamily.rawValue) | \(state.behaviorProfile.rawValue)")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("opposing-ai-army-family")
+                Text("Order: \(state.chosenOrder.rawValue) by \(state.chosenUnitName)")
+                    .font(.caption)
+                    .accessibilityIdentifier("opposing-ai-order-choice")
+                Text(state.pathSummary)
+                    .font(.caption)
+                Text(model.standingOrderDecisionState(for: snapshot)?.reason ?? state.orderPrioritySummary)
+                    .font(.caption)
+                    .accessibilityIdentifier("opposing-ai-standing-order")
+                Text(model.pinsMoraleAIState(for: snapshot)?.riskSummary ?? state.failedOrderTestPlan)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("opposing-ai-morale-risk")
+                Text(model.targetReactionAIState(for: snapshot)?.opportunitySummary ?? "Target reaction AI is waiting for a selected attacker and target.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("target-reaction-ai-summary")
+            } else {
+                Text("No opposing-force order-dice activation is currently available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("opposing-order-ai-panel")
     }
 
     private func orderInspectorSummary(for unit: NativeBoardUnitSnapshot) -> some View {
