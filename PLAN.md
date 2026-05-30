@@ -73,6 +73,10 @@ Implement Guderian cycles only after the corresponding DZW rules contract exists
 - Tutorials and docs explain the new method.
 - Monty has a stable consumer contract after Guderian cycle 185.
 
+### Order-Dice Migration Cycle Progress
+
+- **Cycles 1-20 complete:** Added the Guderian-side DZW order-dice contract audit, a 35-battle scenario impact map, a temporary order-assignment compatibility shim, cycle-20 acceptance reporting, and future phase-surface retirement gates tied to the Bolt Action-style order-dice rules now owned by `dzw`. Documentation lives in `docs/guderian_order_dice_cycle_001_020.md`; the player-facing phase UI remains intentionally transitional until cycles 46-75 convert it to an order panel.
+
 ## Current Ship Status
 
 The campaign content and native automation layers are substantial, and the accepted playable-game milestone is tracked against the DZW-style hand-playable screen. Cycle 590 completed playable-screen parity for the first 19 battles, from Tuchola Forest through Moscow/Tula/Kashira; those field-command battles now include a playable-side selector with the opposing-force lens as the default and Guderian command play framed as sober command study. Cycle 890 completes the corrected unified 35-battle playable campaign: the 16 added staff/epilogue battles now share the same real DZW playable view path, board renderer, live board session, AI turn flow, blocked-action feedback, debrief persistence, progress/save model, README chronology treatment, and acceptance gate as the first 19. Cycle 930 completes the tutorial onboarding block with first-run historical context and first-battle contextual hints. Cycle 1080 closes the local `REVIEW.md` hardening pass.

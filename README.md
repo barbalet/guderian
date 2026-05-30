@@ -51,6 +51,8 @@ Useful inherited scope from `dzw`:
 
 Guderian-specific work should mostly add campaign data, scenario maps, app identity, opponent AI, and historical presentation around this engine. Engine changes should be rare, guarded, and documented.
 
+The embedded `dzw` package now owns the Bolt Action-style order-dice rules migration. Guderian's consumer-layer adaptation starts with the cycle 1-20 audit, impact map, compatibility shim, and acceptance gates recorded in `docs/guderian_order_dice_cycle_001_020.md`.
+
 ## Historical Scope
 
 Wikipedia was used as the initial open research shelf for [Heinz Guderian](https://en.wikipedia.org/wiki/Heinz_Guderian)'s World War II field-command battles. The playable campaign should prioritize battles where Guderian commanded XIX Army Corps, Panzergruppe Guderian, 2nd Panzer Group, or 2nd Panzer Army. Later staff positions, including Inspector General of Armoured Troops and acting Chief of the Army General Staff, are historical context rather than direct battlefield command scenarios.
