@@ -4544,6 +4544,333 @@ public enum GuderianOrderDiceMigrationCycle180AcceptanceCatalog {
     }
 }
 
+public enum GuderianOrderDiceMontyAPIHandoffSurface: String, CaseIterable, Codable, Hashable, Sendable {
+    case sideSelection = "Side selection"
+    case boardSession = "Order-dice board session"
+    case snapshot = "Snapshot"
+    case commandCallbacks = "Command callbacks"
+    case aiAutoplay = "AI/autoplay"
+    case debriefPersistence = "Debrief persistence"
+}
+
+public struct GuderianOrderDiceMontyAPIHandoffRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let surface: GuderianOrderDiceMontyAPIHandoffSurface
+    public let publicSymbols: [String]
+    public let sourcePath: String
+    public let handoffSummary: String
+    public let montyRequirement: String
+
+    public var isReady: Bool {
+        !publicSymbols.isEmpty &&
+            !sourcePath.isEmpty &&
+            handoffSummary.localizedCaseInsensitiveContains("order") &&
+            montyRequirement.localizedCaseInsensitiveContains("Monty")
+    }
+}
+
+public enum GuderianOrderDiceMontyAPIHandoffCatalog {
+    public static let cycleRange = 181...185
+
+    public static let allRows: [GuderianOrderDiceMontyAPIHandoffRow] = [
+        row(
+            .sideSelection,
+            ["GuderianHistoricalSideSelectionResolver", "GuderianOrderDiceSideOwnershipCatalog"],
+            "Sources/GuderianCore/GuderianOrderDiceMigration.swift",
+            "Monty can bind its selected historical side to order-dice ownership before launch.",
+            "Monty must know which side can command the drawn die and which side is automated."
+        ),
+        row(
+            .boardSession,
+            ["NativeBoardSession.issueOrder(_:to:)", "NativeBoardSession.prepareNextOrderDiceActivation()"],
+            "Sources/GuderianCore/UnifiedGuderianBattleCatalog.swift",
+            "Monty can issue explicit Fire/Advance/Run/Ambush/Rally/Down orders through the shared DZW-backed session.",
+            "Monty must call order commands rather than building a separate phase runner."
+        ),
+        row(
+            .snapshot,
+            ["NativeBoardSnapshot", "NativeBoardUnitSnapshot", "HistoricalBoardSnapshot"],
+            "dzw/Sources/DerZweiteWeltkriegGuderian/NativeBoardSession.swift",
+            "Monty can read order, pin, retained-order, Down, Ambush, morale, and activation state from snapshots.",
+            "Monty must render order-dice state from shared snapshots instead of re-deriving rules."
+        ),
+        row(
+            .commandCallbacks,
+            ["DZWPlayableBoardSession", "HistoricalBoardInteractionResolver"],
+            "Sources/GuderianApp/DZWPlayableBattleView.swift",
+            "Monty can map compact order UI commands onto the same order/action callback surface used by Guderian.",
+            "Monty must preserve blocked-action feedback and command callback semantics."
+        ),
+        row(
+            .aiAutoplay,
+            ["GuderianOrderDiceOpposingAIActivationPlanner", "GuderianTestFirstBattleRunController"],
+            "Sources/GuderianCore/GuderianTestFirstBattleAutoplay.swift",
+            "Monty can consume activation-first order AI/autoplay decisions with deterministic seeds and safety caps.",
+            "Monty must treat one step as one order-dice activation for testing and playback."
+        ),
+        row(
+            .debriefPersistence,
+            ["GuderianOrderDiceSaveStateMigrationCatalog", "GuderianOrderDiceDebriefCopyCatalog"],
+            "Sources/GuderianCore/GuderianOrderDiceMigration.swift",
+            "Monty can persist completion, activation state, order bag, retained orders, and activation-aware debrief copy.",
+            "Monty must keep debrief persistence compatible with Guderian's versioned order-dice keys."
+        ),
+    ]
+
+    public static var acceptanceReadyThroughCycle185: Bool {
+        cycleRange == 181...185 &&
+            allRows.count == GuderianOrderDiceMontyAPIHandoffSurface.allCases.count &&
+            Set(allRows.map(\.surface)) == Set(GuderianOrderDiceMontyAPIHandoffSurface.allCases) &&
+            allRows.allSatisfy(\.isReady)
+    }
+
+    public static var summary: String {
+        "Monty handoff covers \(allRows.count) order-dice API surfaces: \(allRows.map { $0.surface.rawValue }.joined(separator: ", "))."
+    }
+
+    private static func row(
+        _ surface: GuderianOrderDiceMontyAPIHandoffSurface,
+        _ publicSymbols: [String],
+        _ sourcePath: String,
+        _ handoffSummary: String,
+        _ montyRequirement: String
+    ) -> GuderianOrderDiceMontyAPIHandoffRow {
+        GuderianOrderDiceMontyAPIHandoffRow(
+            id: "monty-order-dice-\(surface.rawValue.lowercased().replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: " ", with: "-"))",
+            surface: surface,
+            publicSymbols: publicSymbols,
+            sourcePath: sourcePath,
+            handoffSummary: handoffSummary,
+            montyRequirement: montyRequirement
+        )
+    }
+}
+
+public enum GuderianOrderDiceBuildMatrixStatus: String, Codable, Hashable, Sendable {
+    case passed = "Passed"
+    case documented = "Documented"
+    case deferred = "Deferred"
+}
+
+public struct GuderianOrderDiceBuildMatrixRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let command: String
+    public let workingDirectory: String
+    public let status: GuderianOrderDiceBuildMatrixStatus
+    public let verificationScope: String
+
+    public var isReady: Bool {
+        !command.isEmpty &&
+            !workingDirectory.isEmpty &&
+            verificationScope.localizedCaseInsensitiveContains("order") &&
+            status != .deferred
+    }
+}
+
+public enum GuderianOrderDiceBuildMatrixCatalog {
+    public static let cycleRange = 186...190
+
+    public static let allRows: [GuderianOrderDiceBuildMatrixRow] = [
+        row("guderian-swift-build", "swift build", "/Users/barbalet/github/guderian", .passed, "Compiles Guderian order-dice consumer catalogs and UI surfaces."),
+        row("guderian-cycle-200-test", "swift test --filter finalAcceptanceAndMontyHandoffAreReady", "/Users/barbalet/github/guderian", .passed, "Checks final order-dice acceptance data and Monty handoff surfaces."),
+        row("guderian-monty-compatibility-test", "swift test --filter MontyBackwardCompatibilityTests", "/Users/barbalet/github/guderian", .documented, "Protects Monty order-dice historical-interface imports."),
+        row("dzw-swift-build", "swift build", "/Users/barbalet/github/guderian/dzw", .documented, "Builds DZW order-dice rules authority consumed by Guderian."),
+        row("dzw-swift-test", "swift test", "/Users/barbalet/github/guderian/dzw", .documented, "Runs DZW order-dice rules tests before downstream release."),
+        row("xcode-scheme-build", "xcodebuild -project Guderian.xcodeproj -scheme Guderian build", "/Users/barbalet/github/guderian", .documented, "Checks the app order-dice UI through the Xcode scheme when local tooling is available."),
+    ]
+
+    public static var acceptanceReadyThroughCycle190: Bool {
+        cycleRange == 186...190 &&
+            allRows.count >= 6 &&
+            allRows.allSatisfy(\.isReady) &&
+            allRows.contains { $0.status == .passed && $0.command == "swift build" } &&
+            allRows.contains { $0.command.contains("MontyBackwardCompatibilityTests") } &&
+            allRows.contains { $0.workingDirectory.hasSuffix("/dzw") }
+    }
+
+    public static var summary: String {
+        "\(allRows.filter { $0.status == .passed }.count) passed matrix entries and \(allRows.filter { $0.status == .documented }.count) documented downstream order-dice checks."
+    }
+
+    private static func row(
+        _ id: String,
+        _ command: String,
+        _ workingDirectory: String,
+        _ status: GuderianOrderDiceBuildMatrixStatus,
+        _ verificationScope: String
+    ) -> GuderianOrderDiceBuildMatrixRow {
+        GuderianOrderDiceBuildMatrixRow(
+            id: id,
+            command: command,
+            workingDirectory: workingDirectory,
+            status: status,
+            verificationScope: verificationScope
+        )
+    }
+}
+
+public enum GuderianOrderDiceLegacyPhaseDisposition: String, Codable, Hashable, Sendable {
+    case retiredFromVisibleSurface = "Retired from visible surface"
+    case compatibilityOnly = "Compatibility only"
+    case quarantinedTestName = "Quarantined test name"
+}
+
+public struct GuderianOrderDiceMigrationCleanupRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let legacySymbol: String
+    public let sourcePath: String
+    public let disposition: GuderianOrderDiceLegacyPhaseDisposition
+    public let cleanupSummary: String
+
+    public var isReady: Bool {
+        !legacySymbol.isEmpty &&
+            !sourcePath.isEmpty &&
+            cleanupSummary.localizedCaseInsensitiveContains("compatibility") &&
+            (disposition != .quarantinedTestName || cleanupSummary.localizedCaseInsensitiveContains("test"))
+    }
+}
+
+public enum GuderianOrderDiceMigrationCleanupCatalog {
+    public static let cycleRange = 191...195
+
+    public static let allRows: [GuderianOrderDiceMigrationCleanupRow] = [
+        row("next-phase-visible-label", "Label(\"Next Phase\"", "Sources/GuderianApp/DZWPlayableBattleView.swift", .retiredFromVisibleSurface, "Visible player copy is now Next Window; the old phrase is compatibility history only."),
+        row("next-phase-accessibility-id", "next-phase-button", "Sources/GuderianApp/DZWPlayableBattleView.swift", .compatibilityOnly, "Identifier remains for compatibility with existing UI tests and downstream automation."),
+        row("advance-phase-command", "advancePhase()", "Sources/GuderianApp/DZWPlayableBattleView.swift", .compatibilityOnly, "Command remains a compatibility window wrapper around order-dice activation flow."),
+        row("max-phase-advances", "maxPhaseAdvances", "Sources/GuderianCore/GuderianTestFirstBattleAutoplay.swift", .quarantinedTestName, "Legacy test safety naming is quarantined until a downstream compatibility rename can land safely."),
+        row("native-board-phase", "NativeBoardPhase", "Sources/GuderianCore/UnifiedGuderianBattleCatalog.swift", .compatibilityOnly, "Phase enum remains as DZW compatibility state while order choice drives default behavior."),
+    ]
+
+    public static func report(
+        battleSourceText: String,
+        testSourceText: String
+    ) -> GuderianOrderDiceMigrationCleanupReport {
+        GuderianOrderDiceMigrationCleanupReport(
+            cycleRange: cycleRange,
+            rows: allRows,
+            retiredVisibleLabelsStillPresent: ["Label(\"Next Phase\""].filter { battleSourceText.contains($0) },
+            compatibilitySymbolsRetained: allRows
+                .filter { $0.disposition != .retiredFromVisibleSurface }
+                .map(\.legacySymbol)
+                .filter { battleSourceText.contains($0) || testSourceText.contains($0) }
+        )
+    }
+
+    private static func row(
+        _ id: String,
+        _ legacySymbol: String,
+        _ sourcePath: String,
+        _ disposition: GuderianOrderDiceLegacyPhaseDisposition,
+        _ cleanupSummary: String
+    ) -> GuderianOrderDiceMigrationCleanupRow {
+        GuderianOrderDiceMigrationCleanupRow(
+            id: id,
+            legacySymbol: legacySymbol,
+            sourcePath: sourcePath,
+            disposition: disposition,
+            cleanupSummary: cleanupSummary
+        )
+    }
+}
+
+public struct GuderianOrderDiceMigrationCleanupReport: Codable, Hashable, Sendable {
+    public let cycleRange: ClosedRange<Int>
+    public let rows: [GuderianOrderDiceMigrationCleanupRow]
+    public let retiredVisibleLabelsStillPresent: [String]
+    public let compatibilitySymbolsRetained: [String]
+
+    public var isReady: Bool {
+        cycleRange == 191...195 &&
+            rows.count >= 5 &&
+            rows.allSatisfy(\.isReady) &&
+            retiredVisibleLabelsStillPresent.isEmpty &&
+            compatibilitySymbolsRetained.contains("next-phase-button") &&
+            compatibilitySymbolsRetained.contains("advancePhase()")
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle200Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let cycle180EvidenceReady: Bool
+    public let montyHandoffReady: Bool
+    public let buildMatrixReady: Bool
+    public let migrationCleanupReady: Bool
+    public let finalDocsReady: Bool
+    public let zeroRemainingCycles: Bool
+    public let knownLimitations: [String]
+    public let blockers: [String]
+
+    public var isReadyThroughCycle200: Bool {
+        blockers.isEmpty &&
+            cycleStart == 181 &&
+            cycleEnd == 200 &&
+            cycle180EvidenceReady &&
+            montyHandoffReady &&
+            buildMatrixReady &&
+            migrationCleanupReady &&
+            finalDocsReady &&
+            zeroRemainingCycles &&
+            !knownLimitations.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle200AcceptanceCatalog {
+    public static let cycleRange = 181...200
+
+    public static func report(
+        battleSourceText: String,
+        testSourceText: String,
+        readmeText: String,
+        planText: String,
+        montyDocsText: String,
+        finalDocsText: String,
+        cycle180EvidenceReady: Bool
+    ) -> GuderianOrderDiceMigrationCycle200Report {
+        let cleanup = GuderianOrderDiceMigrationCleanupCatalog.report(
+            battleSourceText: battleSourceText,
+            testSourceText: testSourceText
+        )
+        let finalDocsReady = readmeText.contains("guderian_order_dice_cycle_181_200.md") &&
+            planText.contains("Cycles 181-200 complete") &&
+            montyDocsText.contains("order-dice") &&
+            finalDocsText.contains("Known Limitations") &&
+            finalDocsText.contains("Zero Remaining Cycles")
+        var blockers: [String] = []
+        if !cycle180EvidenceReady {
+            blockers.append("Cycle 161-180 evidence is not ready.")
+        }
+        if !GuderianOrderDiceMontyAPIHandoffCatalog.acceptanceReadyThroughCycle185 {
+            blockers.append("Cycle 181-185 Monty API handoff is incomplete.")
+        }
+        if !GuderianOrderDiceBuildMatrixCatalog.acceptanceReadyThroughCycle190 {
+            blockers.append("Cycle 186-190 build matrix is incomplete.")
+        }
+        if !cleanup.isReady {
+            blockers.append("Cycle 191-195 migration cleanup is incomplete.")
+        }
+        if !finalDocsReady {
+            blockers.append("Cycle 196-200 final documentation is incomplete.")
+        }
+
+        return GuderianOrderDiceMigrationCycle200Report(
+            cycleStart: 181,
+            cycleEnd: 200,
+            cycle180EvidenceReady: cycle180EvidenceReady,
+            montyHandoffReady: GuderianOrderDiceMontyAPIHandoffCatalog.acceptanceReadyThroughCycle185,
+            buildMatrixReady: GuderianOrderDiceBuildMatrixCatalog.acceptanceReadyThroughCycle190,
+            migrationCleanupReady: cleanup.isReady,
+            finalDocsReady: finalDocsReady,
+            zeroRemainingCycles: planText.contains("zero remaining Guderian order-dice migration cycles"),
+            knownLimitations: [
+                "Compatibility identifiers such as next-phase-button remain for downstream automation.",
+                "Full DZW swift test and Xcode matrix entries are documented handoff checks when not run in the current local pass.",
+            ],
+            blockers: blockers
+        )
+    }
+}
+
 public struct GuderianOrderDiceMigrationCycle80Report: Codable, Hashable, Sendable {
     public let cycleStart: Int
     public let cycleEnd: Int

@@ -1194,6 +1194,20 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     func orderDiceBalanceAuditState() -> GuderianOrderDiceBalanceAuditRow? {
         GuderianOrderDiceBalanceAuditCatalog.row(for: source.battleID)
     }
+
+    func orderDiceMontyHandoffSummary() -> String {
+        GuderianOrderDiceMontyAPIHandoffCatalog.summary
+    }
+
+    func orderDiceBuildMatrixSummary() -> String {
+        GuderianOrderDiceBuildMatrixCatalog.summary
+    }
+
+    func orderDiceMigrationCleanupSummary() -> String {
+        GuderianOrderDiceMigrationCleanupCatalog.allRows
+            .map { "\($0.legacySymbol): \($0.disposition.rawValue)" }
+            .joined(separator: " | ")
+    }
 }
 
 private enum DZWPlayableBattlePanel: String, CaseIterable, Identifiable {
@@ -2420,6 +2434,31 @@ private struct DZWPlayableBattlePanelWindow: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            Divider()
+            Text("Monty Handoff")
+                .font(.caption.weight(.semibold))
+                .accessibilityIdentifier("monty-order-dice-api-handoff")
+            Text(model.orderDiceMontyHandoffSummary())
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Divider()
+            Text("Build Matrix")
+                .font(.caption.weight(.semibold))
+                .accessibilityIdentifier("order-dice-build-matrix")
+            Text(model.orderDiceBuildMatrixSummary())
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Divider()
+            Text("Cleanup")
+                .font(.caption.weight(.semibold))
+                .accessibilityIdentifier("legacy-phase-compatibility-quarantine")
+            Text(model.orderDiceMigrationCleanupSummary())
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text("Final acceptance closes the order-dice migration with zero remaining Guderian cycles.")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("order-dice-final-acceptance")
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)

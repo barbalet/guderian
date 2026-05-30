@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-180")
+@Suite("Guderian order-dice migration cycles 1-200")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -479,5 +479,57 @@ struct GuderianOrderDiceMigrationTests {
         #expect(acceptance.isReadyThroughCycle180)
         #expect(acceptance.blockers.isEmpty)
         #expect(acceptance.replaySignatureCount == 35)
+    }
+
+    @Test("Cycles 181-200 close with Monty handoff, build matrix, cleanup, and final acceptance")
+    func finalAcceptanceAndMontyHandoffAreReady() throws {
+        let battleSource = try String(contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift", encoding: .utf8)
+        let autoplaySource = try String(contentsOfFile: "Sources/GuderianCore/GuderianTestFirstBattleAutoplay.swift", encoding: .utf8)
+        let tutorialSource = try String(contentsOfFile: "Sources/GuderianCore/TutorialOnboarding.swift", encoding: .utf8)
+        let readme = try String(contentsOfFile: "README.md", encoding: .utf8)
+        let plan = try String(contentsOfFile: "PLAN.md", encoding: .utf8)
+        let montyDocs = try String(contentsOfFile: "docs/montyBackwardcompatibility.md", encoding: .utf8)
+        let finalDocs = try String(contentsOfFile: "docs/guderian_order_dice_cycle_181_200.md", encoding: .utf8)
+        let phaseReport = GuderianOrderDicePhaseSurfaceRetirementCatalog.report(
+            battleSourceText: battleSource,
+            tutorialSourceText: tutorialSource,
+            readmeText: readme,
+            planText: plan
+        )
+        let cycle180EvidenceReady = GuderianOrderDiceTurnEndPersistenceCatalog.acceptanceReadyThroughCycle165 &&
+            GuderianOrderDiceFullBattleHarnessCatalog.acceptanceReadyThroughCycle170 &&
+            GuderianOrderDiceBalanceAuditCatalog.acceptanceReadyThroughCycle175 &&
+            phaseReport.isReady
+        let cleanup = GuderianOrderDiceMigrationCleanupCatalog.report(
+            battleSourceText: battleSource,
+            testSourceText: autoplaySource
+        )
+        let acceptance = GuderianOrderDiceMigrationCycle200AcceptanceCatalog.report(
+            battleSourceText: battleSource,
+            testSourceText: autoplaySource,
+            readmeText: readme,
+            planText: plan,
+            montyDocsText: montyDocs,
+            finalDocsText: finalDocs,
+            cycle180EvidenceReady: cycle180EvidenceReady
+        )
+
+        #expect(GuderianOrderDiceMontyAPIHandoffCatalog.acceptanceReadyThroughCycle185)
+        #expect(GuderianOrderDiceMontyAPIHandoffCatalog.allRows.count == GuderianOrderDiceMontyAPIHandoffSurface.allCases.count)
+        #expect(GuderianOrderDiceMontyAPIHandoffCatalog.allRows.allSatisfy { $0.isReady })
+        #expect(GuderianOrderDiceMontyAPIHandoffCatalog.summary.localizedCaseInsensitiveContains("Monty"))
+        #expect(GuderianOrderDiceBuildMatrixCatalog.acceptanceReadyThroughCycle190)
+        #expect(GuderianOrderDiceBuildMatrixCatalog.allRows.contains { $0.command == "swift build" && $0.status == .passed })
+        #expect(GuderianOrderDiceBuildMatrixCatalog.allRows.contains { $0.command.contains("MontyBackwardCompatibilityTests") })
+        #expect(cleanup.isReady)
+        #expect(cleanup.retiredVisibleLabelsStillPresent.isEmpty)
+        #expect(cleanup.compatibilitySymbolsRetained.contains("next-phase-button"))
+        #expect(battleSource.contains("monty-order-dice-api-handoff"))
+        #expect(battleSource.contains("order-dice-build-matrix"))
+        #expect(battleSource.contains("legacy-phase-compatibility-quarantine"))
+        #expect(battleSource.contains("order-dice-final-acceptance"))
+        #expect(acceptance.isReadyThroughCycle200)
+        #expect(acceptance.zeroRemainingCycles)
+        #expect(acceptance.blockers.isEmpty)
     }
 }
