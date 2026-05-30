@@ -1174,6 +1174,14 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     func activationScoringState() -> GuderianOrderDiceActivationScoringRow? {
         GuderianOrderDiceActivationScoringCatalog.row(for: source.battleID)
     }
+
+    func orderDiceSaveStateMigration() -> GuderianOrderDiceSaveStateMigrationRow? {
+        GuderianOrderDiceSaveStateMigrationCatalog.row(for: source.battleID)
+    }
+
+    func orderDiceDebriefCopyState() -> GuderianOrderDiceDebriefCopyRow? {
+        GuderianOrderDiceDebriefCopyCatalog.row(for: source.battleID)
+    }
 }
 
 private enum DZWPlayableBattlePanel: String, CaseIterable, Identifiable {
@@ -2338,6 +2346,30 @@ private struct DZWPlayableBattlePanelWindow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("order-dice-score-pacing-tuning")
+            }
+            if let saveState = model.orderDiceSaveStateMigration() {
+                Divider()
+                Text("Save State")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("order-dice-save-state-migration")
+                Text(saveState.migrationNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(saveState.legacyCompatibilityNote)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if let debriefCopy = model.orderDiceDebriefCopyState() {
+                Divider()
+                Text("Debrief Copy")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier("activation-first-debrief-copy")
+                Text(debriefCopy.activationSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(debriefCopy.persistenceSummary)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(10)

@@ -446,6 +446,7 @@ public enum GuderianTutorialCatalog {
     public static let firstRunCycleRange = 891...910
     public static let firstBattleCycleRange = 911...930
     public static let doNotShowAgainLabel = "Do not show again"
+    public static let activationFirstLanguageAccessibilityIdentifier = "activation-first-tutorial-language"
 
     public static let firstRunHistoryStorageKey = TutorialStorageKey("guderian.tutorial.firstRunHistory.v1.dismissed")
     public static let firstBattleGuidanceStorageKey = TutorialStorageKey("guderian.tutorial.firstBattleGuidance.v1.dismissed")
@@ -481,9 +482,9 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .autoStep,
                 title: "Auto Step",
-                body: "Runs one legal action for the active side and then advances the board. Use it when you want the engine to handle a single phase step.",
+                body: "Runs one legal order-dice activation for the drawn side: choose an eligible unit, issue an order, resolve the action, and then advance the board.",
                 accessibilityIdentifier: "first-battle-button-coach-auto-step",
-                requiredTopics: ["legal action", "phase"]
+                requiredTopics: ["activation", "order"]
             ),
             FirstBattleButtonCoachTip(
                 id: .germanTurn,
@@ -501,17 +502,17 @@ public enum GuderianTutorialCatalog {
             ),
             FirstBattleButtonCoachTip(
                 id: .nextPhase,
-                title: "Next Phase",
-                body: "Moves the battle to the next movement, shooting, or assault phase. Check your selected unit first because some actions are only legal in one phase.",
+                title: "Next Window",
+                body: "Advances the compatibility window after the current activation and order choices are spent. Check the selected unit first because some orders are only legal in the current window.",
                 accessibilityIdentifier: "first-battle-button-coach-next-phase",
-                requiredTopics: ["phase", "legal"]
+                requiredTopics: ["activation", "order"]
             ),
             FirstBattleButtonCoachTip(
                 id: .debrief,
                 title: "Debrief",
-                body: "Ends the current battle state and records score, victory band, and campaign progress. Use it when you are ready to accept the result.",
+                body: "Ends the current battle state and records score, activation pacing, order history, victory band, and campaign persistence. Use it when you are ready to accept the result.",
                 accessibilityIdentifier: "first-battle-button-coach-debrief",
-                requiredTopics: ["score", "campaign progress"]
+                requiredTopics: ["score", "activation", "campaign persistence"]
             ),
             FirstBattleButtonCoachTip(
                 id: .restart,
@@ -530,9 +531,9 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .nextReady,
                 title: "Next Ready",
-                body: "Selects the next active unit that can still participate. Use it to step through your available units before ending a phase.",
+                body: "Selects the next active unit that can still receive an order. Use it to step through available units before ending the activation window.",
                 accessibilityIdentifier: "first-battle-button-coach-next-ready",
-                requiredTopics: ["active unit", "phase"]
+                requiredTopics: ["active unit", "order"]
             ),
             FirstBattleButtonCoachTip(
                 id: .nearestEnemy,
@@ -579,9 +580,9 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .shootTarget,
                 title: "Shoot Target",
-                body: "Fires with the selected unit at the current target during the shooting phase. If the button is disabled, check phase, target, and whether the unit can still fire.",
+                body: "Fires with the selected unit at the current target after a Fire or Advance order in this activation. If the button is disabled, check order, target, line of sight, and whether the unit can still fire.",
                 accessibilityIdentifier: "first-battle-button-coach-shoot-target",
-                requiredTopics: ["shooting phase", "target"]
+                requiredTopics: ["Fire", "Advance", "target"]
             ),
             FirstBattleButtonCoachTip(
                 id: .assaultFollowUp,
@@ -593,9 +594,9 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .assaultTarget,
                 title: "Assault Target",
-                body: "Orders close combat against the selected target during the assault phase. Use it only when the board position is worth the risk.",
+                body: "Orders close combat against the selected target through a Run order. Use it only when the board position is worth the risk.",
                 accessibilityIdentifier: "first-battle-button-coach-assault-target",
-                requiredTopics: ["assault phase", "target"]
+                requiredTopics: ["Run", "target"]
             ),
             FirstBattleButtonCoachTip(
                 id: .resolvePending,
@@ -621,7 +622,7 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .commandPanel,
                 title: "Command Panel",
-                body: "Shows or hides the command panel with phase and action controls. Keep it open when you are issuing orders frequently.",
+                body: "Shows or hides the command panel with order and action controls. Keep it open when you are issuing orders frequently.",
                 accessibilityIdentifier: "first-battle-button-coach-command-panel",
                 requiredTopics: ["command panel", "orders"]
             ),
@@ -648,10 +649,10 @@ public enum GuderianTutorialCatalog {
             ),
             FirstBattleButtonCoachTip(
                 id: .phaseStatus,
-                title: "Phase And Side",
-                body: "Shows the active side, turn, and phase. Movement, shooting, and assault each allow different orders, so check this line before blaming a disabled control.",
+                title: "Activation State",
+                body: "Shows the active side, turn, order state, and activation window. Use it to see why an order is available, spent, retained, or waiting on the next draw.",
                 accessibilityIdentifier: "first-battle-button-coach-phase-status",
-                requiredTopics: ["phase", "orders"]
+                requiredTopics: ["activation", "order"]
             ),
             FirstBattleButtonCoachTip(
                 id: .boardUnitMovement,
@@ -663,7 +664,7 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .boardEnemyTargeting,
                 title: "Targeting",
-                body: "Hover an enemy counter to read it as a target, then click it or use Nearest Enemy before shooting or assault; the low-alpha reticle links your selected unit to the target. Targeting is about tempo: pin, block, or clear the unit that changes the next phase.",
+                body: "Hover an enemy counter to read it as a target, then click it or use Nearest Enemy before shooting or assault; the low-alpha reticle links your selected unit to the target. Targeting is about tempo: pin, block, or clear the unit that changes the next activation.",
                 accessibilityIdentifier: "first-battle-button-coach-board-enemy-targeting",
                 requiredTopics: ["target", "shooting", "assault"]
             ),
@@ -684,9 +685,9 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .actionFeedback,
                 title: "Action Feedback",
-                body: "The feedback line explains the last order. When an action is blocked, read it as the rules tutor for phase, target, movement limit, line of sight, or unit state.",
+                body: "The feedback line explains the last order. When an action is blocked, read it as the rules tutor for order, target, movement limit, line of sight, activation window, or unit state.",
                 accessibilityIdentifier: "first-battle-button-coach-action-feedback",
-                requiredTopics: ["blocked", "phase", "target"]
+                requiredTopics: ["blocked", "order", "target"]
             ),
         ]
     }
@@ -753,7 +754,7 @@ public enum GuderianTutorialCatalog {
                 trigger: .unitSelection,
                 order: 3,
                 title: "Select A Ready Unit",
-                body: "Click a unit to inspect it. The inspector shows side, role, remaining wounds, cover state, hull-down state, and historical notes. The selected unit is outlined on the board. Use Next Ready when you want to cycle through your selected side's units that can still matter this phase.",
+                body: "Click a unit to inspect it. The inspector shows side, role, remaining wounds, cover state, hull-down state, and historical notes. The selected unit is outlined on the board. Use Next Ready when you want to cycle through your selected side's units that can still receive an order.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-selection",
                 requiredTopics: ["Click", "inspector", "selected side"]
             ),
@@ -771,7 +772,7 @@ public enum GuderianTutorialCatalog {
                 trigger: .movementDrag,
                 order: 5,
                 title: "Drag To Move, Then Anchor",
-                body: "During movement, drag one of your selected side's units to a useful position. Short moves are often better than dramatic lunges: keep fields of fire, stay near cover, and leave routes open for later choices. If a move is refused, read the feedback line before trying again.",
+                body: "After an Advance or Run order allows movement, drag one of your selected side's units to a useful position. Short moves are often better than dramatic lunges: keep fields of fire, stay near cover, and leave routes open for later choices. If a move is refused, read the feedback line before trying again.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-movement",
                 requiredTopics: ["movement", "selected side", "feedback"]
             ),
@@ -779,19 +780,19 @@ public enum GuderianTutorialCatalog {
                 id: FirstBattleGuidanceHintID.phase.rawValue,
                 trigger: .phaseAdvance,
                 order: 6,
-                title: "Phases Set What Is Legal",
-                body: "The battle advances through movement, shooting, and assault phases. A command that made sense one moment may be blocked in the next because the phase changed. Use Next Phase deliberately, after checking whether your selected unit still has a useful action.",
+                title: "Orders Set What Is Legal",
+                body: "The battle advances through order-dice activations. Fire, Advance, Run, Rally, Down, and Ambush each open different choices, and the compatibility window only explains where older controls fit. Use Next Window deliberately after checking whether your selected unit still has a useful order.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-phase",
-                requiredTopics: ["movement", "shooting", "assault"]
+                requiredTopics: ["activation", "order", "Fire"]
             ),
             TutorialHint(
                 id: FirstBattleGuidanceHintID.shooting.rawValue,
                 trigger: .shooting,
                 order: 7,
                 title: "Shoot To Disrupt, Not To Duel",
-                body: "In the shooting phase, pick a target that affects tempo. Fire at units threatening bridges, roads, exposed defenders, or your chosen operational path. Damage helps, but pinning and forcing caution also matter. When a weapon or hit allocation choice appears, Resolve Pending keeps play moving.",
+                body: "After a Fire or Advance order, pick a target that affects activation tempo. Fire at units threatening bridges, roads, exposed defenders, or your chosen operational path. Damage helps, but pinning and forcing caution also matter. When a weapon or hit allocation choice appears, Resolve Pending keeps play moving.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-shooting",
-                requiredTopics: ["shooting", "tempo", "Resolve Pending"]
+                requiredTopics: ["Fire", "Advance", "Resolve Pending"]
             ),
             TutorialHint(
                 id: FirstBattleGuidanceHintID.assault.rawValue,
@@ -807,7 +808,7 @@ public enum GuderianTutorialCatalog {
                 trigger: .blockedAction,
                 order: 9,
                 title: "Blocked Actions Are Useful",
-                body: "A blocked action is not just an error. It tells you why the rules rejected an order: wrong phase, no target, movement limit, line of sight, or unavailable unit. Treat that feedback as a rules tutor, then adjust the plan rather than forcing the same command.",
+                body: "A blocked action is not just an error. It tells you why the rules rejected an order: wrong activation window, no target, movement limit, line of sight, or unavailable unit. Treat that feedback as a rules tutor, then adjust the plan rather than forcing the same command.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-blocked",
                 requiredTopics: ["blocked action", "rules", "feedback"]
             ),
@@ -816,7 +817,7 @@ public enum GuderianTutorialCatalog {
                 trigger: .germanAITurn,
                 order: 10,
                 title: "Let The AI Reveal Pressure",
-                body: "AI Turn advances the automated opposing side through its rules-backed actions. Watch which objective the AI pressures, then plan your selected side's next phase around delay, tempo, preservation, or breakthrough. The aim is not to stop every attack; it is to make the scenario goal legible.",
+                body: "AI Turn advances the automated opposing side through rules-backed order activations. Watch which objective the AI pressures, then plan your selected side's next activation around delay, tempo, preservation, or breakthrough. The aim is not to stop every attack; it is to make the scenario goal legible.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-german-ai",
                 requiredTopics: ["AI Turn", "selected side", "scenario goal"]
             ),
@@ -825,9 +826,9 @@ public enum GuderianTutorialCatalog {
                 trigger: .debrief,
                 order: 11,
                 title: "Debrief Saves The Lesson",
-                body: "The debrief converts the battle into score, victory band, notes, and campaign persistence. Read it as after-action analysis, not just a win screen. If these hints have done their job, use the checkbox here to keep this first-battle tutorial from appearing again.",
+                body: "The debrief converts the battle into score, activation pacing, order history, victory band, notes, and campaign persistence. Read it as after-action analysis, not just a win screen. If these hints have done their job, use the checkbox here to keep this first-battle tutorial from appearing again.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-debrief",
-                requiredTopics: ["debrief", "campaign persistence", "checkbox"]
+                requiredTopics: ["debrief", "activation", "campaign persistence", "checkbox"]
             ),
         ]
     }

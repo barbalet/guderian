@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-140")
+@Suite("Guderian order-dice migration cycles 1-160")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -386,6 +386,46 @@ struct GuderianOrderDiceMigrationTests {
             fieldScore.activationAdjustedScore(baseScore: fieldScore.parScore, activationSteps: fieldScore.overBudgetActivationThreshold + 1))
         #expect(lateScore.scoringSummary.localizedCaseInsensitiveContains("activation"))
         #expect(acceptance.isReadyThroughCycle140)
+        #expect(acceptance.missingSourceIdentifiers.isEmpty)
+        #expect(acceptance.blockers.isEmpty)
+    }
+
+    @Test("Cycles 141-160 expose save migration, debrief copy, and activation-first tutorial language")
+    func saveMigrationDebriefCopyAndTutorialLanguageAreReady() throws {
+        let battleSource = try String(contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift", encoding: .utf8)
+        let guderianTestSource = try String(contentsOfFile: "Sources/GuderianTest/GuderianTestApp.swift", encoding: .utf8)
+        let tutorialSource = try String(contentsOfFile: "Sources/GuderianCore/TutorialOnboarding.swift", encoding: .utf8)
+        let saveRows = GuderianOrderDiceSaveStateMigrationCatalog.allRows
+        let debriefRows = GuderianOrderDiceDebriefCopyCatalog.allRows
+        let tutorialRows = GuderianOrderDiceActivationFirstTutorialCatalog.allRows
+        let tucholaSave = try #require(GuderianOrderDiceSaveStateMigrationCatalog.row(for: .fieldCommand(.tucholaForest)))
+        let lateDebrief = try #require(GuderianOrderDiceDebriefCopyCatalog.row(for: .lateCareer(LateCareerStaffBattlefieldSetDCatalog.battlefieldIDs[0])))
+        let autoStepLanguage = try #require(tutorialRows.first { $0.id == FirstBattleButtonCoachID.autoStep.rawValue })
+        let acceptance = GuderianOrderDiceMigrationCycle160AcceptanceCatalog.report(
+            cycle80And100SourceText: battleSource,
+            guderianTestSourceText: guderianTestSource,
+            battleSourceText: battleSource,
+            tutorialSourceText: tutorialSource
+        )
+
+        #expect(GuderianOrderDiceSaveStateMigrationCatalog.acceptanceReadyThroughCycle145)
+        #expect(saveRows.count == 35)
+        #expect(saveRows.filter { $0.source == .fieldCommand }.count == 19)
+        #expect(saveRows.filter { $0.source == .lateCareer }.count == 16)
+        #expect(saveRows.allSatisfy { $0.isReady })
+        #expect(Set(saveRows.flatMap(\.orderDiceStateKeys)).count == 105)
+        #expect(tucholaSave.completionPersistenceKey == "guderian.campaign.tucholaForest.completion.v1")
+        #expect(tucholaSave.orderDiceBagKey.contains("orderDice"))
+        #expect(GuderianOrderDiceDebriefCopyCatalog.acceptanceReadyThroughCycle150)
+        #expect(debriefRows.count == 35)
+        #expect(debriefRows.allSatisfy { $0.isReady })
+        #expect(lateDebrief.ethicalFrame.localizedCaseInsensitiveContains("not a direct field command"))
+        #expect(lateDebrief.activationSummary.localizedCaseInsensitiveContains("activations"))
+        #expect(GuderianOrderDiceActivationFirstTutorialCatalog.acceptanceReadyThroughCycle155)
+        #expect(tutorialRows.count == 9)
+        #expect(tutorialRows.allSatisfy { $0.isReady })
+        #expect(autoStepLanguage.body.localizedCaseInsensitiveContains("order-dice activation"))
+        #expect(acceptance.isReadyThroughCycle160)
         #expect(acceptance.missingSourceIdentifiers.isEmpty)
         #expect(acceptance.blockers.isEmpty)
     }

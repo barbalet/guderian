@@ -3809,6 +3809,358 @@ public enum GuderianOrderDiceMigrationCycle140AcceptanceCatalog {
     }
 }
 
+public enum GuderianOrderDiceSaveStateMigrationSource: String, Codable, Hashable, Sendable {
+    case fieldCommand = "Field command"
+    case lateCareer = "Late career"
+}
+
+public struct GuderianOrderDiceSaveStateMigrationRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let source: GuderianOrderDiceSaveStateMigrationSource
+    public let completionPersistenceKey: String
+    public let activationStateKey: String
+    public let orderDiceBagKey: String
+    public let retainedOrdersKey: String
+    public let migrationNote: String
+    public let legacyCompatibilityNote: String
+
+    public var orderDiceStateKeys: [String] {
+        [
+            activationStateKey,
+            orderDiceBagKey,
+            retainedOrdersKey,
+        ]
+    }
+
+    public var isReady: Bool {
+        !completionPersistenceKey.isEmpty &&
+            orderDiceStateKeys.allSatisfy { $0.hasPrefix("guderian.orderDice.") && $0.hasSuffix(".v1") } &&
+            migrationNote.localizedCaseInsensitiveContains("activation") &&
+            migrationNote.localizedCaseInsensitiveContains("order-dice") &&
+            legacyCompatibilityNote.localizedCaseInsensitiveContains("legacy") &&
+            legacyCompatibilityNote.localizedCaseInsensitiveContains("completion")
+    }
+}
+
+public enum GuderianOrderDiceSaveStateMigrationCatalog {
+    public static let cycleRange = 141...145
+
+    public static var allRows: [GuderianOrderDiceSaveStateMigrationRow] {
+        fieldRows + lateCareerRows
+    }
+
+    public static var fieldRows: [GuderianOrderDiceSaveStateMigrationRow] {
+        GuderianOrderDiceActivationScoringCatalog.fieldRows.map { scoring in
+            row(
+                battleID: scoring.battleID,
+                title: scoring.title,
+                source: .fieldCommand,
+                completionPersistenceKey: "guderian.campaign.\(scoring.battleID.rawValue).completion.v1",
+                sourceKey: "field"
+            )
+        }
+    }
+
+    public static var lateCareerRows: [GuderianOrderDiceSaveStateMigrationRow] {
+        GuderianOrderDiceActivationScoringCatalog.lateCareerRows.map { scoring in
+            row(
+                battleID: scoring.battleID,
+                title: scoring.title,
+                source: .lateCareer,
+                completionPersistenceKey: scoring.persistenceKey,
+                sourceKey: "late"
+            )
+        }
+    }
+
+    public static func row(for battleID: UnifiedGuderianBattleID) -> GuderianOrderDiceSaveStateMigrationRow? {
+        allRows.first { $0.battleID == battleID }
+    }
+
+    public static var acceptanceReadyThroughCycle145: Bool {
+        let rows = allRows
+        let orderDiceKeys = rows.flatMap(\.orderDiceStateKeys)
+        return cycleRange == 141...145 &&
+            rows.count == 35 &&
+            fieldRows.count == 19 &&
+            lateCareerRows.count == 16 &&
+            rows.allSatisfy(\.isReady) &&
+            Set(rows.map(\.battleID)).count == 35 &&
+            Set(rows.map(\.completionPersistenceKey)).count == 35 &&
+            Set(orderDiceKeys).count == 105 &&
+            orderDiceKeys.allSatisfy { $0.contains("orderDice") }
+    }
+
+    private static func row(
+        battleID: UnifiedGuderianBattleID,
+        title: String,
+        source: GuderianOrderDiceSaveStateMigrationSource,
+        completionPersistenceKey: String,
+        sourceKey: String
+    ) -> GuderianOrderDiceSaveStateMigrationRow {
+        let base = "guderian.orderDice.\(sourceKey).\(battleID.rawValue)"
+        return GuderianOrderDiceSaveStateMigrationRow(
+            id: "\(battleID.rawValue)-order-dice-save-migration",
+            battleID: battleID,
+            title: title,
+            source: source,
+            completionPersistenceKey: completionPersistenceKey,
+            activationStateKey: "\(base).activationState.v1",
+            orderDiceBagKey: "\(base).orderBag.v1",
+            retainedOrdersKey: "\(base).retainedOrders.v1",
+            migrationNote: "\(title) saves selected side, current activation, order-dice bag, unit orders, pins, and retained Ambush/Down state beside the completion record.",
+            legacyCompatibilityNote: "Legacy completion progress remains readable through \(completionPersistenceKey) while order-dice state is versioned separately."
+        )
+    }
+}
+
+public struct GuderianOrderDiceDebriefCopyRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let source: GuderianOrderDiceSaveStateMigrationSource
+    public let activationSummary: String
+    public let scoringSummary: String
+    public let persistenceSummary: String
+    public let ethicalFrame: String
+
+    public var isReady: Bool {
+        activationSummary.localizedCaseInsensitiveContains("activation") &&
+            activationSummary.localizedCaseInsensitiveContains("order") &&
+            scoringSummary.localizedCaseInsensitiveContains("score") &&
+            persistenceSummary.localizedCaseInsensitiveContains("save") &&
+            persistenceSummary.localizedCaseInsensitiveContains("persistence") &&
+            ethicalFrame.localizedCaseInsensitiveContains("not celebratory")
+    }
+}
+
+public enum GuderianOrderDiceDebriefCopyCatalog {
+    public static let cycleRange = 146...150
+
+    public static var allRows: [GuderianOrderDiceDebriefCopyRow] {
+        GuderianOrderDiceSaveStateMigrationCatalog.allRows.compactMap(row)
+    }
+
+    public static var fieldRows: [GuderianOrderDiceDebriefCopyRow] {
+        allRows.filter { $0.source == .fieldCommand }
+    }
+
+    public static var lateCareerRows: [GuderianOrderDiceDebriefCopyRow] {
+        allRows.filter { $0.source == .lateCareer }
+    }
+
+    public static func row(for battleID: UnifiedGuderianBattleID) -> GuderianOrderDiceDebriefCopyRow? {
+        allRows.first { $0.battleID == battleID }
+    }
+
+    public static var acceptanceReadyThroughCycle150: Bool {
+        allRows.count == 35 &&
+            fieldRows.count == 19 &&
+            lateCareerRows.count == 16 &&
+            allRows.allSatisfy(\.isReady) &&
+            Set(allRows.map(\.battleID)).count == 35 &&
+            lateCareerRows.allSatisfy { $0.ethicalFrame.localizedCaseInsensitiveContains("not a direct field command") }
+    }
+
+    private static func row(
+        for saveRow: GuderianOrderDiceSaveStateMigrationRow
+    ) -> GuderianOrderDiceDebriefCopyRow? {
+        guard let scoring = GuderianOrderDiceActivationScoringCatalog.row(for: saveRow.battleID) else {
+            return nil
+        }
+        let ethicalFrame: String
+        switch saveRow.source {
+        case .fieldCommand:
+            ethicalFrame = "Debrief copy remains a sober operational study, not celebratory framing, even when the selected side wins."
+        case .lateCareer:
+            ethicalFrame = "Command caveat: \(saveRow.title) is not a direct field command; the debrief is not celebratory framing and keeps the staff-context warning visible."
+        }
+        return GuderianOrderDiceDebriefCopyRow(
+            id: "\(saveRow.battleID.rawValue)-activation-first-debrief-copy",
+            battleID: saveRow.battleID,
+            title: saveRow.title,
+            source: saveRow.source,
+            activationSummary: "Report the result by turns and order-dice activations so players can see whether tempo came from fast orders or delayed reactions.",
+            scoringSummary: scoring.scoringSummary,
+            persistenceSummary: "Save the debrief through \(saveRow.completionPersistenceKey) and preserve order-dice persistence keys for activation state, bag state, and retained orders.",
+            ethicalFrame: ethicalFrame
+        )
+    }
+}
+
+public struct GuderianOrderDiceTutorialLanguageRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let sourceIdentifier: String
+    public let title: String
+    public let body: String
+    public let expectedTopics: [String]
+
+    public var isReady: Bool {
+        expectedTopics.allSatisfy { body.localizedCaseInsensitiveContains($0) } &&
+            body.localizedCaseInsensitiveContains("activation") &&
+            body.localizedCaseInsensitiveContains("order")
+    }
+}
+
+public enum GuderianOrderDiceActivationFirstTutorialCatalog {
+    public static let cycleRange = 151...155
+
+    public static var allRows: [GuderianOrderDiceTutorialLanguageRow] {
+        [
+            buttonRow(.autoStep, topics: ["activation", "order"]),
+            buttonRow(.nextPhase, topics: ["activation", "order"]),
+            buttonRow(.nextReady, topics: ["activation", "order"]),
+            buttonRow(.shootTarget, topics: ["Fire", "Advance", "order"]),
+            buttonRow(.phaseStatus, topics: ["activation", "order"]),
+            hintRow(.phase, topics: ["activation", "order"]),
+            hintRow(.shooting, topics: ["Fire", "Advance", "order"]),
+            hintRow(.germanAI, topics: ["activation", "order"]),
+            hintRow(.debrief, topics: ["activation", "score", "persistence"]),
+        ].compactMap { $0 }
+    }
+
+    public static var acceptanceReadyThroughCycle155: Bool {
+        let rows = allRows
+        return cycleRange == 151...155 &&
+            rows.count == 9 &&
+            rows.allSatisfy(\.isReady) &&
+            Set(rows.map(\.sourceIdentifier)).contains(GuderianTutorialCatalog.activationFirstLanguageAccessibilityIdentifier) &&
+            rows.allSatisfy { !$0.body.localizedCaseInsensitiveContains("phase step") } &&
+            rows.allSatisfy { !$0.body.localizedCaseInsensitiveContains("shooting phase") } &&
+            rows.allSatisfy { !$0.body.localizedCaseInsensitiveContains("assault phase") }
+    }
+
+    private static func buttonRow(
+        _ id: FirstBattleButtonCoachID,
+        topics: [String]
+    ) -> GuderianOrderDiceTutorialLanguageRow? {
+        guard let tip = GuderianTutorialCatalog.firstBattleButtonCoachTip(for: id) else {
+            return nil
+        }
+        return GuderianOrderDiceTutorialLanguageRow(
+            id: tip.id.rawValue,
+            sourceIdentifier: tip.accessibilityIdentifier,
+            title: tip.title,
+            body: tip.body,
+            expectedTopics: topics
+        )
+    }
+
+    private static func hintRow(
+        _ id: FirstBattleGuidanceHintID,
+        topics: [String]
+    ) -> GuderianOrderDiceTutorialLanguageRow? {
+        guard let hint = GuderianTutorialCatalog.firstBattleGuidanceHints.first(where: { $0.id == id.rawValue }) else {
+            return nil
+        }
+        return GuderianOrderDiceTutorialLanguageRow(
+            id: hint.id,
+            sourceIdentifier: id == .phase ? GuderianTutorialCatalog.activationFirstLanguageAccessibilityIdentifier : hint.accessibilityIdentifier,
+            title: hint.title,
+            body: hint.body,
+            expectedTopics: topics
+        )
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle160Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let cycle140Ready: Bool
+    public let saveStateMigrationReady: Bool
+    public let debriefCopyReady: Bool
+    public let activationFirstTutorialReady: Bool
+    public let saveStateRows: Int
+    public let debriefCopyRows: Int
+    public let tutorialLanguageRows: Int
+    public let missingSourceIdentifiers: [String]
+    public let blockers: [String]
+
+    public var isReadyThroughCycle160: Bool {
+        blockers.isEmpty &&
+            cycleStart == 141 &&
+            cycleEnd == 160 &&
+            cycle140Ready &&
+            saveStateMigrationReady &&
+            debriefCopyReady &&
+            activationFirstTutorialReady &&
+            saveStateRows == 35 &&
+            debriefCopyRows == 35 &&
+            tutorialLanguageRows >= 9 &&
+            missingSourceIdentifiers.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle160AcceptanceCatalog {
+    public static let cycleRange = 141...160
+    public static let requiredSourceIdentifiers = [
+        "order-dice-save-state-migration",
+        "activation-first-debrief-copy",
+        "activation-first-tutorial-language",
+    ]
+
+    public static func report(
+        cycle80And100SourceText: String,
+        guderianTestSourceText: String,
+        battleSourceText: String,
+        tutorialSourceText: String
+    ) -> GuderianOrderDiceMigrationCycle160Report {
+        let cycle140Ready = GuderianOrderDiceMigrationCycle140AcceptanceCatalog.acceptanceReadyThroughCycle140(
+            cycle80And100SourceText: cycle80And100SourceText,
+            guderianTestSourceText: guderianTestSourceText,
+            battleSourceText: battleSourceText
+        )
+        let combinedSourceText = battleSourceText + "\n" + tutorialSourceText
+        let missingIdentifiers = requiredSourceIdentifiers.filter { !combinedSourceText.contains($0) }
+        var blockers: [String] = []
+        if !cycle140Ready {
+            blockers.append("Cycle 121-140 late-career tuning and activation-aware scoring gates are not ready.")
+        }
+        if !GuderianOrderDiceSaveStateMigrationCatalog.acceptanceReadyThroughCycle145 {
+            blockers.append("Cycle 141-145 order-dice save-state migration is incomplete.")
+        }
+        if !GuderianOrderDiceDebriefCopyCatalog.acceptanceReadyThroughCycle150 {
+            blockers.append("Cycle 146-150 activation-first debrief copy is incomplete.")
+        }
+        if !GuderianOrderDiceActivationFirstTutorialCatalog.acceptanceReadyThroughCycle155 {
+            blockers.append("Cycle 151-155 activation-first tutorial language is incomplete.")
+        }
+        if !missingIdentifiers.isEmpty {
+            blockers.append("Cycle 141-160 UI/source identifiers are missing: \(missingIdentifiers.joined(separator: ", ")).")
+        }
+
+        return GuderianOrderDiceMigrationCycle160Report(
+            cycleStart: 141,
+            cycleEnd: 160,
+            cycle140Ready: cycle140Ready,
+            saveStateMigrationReady: GuderianOrderDiceSaveStateMigrationCatalog.acceptanceReadyThroughCycle145,
+            debriefCopyReady: GuderianOrderDiceDebriefCopyCatalog.acceptanceReadyThroughCycle150,
+            activationFirstTutorialReady: GuderianOrderDiceActivationFirstTutorialCatalog.acceptanceReadyThroughCycle155,
+            saveStateRows: GuderianOrderDiceSaveStateMigrationCatalog.allRows.count,
+            debriefCopyRows: GuderianOrderDiceDebriefCopyCatalog.allRows.count,
+            tutorialLanguageRows: GuderianOrderDiceActivationFirstTutorialCatalog.allRows.count,
+            missingSourceIdentifiers: missingIdentifiers,
+            blockers: blockers
+        )
+    }
+
+    public static func acceptanceReadyThroughCycle160(
+        cycle80And100SourceText: String,
+        guderianTestSourceText: String,
+        battleSourceText: String,
+        tutorialSourceText: String
+    ) -> Bool {
+        report(
+            cycle80And100SourceText: cycle80And100SourceText,
+            guderianTestSourceText: guderianTestSourceText,
+            battleSourceText: battleSourceText,
+            tutorialSourceText: tutorialSourceText
+        ).isReadyThroughCycle160
+    }
+}
+
 public struct GuderianOrderDiceMigrationCycle80Report: Codable, Hashable, Sendable {
     public let cycleStart: Int
     public let cycleEnd: Int
