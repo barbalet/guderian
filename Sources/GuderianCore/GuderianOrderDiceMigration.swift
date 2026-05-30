@@ -761,3 +761,770 @@ public enum GuderianOrderDiceAcceptanceCatalog {
         )
     }
 }
+
+public enum GuderianOrderDiceForceFamily: String, CaseIterable, Codable, Hashable, Sendable {
+    case polish = "Polish"
+    case french = "French"
+    case britishExpeditionary = "BEF"
+    case belgianDutch = "Belgian/Dutch"
+    case soviet1941 = "Soviet 1941"
+    case sovietWinter = "Soviet winter"
+    case germanEarlyWar = "German early-war"
+    case germanEasternFront = "German Eastern Front"
+    case lateWarGerman = "Late-war German"
+    case lateCareerGenerated = "Late-career generated"
+}
+
+public enum GuderianOrderDiceMoraleQuality: String, CaseIterable, Codable, Hashable, Sendable {
+    case inexperienced = "Inexperienced"
+    case regular = "Regular"
+    case veteran = "Veteran"
+}
+
+public struct GuderianOrderDiceUnitQualityAssignment: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let battleID: UnifiedGuderianBattleID
+    public let battleTitle: String
+    public let side: NativeBattleSide
+    public let forceFamily: GuderianOrderDiceForceFamily
+    public let unitName: String
+    public let mobility: NativeBattleUnitMobility
+    public let weaponRoles: [NativeBattleWeaponRole]
+    public let moraleQuality: GuderianOrderDiceMoraleQuality
+    public let reason: String
+
+    public var isVehicleOrSupport: Bool {
+        mobility != .infantry && mobility != .cavalry && mobility != .command
+    }
+}
+
+public enum GuderianOrderDiceUnitQualityCatalog {
+    public static let cycleRange = 21...25
+
+    public static var allAssignments: [GuderianOrderDiceUnitQualityAssignment] {
+        fieldCommandAssignments + lateCareerAssignments
+    }
+
+    public static var fieldCommandAssignments: [GuderianOrderDiceUnitQualityAssignment] {
+        GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .flatMap { scenario -> [GuderianOrderDiceUnitQualityAssignment] in
+                let instance = NativeBattleInstanceCatalog.instance(for: scenario)
+                return instance.units.map { unit in
+                    assignment(for: unit, battleID: .fieldCommand(scenario.id), title: scenario.title, scenario: scenario)
+                }
+            }
+    }
+
+    public static var lateCareerAssignments: [GuderianOrderDiceUnitQualityAssignment] {
+        UnifiedGuderianBattleCatalog.lateCareerEntries
+            .sorted { $0.order < $1.order }
+            .compactMap { entry -> (UnifiedGuderianBattleEntry, LateCareerNativeBattleInstance)? in
+                guard let battlefieldID = entry.id.lateCareerID,
+                      let instance = LateCareerNativeBattleInstanceCatalog.instance(for: battlefieldID) else {
+                    return nil
+                }
+                return (entry, instance)
+            }
+            .flatMap { entry, instance in
+                instance.units.map { unit in
+                    let family: GuderianOrderDiceForceFamily = unit.side == .guderianAI ? .lateWarGerman : .lateCareerGenerated
+                    let quality = lateCareerQuality(for: unit, family: family, commandScope: entry.commandScope)
+                    return GuderianOrderDiceUnitQualityAssignment(
+                        id: "\(entry.id.rawValue)-\(unit.id)",
+                        battleID: entry.id,
+                        battleTitle: entry.title,
+                        side: unit.side,
+                        forceFamily: family,
+                        unitName: unit.name,
+                        mobility: unit.mobility,
+                        weaponRoles: unit.weapons.map(\.role),
+                        moraleQuality: quality,
+                        reason: "\(family.rawValue) \(unit.mobility.rawValue) quality for \(entry.commandScope.rawValue) order-dice conversion."
+                    )
+                }
+            }
+    }
+
+    public static var forceFamiliesCovered: Set<GuderianOrderDiceForceFamily> {
+        Set(allAssignments.map(\.forceFamily))
+    }
+
+    public static var moraleQualitiesCovered: Set<GuderianOrderDiceMoraleQuality> {
+        Set(allAssignments.map(\.moraleQuality))
+    }
+
+    public static var acceptanceReadyThroughCycle25: Bool {
+        cycleRange == 21...25 &&
+            !allAssignments.isEmpty &&
+            forceFamiliesCovered.isSuperset(of: Set(GuderianOrderDiceForceFamily.allCases)) &&
+            moraleQualitiesCovered == Set(GuderianOrderDiceMoraleQuality.allCases) &&
+            allAssignments.contains { $0.forceFamily == .lateWarGerman && $0.moraleQuality == .regular } &&
+            allAssignments.contains { $0.forceFamily == .sovietWinter && $0.moraleQuality == .veteran }
+    }
+
+    public static func assignments(for id: UnifiedGuderianBattleID) -> [GuderianOrderDiceUnitQualityAssignment] {
+        allAssignments.filter { $0.battleID == id }
+    }
+
+    private static func assignment(
+        for unit: NativeBattleUnit,
+        battleID: UnifiedGuderianBattleID,
+        title: String,
+        scenario: GuderianScenario
+    ) -> GuderianOrderDiceUnitQualityAssignment {
+        let family = forceFamily(for: unit, scenario: scenario)
+        let quality = moraleQuality(for: unit, scenario: scenario, family: family)
+        return GuderianOrderDiceUnitQualityAssignment(
+            id: "\(battleID.rawValue)-\(unit.id)",
+            battleID: battleID,
+            battleTitle: title,
+            side: unit.side,
+            forceFamily: family,
+            unitName: unit.name,
+            mobility: unit.mobility,
+            weaponRoles: unit.weapons.map(\.role),
+            moraleQuality: quality,
+            reason: "\(family.rawValue) \(unit.mobility.rawValue) quality assigned for \(scenario.playerPosture.rawValue) order-dice play."
+        )
+    }
+
+    private static func forceFamily(
+        for unit: NativeBattleUnit,
+        scenario: GuderianScenario
+    ) -> GuderianOrderDiceForceFamily {
+        if unit.side == .guderianAI {
+            return scenario.theater == .easternFront1941 ? .germanEasternFront : .germanEarlyWar
+        }
+
+        switch scenario.theater {
+        case .poland1939:
+            return .polish
+        case .france1940:
+            if scenario.id == .boulogne || scenario.id == .calais {
+                return unit.name.localizedCaseInsensitiveContains("belg") ? .belgianDutch : .britishExpeditionary
+            }
+            if scenario.id == .dunkirk {
+                let lowerName = unit.name.lowercased()
+                return lowerName.contains("dutch") || lowerName.contains("belgian") ? .belgianDutch : .britishExpeditionary
+            }
+            return .french
+        case .easternFront1941:
+            return scenario.id == .moscowTulaKashira ? .sovietWinter : .soviet1941
+        }
+    }
+
+    private static func moraleQuality(
+        for unit: NativeBattleUnit,
+        scenario: GuderianScenario,
+        family: GuderianOrderDiceForceFamily
+    ) -> GuderianOrderDiceMoraleQuality {
+        switch family {
+        case .polish:
+            if scenario.playerPosture == .fortifiedDelay || unit.mobility == .cavalry || unit.mobility == .armoredTrain {
+                return .veteran
+            }
+            return unit.mobility == .armor ? .inexperienced : .regular
+        case .french:
+            if unit.mobility == .armor ||
+                unit.mobility == .artillery ||
+                unit.mobility == .command ||
+                unit.weapons.contains(where: { $0.role == .armorGun || $0.role == .antiTank || $0.role == .artillery || $0.role == .command }) {
+                return .veteran
+            }
+            return .regular
+        case .britishExpeditionary:
+            return unit.mobility == .command || unit.weapons.contains(where: { $0.role == .navalSupport }) ? .veteran : .regular
+        case .belgianDutch:
+            return .regular
+        case .soviet1941:
+            if unit.name.localizedCaseInsensitiveContains("guard") || unit.name.localizedCaseInsensitiveContains("tank") {
+                return .veteran
+            }
+            return unit.mobility == .command ? .regular : .inexperienced
+        case .sovietWinter:
+            if unit.mobility == .command || unit.mobility == .armor || unit.name.localizedCaseInsensitiveContains("reserve") {
+                return .veteran
+            }
+            return .regular
+        case .germanEarlyWar:
+            return unit.mobility == .command || unit.mobility == .armor || unit.mobility == .engineer ? .veteran : .regular
+        case .germanEasternFront:
+            return scenario.id == .moscowTulaKashira && unit.mobility == .infantry ? .regular : .veteran
+        case .lateWarGerman, .lateCareerGenerated:
+            return .regular
+        }
+    }
+
+    private static func lateCareerQuality(
+        for unit: NativeBattleUnit,
+        family: GuderianOrderDiceForceFamily,
+        commandScope: GuderianCommandScope
+    ) -> GuderianOrderDiceMoraleQuality {
+        if family == .lateWarGerman {
+            return commandScope == .postDismissalContext ? .inexperienced : .regular
+        }
+        if unit.mobility == .armor || unit.mobility == .artillery || unit.mobility == .command {
+            return .veteran
+        }
+        return .regular
+    }
+}
+
+public struct GuderianOrderDiceSideCupReport: Codable, Hashable, Sendable {
+    public let battleID: UnifiedGuderianBattleID
+    public let title: String
+    public let rulesetName: String
+    public let playerDice: Int
+    public let guderianDice: Int
+    public let totalRemainingDice: Int
+    public let replaySignature: UInt32
+    public let eligiblePlayerUnits: Int
+    public let eligibleGuderianUnits: Int
+    public let blockers: [String]
+
+    public var isReady: Bool {
+        blockers.isEmpty &&
+            rulesetName == "Order Dice" &&
+            playerDice == eligiblePlayerUnits &&
+            guderianDice == eligibleGuderianUnits &&
+            totalRemainingDice == playerDice + guderianDice
+    }
+}
+
+public enum GuderianOrderDiceSessionBootstrap {
+    public static let cycleRange = 26...30
+
+    public static func enableOrderDice(
+        in session: NativeBoardSession
+    ) -> GuderianOrderDiceSideCupReport {
+        enableOrderDice(
+            handle: session.handle,
+            battleID: .fieldCommand(session.loadout.scenario.id),
+            title: session.loadout.scenario.title
+        )
+    }
+
+    public static func enableOrderDice(
+        in session: LateCareerNativeBoardSession
+    ) -> GuderianOrderDiceSideCupReport {
+        enableOrderDice(
+            handle: session.handle,
+            battleID: .lateCareer(session.loadout.battlefield.id),
+            title: session.loadout.battlefield.title
+        )
+    }
+
+    public static var acceptanceReadyThroughCycle30: Bool {
+        guard let fieldScenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+              let fieldSession = NativeBoardSession(scenario: fieldScenario, seed: 26_030),
+              let lateID = UnifiedGuderianBattleCatalog.lateCareerEntries.first?.id.lateCareerID,
+              let lateSession = LateCareerNativeBoardSession(battlefieldID: lateID, seed: 26_130) else {
+            return false
+        }
+
+        return cycleRange == 26...30 &&
+            enableOrderDice(in: fieldSession).isReady &&
+            enableOrderDice(in: lateSession).isReady
+    }
+
+    private static func enableOrderDice(
+        handle: OpaquePointer,
+        battleID: UnifiedGuderianBattleID,
+        title: String
+    ) -> GuderianOrderDiceSideCupReport {
+        var blockers: [String] = []
+        if !game_set_ruleset(handle, DZW_RULESET_ORDER_DICE) {
+            blockers.append("DZW refused the Order Dice ruleset.")
+        }
+        if !game_rebuild_order_dice_cup(handle) {
+            blockers.append("DZW could not rebuild the order-dice cup.")
+        }
+
+        let playerDice = diceCount(in: handle, owner: DZW_PLAYER_ONE)
+        let guderianDice = diceCount(in: handle, owner: DZW_PLAYER_TWO)
+        let eligiblePlayerUnits = eligibleUnitCount(in: handle, owner: DZW_PLAYER_ONE)
+        let eligibleGuderianUnits = eligibleUnitCount(in: handle, owner: DZW_PLAYER_TWO)
+        let rulesetName = guderianCString(game_ruleset_name(game_view(handle).ruleset))
+
+        if playerDice != eligiblePlayerUnits {
+            blockers.append("Player order dice \(playerDice) did not match eligible units \(eligiblePlayerUnits).")
+        }
+        if guderianDice != eligibleGuderianUnits {
+            blockers.append("Guderian order dice \(guderianDice) did not match eligible units \(eligibleGuderianUnits).")
+        }
+
+        return GuderianOrderDiceSideCupReport(
+            battleID: battleID,
+            title: title,
+            rulesetName: rulesetName,
+            playerDice: playerDice,
+            guderianDice: guderianDice,
+            totalRemainingDice: Int(game_order_dice_remaining_count(handle)),
+            replaySignature: game_order_dice_replay_signature(handle),
+            eligiblePlayerUnits: eligiblePlayerUnits,
+            eligibleGuderianUnits: eligibleGuderianUnits,
+            blockers: blockers
+        )
+    }
+
+    private static func diceCount(in handle: OpaquePointer, owner: player_t) -> Int {
+        let count = Int(game_order_dice_remaining_count(handle))
+        return (0..<count)
+            .map { game_order_dice_remaining_view(handle, Int32($0)) }
+            .filter { $0.available && $0.owner == owner }
+            .count
+    }
+
+    private static func eligibleUnitCount(in handle: OpaquePointer, owner: player_t) -> Int {
+        (0..<Int(game_unit_count(handle)))
+            .map { game_unit_view(handle, Int32($0)) }
+            .filter { $0.owner == owner && orderDiceUnitCanReceiveDie($0) }
+            .count
+    }
+
+    private static func orderDiceUnitCanReceiveDie(_ unit: unit_view_t) -> Bool {
+        !unit.destroyed &&
+            Int(unit.models) > 0 &&
+            unit.owner != DZW_PLAYER_NONE &&
+            !unit.embarked &&
+            !unit.falling_back &&
+            !unit.locked_in_assault &&
+            !unit.acted_this_turn &&
+            !unit.retained_order &&
+            unit.current_order == DZW_ORDER_NONE
+    }
+}
+
+public enum GuderianOrderDiceEligibilityCategory: String, CaseIterable, Codable, Hashable, Sendable {
+    case eligible = "Eligible"
+    case commandCaveat = "Command caveat"
+    case noDrawnDie = "No drawn die"
+    case wrongSideDie = "Wrong-side die"
+    case destroyed = "Destroyed"
+    case embarked = "Embarked"
+    case retainedOrder = "Retained order"
+    case alreadyOrdered = "Already ordered"
+    case pinnedOrderTest = "Pinned order test"
+    case immobilizedVehicle = "Immobilized vehicle"
+    case crewStunned = "Crew stunned"
+    case lockedInAssault = "Locked in assault"
+    case fallingBack = "Falling back"
+    case unavailable = "Unavailable"
+}
+
+public struct GuderianOrderDiceEligibilityReason: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let unitID: Int
+    public let order: HistoricalBoardOrder?
+    public let category: GuderianOrderDiceEligibilityCategory
+    public let message: String
+    public let requiresOrderTest: Bool
+}
+
+public struct GuderianOrderDiceEligibilityReport: Codable, Hashable, Sendable {
+    public let battleID: UnifiedGuderianBattleID
+    public let unitID: Int
+    public let unitName: String
+    public let reasons: [GuderianOrderDiceEligibilityReason]
+
+    public var categories: Set<GuderianOrderDiceEligibilityCategory> {
+        Set(reasons.map(\.category))
+    }
+
+    public var hasOrderTestReason: Bool {
+        reasons.contains { $0.requiresOrderTest || $0.category == .pinnedOrderTest }
+    }
+}
+
+public enum GuderianOrderDiceEligibilityMapper {
+    public static let cycleRange = 31...35
+
+    public static var acceptanceReadyThroughCycle35: Bool {
+        cycleRange == 31...35 &&
+            category(for: "Destroyed units cannot receive orders.") == .destroyed &&
+            category(for: "Embarked units cannot receive orders directly.") == .embarked &&
+            category(for: "Unit is retaining an order.") == .retainedOrder &&
+            category(for: "Pin markers require an order test.") == .pinnedOrderTest &&
+            category(for: "Immobilized vehicles cannot receive movement orders.") == .immobilizedVehicle &&
+            GuderianOrderDiceEligibilityCategory.allCases.contains(.commandCaveat)
+    }
+
+    public static func report(
+        in session: NativeBoardSession,
+        unitID: Int,
+        commandCaveat: String? = nil
+    ) -> GuderianOrderDiceEligibilityReport? {
+        report(handle: session.handle, battleID: .fieldCommand(session.loadout.scenario.id), unitID: unitID, commandCaveat: commandCaveat)
+    }
+
+    public static func report(
+        in session: LateCareerNativeBoardSession,
+        unitID: Int,
+        commandCaveat: String? = nil
+    ) -> GuderianOrderDiceEligibilityReport? {
+        report(handle: session.handle, battleID: .lateCareer(session.loadout.battlefield.id), unitID: unitID, commandCaveat: commandCaveat ?? session.loadout.battlefield.visibleCommandCaveatLabel)
+    }
+
+    public static func category(for reason: String) -> GuderianOrderDiceEligibilityCategory {
+        let lower = reason.lowercased()
+        if lower.contains("eligible") {
+            return .eligible
+        }
+        if lower.contains("command caveat") || lower.contains("not a guderian field command") {
+            return .commandCaveat
+        }
+        if lower.contains("draw an order die") {
+            return .noDrawnDie
+        }
+        if lower.contains("opposing side") {
+            return .wrongSideDie
+        }
+        if lower.contains("destroyed") {
+            return .destroyed
+        }
+        if lower.contains("embarked") {
+            return .embarked
+        }
+        if lower.contains("retaining") {
+            return .retainedOrder
+        }
+        if lower.contains("already received") {
+            return .alreadyOrdered
+        }
+        if lower.contains("pin") || lower.contains("order test") {
+            return .pinnedOrderTest
+        }
+        if lower.contains("immobilized") {
+            return .immobilizedVehicle
+        }
+        if lower.contains("crew stunned") {
+            return .crewStunned
+        }
+        if lower.contains("close-quarters") || lower.contains("locked") {
+            return .lockedInAssault
+        }
+        if lower.contains("falling back") {
+            return .fallingBack
+        }
+        return .unavailable
+    }
+
+    private static func report(
+        handle: OpaquePointer,
+        battleID: UnifiedGuderianBattleID,
+        unitID: Int,
+        commandCaveat: String?
+    ) -> GuderianOrderDiceEligibilityReport? {
+        guard let unit = unitView(handle: handle, unitID: unitID) else {
+            return nil
+        }
+
+        _ = game_set_ruleset(handle, DZW_RULESET_ORDER_DICE)
+        var reasons: [GuderianOrderDiceEligibilityReason] = []
+        if let commandCaveat, !commandCaveat.isEmpty {
+            reasons.append(reason(unitID: unitID, order: nil, category: .commandCaveat, message: commandCaveat, requiresOrderTest: false))
+        }
+        if unit.destroyed {
+            reasons.append(reason(unitID: unitID, order: nil, category: .destroyed, message: "Destroyed units cannot receive orders.", requiresOrderTest: false))
+        }
+        if unit.embarked {
+            reasons.append(reason(unitID: unitID, order: nil, category: .embarked, message: "Embarked units cannot receive orders directly.", requiresOrderTest: false))
+        }
+        if unit.retained_order {
+            reasons.append(reason(unitID: unitID, order: nil, category: .retainedOrder, message: "Unit is retaining an order.", requiresOrderTest: false))
+        }
+        if unit.pin_count > 0 {
+            reasons.append(reason(unitID: unitID, order: nil, category: .pinnedOrderTest, message: "Pin markers require an order test.", requiresOrderTest: true))
+        }
+        if let movementReason = optionalCString(unit.movement_rejection_reason), !movementReason.isEmpty {
+            let category = category(for: movementReason)
+            if category != .eligible {
+                reasons.append(reason(unitID: unitID, order: nil, category: category, message: movementReason, requiresOrderTest: false))
+            }
+        }
+
+        reasons.append(contentsOf: HistoricalBoardOrder.allCases.map { order in
+            let eligibility = game_unit_order_eligibility_view(handle, Int32(unitID), order.guderianCValue)
+            let message = guderianCString(eligibility.reason)
+            return reason(
+                unitID: unitID,
+                order: order,
+                category: category(for: message),
+                message: message,
+                requiresOrderTest: eligibility.requires_order_test
+            )
+        })
+
+        return GuderianOrderDiceEligibilityReport(
+            battleID: battleID,
+            unitID: unitID,
+            unitName: guderianCString(unit.name),
+            reasons: reasons
+        )
+    }
+
+    private static func reason(
+        unitID: Int,
+        order: HistoricalBoardOrder?,
+        category: GuderianOrderDiceEligibilityCategory,
+        message: String,
+        requiresOrderTest: Bool
+    ) -> GuderianOrderDiceEligibilityReason {
+        GuderianOrderDiceEligibilityReason(
+            id: "\(unitID)-\(order?.rawValue ?? category.rawValue)-\(message)",
+            unitID: unitID,
+            order: order,
+            category: category,
+            message: message,
+            requiresOrderTest: requiresOrderTest
+        )
+    }
+}
+
+public enum GuderianOrderDiceMovementClass: String, CaseIterable, Codable, Hashable, Sendable {
+    case openAdvanceRun = "Open Advance/Run"
+    case roughAdvanceOnly = "Rough Advance only"
+    case obstacleAdvanceCheck = "Obstacle Advance check"
+    case buildingEntry = "Building entry"
+    case roadRunBonus = "Road Run bonus"
+    case waterCrossingLimited = "Water crossing limited"
+    case fortifiedCover = "Fortified cover"
+}
+
+public struct GuderianOrderDiceSetupMigrationRow: Identifiable, Codable, Hashable, Sendable {
+    public let id: UnifiedGuderianBattleID
+    public let title: String
+    public let movementClasses: [GuderianOrderDiceMovementClass]
+    public let deploymentOpeningOrders: [HistoricalBoardOrder]
+    public let objectiveOrders: [HistoricalBoardOrder]
+    public let eventOrders: [HistoricalBoardOrder]
+    public let notes: [String]
+
+    public var isReady: Bool {
+        !movementClasses.isEmpty &&
+            deploymentOpeningOrders.contains(.advance) &&
+            !objectiveOrders.isEmpty &&
+            !eventOrders.isEmpty &&
+            !notes.isEmpty
+    }
+}
+
+public enum GuderianOrderDiceSetupMigrationCatalog {
+    public static let cycleRange = 36...40
+
+    public static var allRows: [GuderianOrderDiceSetupMigrationRow] {
+        fieldCommandRows + lateCareerRows
+    }
+
+    public static var fieldCommandRows: [GuderianOrderDiceSetupMigrationRow] {
+        GuderianCampaignCatalog.all
+            .sorted { $0.order < $1.order }
+            .map { scenario in
+                let instance = NativeBattleInstanceCatalog.instance(for: scenario)
+                return row(id: .fieldCommand(scenario.id), title: scenario.title, terrain: instance.terrain, objectives: instance.objectives, events: instance.events, posture: scenario.playerPosture.rawValue)
+            }
+    }
+
+    public static var lateCareerRows: [GuderianOrderDiceSetupMigrationRow] {
+        UnifiedGuderianBattleCatalog.lateCareerEntries
+            .sorted { $0.order < $1.order }
+            .compactMap { entry in
+                guard let battlefieldID = entry.id.lateCareerID,
+                      let instance = LateCareerNativeBattleInstanceCatalog.instance(for: battlefieldID) else {
+                    return nil
+                }
+                return row(id: entry.id, title: entry.title, terrain: instance.terrain, objectives: instance.objectives, events: instance.events, posture: entry.commandScope.rawValue)
+            }
+    }
+
+    public static var acceptanceReadyThroughCycle40: Bool {
+        let rows = allRows
+        return cycleRange == 36...40 &&
+            rows.count == 35 &&
+            rows.allSatisfy(\.isReady) &&
+            rows.contains { $0.movementClasses.contains(.roadRunBonus) } &&
+            rows.contains { $0.movementClasses.contains(.roughAdvanceOnly) } &&
+            rows.contains { $0.objectiveOrders.contains(.rally) || $0.eventOrders.contains(.rally) }
+    }
+
+    private static func row(
+        id: UnifiedGuderianBattleID,
+        title: String,
+        terrain: [NativeBattleTerrainFeature],
+        objectives: [NativeBattleObjective],
+        events: [NativeBattleEventTrigger],
+        posture: String
+    ) -> GuderianOrderDiceSetupMigrationRow {
+        GuderianOrderDiceSetupMigrationRow(
+            id: id,
+            title: title,
+            movementClasses: sortedUnique(terrain.map(movementClass)),
+            deploymentOpeningOrders: [.advance, .run, .down],
+            objectiveOrders: sortedUnique(objectives.flatMap(ordersForObjective)),
+            eventOrders: sortedUnique(events.flatMap(ordersForEvent)),
+            notes: [
+                "\(posture) setup uses DZW order/movement categories.",
+                "Deployment opens with Advance/Run choices while Down remains available for pinned or exposed units.",
+                "Objectives and scripted events are classified into order intents before UI conversion.",
+            ]
+        )
+    }
+
+    private static func movementClass(for terrain: NativeBattleTerrainFeature) -> GuderianOrderDiceMovementClass {
+        switch terrain.kind {
+        case .road, .railway, .phaseLine:
+            return .roadRunBonus
+        case .river, .canal, .lake, .ford, .ferry, .bridge:
+            return .waterCrossingLimited
+        case .marsh, .forest, .ridge:
+            return .roughAdvanceOnly
+        case .town, .village, .urbanDistrict:
+            return .buildingEntry
+        case .bunker, .fortifiedLine:
+            return .fortifiedCover
+        case .objective, .artilleryPark, .airPressure:
+            return .openAdvanceRun
+        }
+    }
+
+    private static func ordersForObjective(_ objective: NativeBattleObjective) -> [HistoricalBoardOrder] {
+        switch objective.kind {
+        case .hold, .delay, .preserve:
+            return [.advance, .down, .ambush, .rally]
+        case .withdraw, .evacuate, .breakout:
+            return [.advance, .run, .rally]
+        case .disrupt, .counterattack:
+            return [.advance, .fire, .run]
+        case .deny:
+            return [.fire, .ambush, .down]
+        case .score:
+            return [.advance, .fire]
+        }
+    }
+
+    private static func ordersForEvent(_ event: NativeBattleEventTrigger) -> [HistoricalBoardOrder] {
+        switch event.kind {
+        case .trigger:
+            return [.advance, .fire]
+        case .reinforcement:
+            return [.run, .advance]
+        case .pacing:
+            return [.rally, .down]
+        case .tutorial:
+            return [.advance]
+        }
+    }
+
+    private static func sortedUnique<T: RawRepresentable & Hashable>(_ values: [T]) -> [T] where T.RawValue == String {
+        Array(Set(values)).sorted { $0.rawValue < $1.rawValue }
+    }
+}
+
+public struct GuderianOrderDiceMigrationCycle40Report: Codable, Hashable, Sendable {
+    public let cycleStart: Int
+    public let cycleEnd: Int
+    public let qualityAssignments: Int
+    public let sideCupFieldReady: Bool
+    public let sideCupLateCareerReady: Bool
+    public let eligibilityReady: Bool
+    public let setupRows: Int
+    public let blockers: [String]
+
+    public var isReadyThroughCycle40: Bool {
+        blockers.isEmpty &&
+            cycleStart == 21 &&
+            cycleEnd == 40 &&
+            qualityAssignments > 0 &&
+            sideCupFieldReady &&
+            sideCupLateCareerReady &&
+            eligibilityReady &&
+            setupRows == 35
+    }
+}
+
+public enum GuderianOrderDiceMigrationCycle40AcceptanceCatalog {
+    public static let cycleRange = 21...40
+
+    public static var acceptanceReadyThroughCycle40: Bool {
+        report().isReadyThroughCycle40
+    }
+
+    public static func report() -> GuderianOrderDiceMigrationCycle40Report {
+        var blockers: [String] = []
+        if !GuderianOrderDiceUnitQualityCatalog.acceptanceReadyThroughCycle25 {
+            blockers.append("Cycle 21-25 unit quality assignment is incomplete.")
+        }
+        if !GuderianOrderDiceSessionBootstrap.acceptanceReadyThroughCycle30 {
+            blockers.append("Cycle 26-30 order-dice side-cup bootstrap is incomplete.")
+        }
+        if !GuderianOrderDiceEligibilityMapper.acceptanceReadyThroughCycle35 {
+            blockers.append("Cycle 31-35 eligibility mapping is incomplete.")
+        }
+        if !GuderianOrderDiceSetupMigrationCatalog.acceptanceReadyThroughCycle40 {
+            blockers.append("Cycle 36-40 setup migration is incomplete.")
+        }
+
+        let fieldReady: Bool
+        if let scenario = GuderianCampaignCatalog.scenario(id: .tucholaForest),
+           let session = NativeBoardSession(scenario: scenario, seed: 40_021) {
+            fieldReady = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session).isReady
+        } else {
+            fieldReady = false
+        }
+        let lateReady: Bool
+        if let lateID = UnifiedGuderianBattleCatalog.lateCareerEntries.first?.id.lateCareerID,
+           let session = LateCareerNativeBoardSession(battlefieldID: lateID, seed: 40_022) {
+            lateReady = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session).isReady
+        } else {
+            lateReady = false
+        }
+
+        return GuderianOrderDiceMigrationCycle40Report(
+            cycleStart: 21,
+            cycleEnd: 40,
+            qualityAssignments: GuderianOrderDiceUnitQualityCatalog.allAssignments.count,
+            sideCupFieldReady: fieldReady,
+            sideCupLateCareerReady: lateReady,
+            eligibilityReady: GuderianOrderDiceEligibilityMapper.acceptanceReadyThroughCycle35,
+            setupRows: GuderianOrderDiceSetupMigrationCatalog.allRows.count,
+            blockers: blockers
+        )
+    }
+}
+
+private func guderianCString(_ pointer: UnsafePointer<CChar>?) -> String {
+    pointer.map { String(cString: $0) } ?? ""
+}
+
+private func optionalCString(_ pointer: UnsafePointer<CChar>?) -> String? {
+    guard let pointer else {
+        return nil
+    }
+    return String(cString: pointer)
+}
+
+private func unitView(handle: OpaquePointer, unitID: Int) -> unit_view_t? {
+    (0..<Int(game_unit_count(handle))).lazy
+        .map { game_unit_view(handle, Int32($0)) }
+        .first { Int($0.id) == unitID }
+}
+
+private extension HistoricalBoardOrder {
+    var guderianCValue: dzw_order_t {
+        switch self {
+        case .fire:
+            return DZW_ORDER_FIRE
+        case .advance:
+            return DZW_ORDER_ADVANCE
+        case .run:
+            return DZW_ORDER_RUN
+        case .ambush:
+            return DZW_ORDER_AMBUSH
+        case .rally:
+            return DZW_ORDER_RALLY
+        case .down:
+            return DZW_ORDER_DOWN
+        }
+    }
+}

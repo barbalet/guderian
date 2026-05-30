@@ -2,7 +2,7 @@ import Foundation
 import GuderianCore
 import Testing
 
-@Suite("Guderian order-dice migration cycles 1-20")
+@Suite("Guderian order-dice migration cycles 1-40")
 struct GuderianOrderDiceMigrationTests {
     @Test("Cycles 1-5 audit covers every known phase-flow dependency category")
     func orderDiceAuditCoversLegacyPhaseDependencies() throws {
@@ -104,5 +104,84 @@ struct GuderianOrderDiceMigrationTests {
         #expect(cycle20Report.gateReports.allSatisfy { !$0.isBlocking })
         #expect(macOSGate.observedLegacyIdentifiers.isEmpty ? macOSGate.isSatisfied : macOSGate.isBlocking)
         #expect(GuderianOrderDiceAcceptanceCatalog.phaseSurfaceGates.allSatisfy { !$0.replacementContract.isEmpty })
+    }
+
+    @Test("Cycles 21-25 assign quality across every Guderian force family")
+    func unitQualityAssignmentsCoverEveryForceFamily() throws {
+        let assignments = GuderianOrderDiceUnitQualityCatalog.allAssignments
+        let tuchola = GuderianOrderDiceUnitQualityCatalog.assignments(for: .fieldCommand(.tucholaForest))
+        let sedan = GuderianOrderDiceUnitQualityCatalog.assignments(for: .fieldCommand(.sedan))
+        let moscow = GuderianOrderDiceUnitQualityCatalog.assignments(for: .fieldCommand(.moscowTulaKashira))
+        let lateCareer = assignments.filter { $0.battleID.kind == .lateCareer }
+
+        #expect(GuderianOrderDiceUnitQualityCatalog.acceptanceReadyThroughCycle25)
+        #expect(assignments.count > 100)
+        #expect(GuderianOrderDiceUnitQualityCatalog.forceFamiliesCovered.isSuperset(of: Set(GuderianOrderDiceForceFamily.allCases)))
+        #expect(GuderianOrderDiceUnitQualityCatalog.moraleQualitiesCovered == Set(GuderianOrderDiceMoraleQuality.allCases))
+        #expect(tuchola.contains { $0.forceFamily == .polish })
+        #expect(tuchola.contains { $0.forceFamily == .germanEarlyWar })
+        #expect(sedan.contains { $0.forceFamily == .french && $0.moraleQuality == .veteran })
+        #expect(moscow.contains { $0.forceFamily == .sovietWinter && $0.moraleQuality == .veteran })
+        #expect(lateCareer.contains { $0.forceFamily == .lateWarGerman })
+        #expect(lateCareer.contains { $0.forceFamily == .lateCareerGenerated })
+    }
+
+    @Test("Cycles 26-30 bootstrap field-command and late-career sessions into order-dice cups")
+    func sideOrderDiceBootstrapCreatesDiceForBothSides() throws {
+        let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let fieldSession = try #require(NativeBoardSession(scenario: scenario, seed: 30_001))
+        let lateID = try #require(UnifiedGuderianBattleCatalog.lateCareerEntries.first?.id.lateCareerID)
+        let lateSession = try #require(LateCareerNativeBoardSession(battlefieldID: lateID, seed: 30_002))
+        let fieldReport = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: fieldSession)
+        let lateReport = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: lateSession)
+
+        #expect(GuderianOrderDiceSessionBootstrap.acceptanceReadyThroughCycle30)
+        #expect(fieldReport.isReady)
+        #expect(lateReport.isReady)
+        #expect(fieldReport.playerDice > 0)
+        #expect(fieldReport.guderianDice > 0)
+        #expect(fieldReport.totalRemainingDice == fieldReport.playerDice + fieldReport.guderianDice)
+        #expect(lateReport.totalRemainingDice == lateReport.playerDice + lateReport.guderianDice)
+    }
+
+    @Test("Cycles 31-35 map DZW and Guderian-specific order eligibility reasons")
+    func eligibilityMapperSurfacesOrderDiceReasons() throws {
+        let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let session = try #require(NativeBoardSession(scenario: scenario, seed: 35_001))
+        let opening = session.snapshot()
+        let unit = try #require(opening.units.first { $0.owner == .player && !$0.destroyed })
+        let report = try #require(GuderianOrderDiceEligibilityMapper.report(in: session, unitID: unit.id))
+
+        #expect(GuderianOrderDiceEligibilityMapper.acceptanceReadyThroughCycle35)
+        #expect(GuderianOrderDiceEligibilityMapper.category(for: "Destroyed units cannot receive orders.") == .destroyed)
+        #expect(GuderianOrderDiceEligibilityMapper.category(for: "Embarked units cannot receive orders directly.") == .embarked)
+        #expect(GuderianOrderDiceEligibilityMapper.category(for: "Unit is retaining an order.") == .retainedOrder)
+        #expect(GuderianOrderDiceEligibilityMapper.category(for: "Pin markers require an order test.") == .pinnedOrderTest)
+        #expect(GuderianOrderDiceEligibilityMapper.category(for: "Immobilized vehicles cannot receive movement orders.") == .immobilizedVehicle)
+        #expect(report.battleID == .fieldCommand(.tucholaForest))
+        #expect(report.unitID == unit.id)
+        #expect(report.reasons.count >= HistoricalBoardOrder.allCases.count)
+        #expect(report.categories.contains(.noDrawnDie) || report.categories.contains(.eligible))
+    }
+
+    @Test("Cycles 36-40 migrate scenario setup to order/movement classifications")
+    func setupMigrationClassifiesEveryBattleForOrderMovement() throws {
+        let rows = GuderianOrderDiceSetupMigrationCatalog.allRows
+        let tuchola = try #require(rows.first { $0.id == .fieldCommand(.tucholaForest) })
+        let berlin = try #require(rows.last)
+        let acceptance = GuderianOrderDiceMigrationCycle40AcceptanceCatalog.report()
+
+        #expect(GuderianOrderDiceSetupMigrationCatalog.acceptanceReadyThroughCycle40)
+        #expect(rows.count == 35)
+        #expect(rows.allSatisfy { $0.isReady })
+        #expect(tuchola.movementClasses.contains(.roadRunBonus))
+        #expect(tuchola.deploymentOpeningOrders.contains(.advance))
+        #expect(tuchola.objectiveOrders.contains(.run) || tuchola.objectiveOrders.contains(.ambush))
+        #expect(berlin.id.kind == .lateCareer)
+        #expect(berlin.eventOrders.contains(.advance))
+        #expect(acceptance.isReadyThroughCycle40)
+        #expect(acceptance.blockers.isEmpty)
+        #expect(acceptance.qualityAssignments == GuderianOrderDiceUnitQualityCatalog.allAssignments.count)
+        #expect(acceptance.setupRows == 35)
     }
 }

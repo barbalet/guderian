@@ -76,6 +76,7 @@ Implement Guderian cycles only after the corresponding DZW rules contract exists
 ### Order-Dice Migration Cycle Progress
 
 - **Cycles 1-20 complete:** Added the Guderian-side DZW order-dice contract audit, a 35-battle scenario impact map, a temporary order-assignment compatibility shim, cycle-20 acceptance reporting, and future phase-surface retirement gates tied to the Bolt Action-style order-dice rules now owned by `dzw`. Documentation lives in `docs/guderian_order_dice_cycle_001_020.md`; the player-facing phase UI remains intentionally transitional until cycles 46-75 convert it to an order panel.
+- **Cycles 21-40 complete:** Added unit-quality assignments across Polish, French, BEF, Belgian/Dutch, Soviet, German, and late-career force families; order-dice side-cup bootstrap for field-command and late-career sessions; eligibility-reason mapping for DZW and Guderian command caveats; and setup-migration rows that classify all 35 battles into order/movement contracts. Documentation lives in `docs/guderian_order_dice_cycle_021_040.md`; historical side-selection binding remains next in cycles 41-45.
 
 ## Current Ship Status
 

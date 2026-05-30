@@ -51,7 +51,7 @@ Useful inherited scope from `dzw`:
 
 Guderian-specific work should mostly add campaign data, scenario maps, app identity, opponent AI, and historical presentation around this engine. Engine changes should be rare, guarded, and documented.
 
-The embedded `dzw` package now owns the Bolt Action-style order-dice rules migration. Guderian's consumer-layer adaptation starts with the cycle 1-20 audit, impact map, compatibility shim, and acceptance gates recorded in `docs/guderian_order_dice_cycle_001_020.md`.
+The embedded `dzw` package now owns the Bolt Action-style order-dice rules migration. Guderian's consumer-layer adaptation starts with the cycle 1-20 audit, impact map, compatibility shim, and acceptance gates recorded in `docs/guderian_order_dice_cycle_001_020.md`; cycles 21-40 add quality, side-cup, eligibility, and setup-migration contracts in `docs/guderian_order_dice_cycle_021_040.md`.
 
 ## Historical Scope
 
