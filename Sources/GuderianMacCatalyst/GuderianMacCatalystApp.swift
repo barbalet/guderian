@@ -236,6 +236,26 @@ private enum CatalystNativeSession {
         }
     }
 
+    @discardableResult
+    func prepareNextOrderDiceActivation() -> Bool {
+        switch self {
+        case .field(_, let session):
+            return session.prepareNextOrderDiceActivation(preferredOwner: nil)
+        case .late(_, let session):
+            return session.prepareNextOrderDiceActivation()
+        }
+    }
+
+    @discardableResult
+    func issueOrder(_ order: HistoricalBoardOrder, to unitID: Int) -> Bool {
+        switch self {
+        case .field(_, let session):
+            return session.issueOrder(order, to: unitID)
+        case .late(_, let session):
+            return session.issueOrder(order, to: unitID)
+        }
+    }
+
     func sideTitle(for player: NativeBoardPlayer) -> String {
         switch self {
         case .field(let scenario, _):
@@ -257,6 +277,34 @@ private enum CatalystNativeSession {
                 return LateCareerPlayableSurfaceCatalog.aiPlan(for: entry.id)?.priorityNames(for: phase) ?? []
             }
             return UnifiedGuderianBattleSideSelectionCatalog.objectivePriorityNames(for: player, in: entry)
+        }
+    }
+
+    func guderianAIDecisionState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceAIDecisionState? {
+        GuderianOrderDiceGuderianAIActivationPlanner.decision(
+            snapshot: snapshot,
+            battleID: entryID,
+            priorityNames: targetPriorities(for: .guderianAI, phase: snapshot.phase)
+        )
+    }
+
+    func opposingAIDecisionState(for snapshot: NativeBoardSnapshot) -> GuderianOrderDiceOpposingAIDecisionState? {
+        switch self {
+        case .field(let scenario, _):
+            return GuderianOrderDiceOpposingAIActivationPlanner.decision(
+                snapshot: snapshot,
+                battleID: entryID,
+                plan: OpposingForceAIPlanCatalog.plan(for: scenario)
+            )
+        case .late(let entry, _):
+            return GuderianOrderDiceOpposingAIActivationPlanner.decision(
+                snapshot: snapshot,
+                battleID: entryID,
+                armyFamily: .lateWarSovietAllied,
+                behaviorProfile: .mobileDelay,
+                priorityNames: targetPriorities(for: .player, phase: snapshot.phase),
+                strategicGoal: entry.visibleCommandCaveatLabel
+            )
         }
     }
 
@@ -378,14 +426,29 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
         guard let snapshot else {
             return false
         }
-        return !isBattleOver && snapshot.activePlayer == humanPlayer
+        return !isBattleOver && snapshot.orderDice.current?.owner == humanPlayer
+    }
+
+    var canResolveHumanActivation: Bool {
+        guard let selectedUnit = snapshot?.selectedUnit, selectedUnit.owner == humanPlayer else {
+            return canIssueHumanOrders
+        }
+        return canIssueHumanOrders ||
+            (!isBattleOver && selectedUnit.currentOrder != nil && (selectedUnit.canMoveNow || selectedUnit.canShootNow || selectedUnit.canAssaultNow))
+    }
+
+    var canDrawOrderDie: Bool {
+        guard let snapshot else {
+            return false
+        }
+        return !isBattleOver && snapshot.orderDice.current == nil
     }
 
     var canRunAITurn: Bool {
         guard let snapshot else {
             return false
         }
-        return !isBattleOver && snapshot.activePlayer == aiPlayer
+        return !isBattleOver && snapshot.orderDice.current?.owner == aiPlayer
     }
 
     var completionLine: String? {
@@ -429,12 +492,14 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func select(_ unit: NativeBoardUnitSnapshot) {
-        guard let session, let snapshot, !isBattleOver else {
+        guard let session, !isBattleOver else {
             return
         }
-        if unit.owner == snapshot.activePlayer {
+        if unit.owner == humanPlayer {
             session.selectUnit(unit.id)
-            session.selectNearestEnemyToSelectedUnit()
+            if canIssueHumanOrders || unit.currentOrder != nil {
+                session.selectNearestEnemyToSelectedUnit()
+            }
         } else {
             session.selectTarget(unit.id)
         }
@@ -446,7 +511,13 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
             return
         }
         let candidates = snapshot.units
-            .filter { $0.owner == humanPlayer && !$0.destroyed }
+            .filter {
+                $0.owner == humanPlayer &&
+                    !$0.destroyed &&
+                    !$0.retainedOrder &&
+                    $0.currentOrder == nil &&
+                    !$0.availableOrders.isEmpty
+            }
             .sorted { $0.id < $1.id }
         guard !candidates.isEmpty else {
             return
@@ -473,8 +544,12 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func moveSelectedTowardObjective() {
+        guard canResolveHumanActivation else {
+            errorMessage = "Draw a die and assign an order before moving."
+            return
+        }
         let priorities = snapshot.flatMap { snapshot in
-            session?.targetPriorities(for: snapshot.activePlayer, phase: snapshot.phase)
+            session?.targetPriorities(for: snapshot.selectedUnit?.owner ?? humanPlayer, phase: snapshot.phase)
         } ?? []
         if !priorities.isEmpty {
             _ = session?.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: 6)
@@ -485,7 +560,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func move(_ unit: NativeBoardUnitSnapshot, to boardPoint: NativeBattleCoordinate) {
-        guard canIssueHumanOrders, unit.owner == humanPlayer else {
+        guard canResolveHumanActivation, unit.owner == humanPlayer else {
             return
         }
         _ = session?.moveUnit(unit.id, to: boardPoint)
@@ -493,7 +568,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func rotateSelected(by degrees: Double) {
-        guard let selected = snapshot?.selectedUnit, selected.owner == humanPlayer else {
+        guard canResolveHumanActivation, let selected = snapshot?.selectedUnit, selected.owner == humanPlayer else {
             return
         }
         _ = session?.rotateUnit(selected.id, to: selected.facingDegrees + degrees)
@@ -501,7 +576,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func toggleCover(_ enabled: Bool) {
-        guard let selected = snapshot?.selectedUnit, selected.owner == humanPlayer else {
+        guard canResolveHumanActivation, let selected = snapshot?.selectedUnit, selected.owner == humanPlayer else {
             return
         }
         _ = session?.toggleCover(for: selected.id, enabled: enabled)
@@ -509,7 +584,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func toggleHullDown(_ enabled: Bool) {
-        guard let selected = snapshot?.selectedUnit, selected.owner == humanPlayer else {
+        guard canResolveHumanActivation, let selected = snapshot?.selectedUnit, selected.owner == humanPlayer else {
             return
         }
         _ = session?.toggleHullDown(for: selected.id, enabled: enabled)
@@ -517,12 +592,17 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func shootSelectedTarget() {
+        guard canResolveHumanActivation else {
+            errorMessage = "Assign an order before firing."
+            return
+        }
         _ = session?.shootSelectedTarget()
         refresh()
     }
 
     func assaultSelected(advance: Bool) {
-        guard let selected = snapshot?.selectedUnit,
+        guard canResolveHumanActivation,
+              let selected = snapshot?.selectedUnit,
               let target = snapshot?.selectedTarget else {
             return
         }
@@ -531,17 +611,71 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func resolvePendingChoice() {
+        guard canResolveHumanActivation else {
+            errorMessage = "Draw a die and assign an order before resolving."
+            return
+        }
         _ = session?.resolveFirstPendingChoice()
         refresh()
     }
 
+    func issueOrder(_ order: HistoricalBoardOrder) {
+        guard canIssueHumanOrders,
+              let selectedUnit = snapshot?.selectedUnit,
+              selectedUnit.owner == humanPlayer else {
+            errorMessage = "Draw a \(sideTitle(for: humanPlayer)) die and select one of your units before issuing an order."
+            return
+        }
+        let issued = session?.issueOrder(order, to: selectedUnit.id) ?? false
+        errorMessage = issued ? nil : session?.snapshot().lastAction.detail
+        refresh()
+    }
+
     func advancePhase() {
+        if snapshot?.orderDice.rulesetActive == true {
+            drawOrderDie()
+            return
+        }
         session?.advancePhase()
         refresh()
     }
 
+    func drawOrderDie() {
+        guard canDrawOrderDie else {
+            errorMessage = "Assign the current order die before reaching into the bag again."
+            return
+        }
+        guard session?.prepareNextOrderDiceActivation() == true else {
+            errorMessage = session?.snapshot().lastAction.detail ?? "Order die draw blocked."
+            refresh()
+            return
+        }
+        errorMessage = nil
+        refresh()
+    }
+
     func runAutomatedActiveStep() {
-        guard let session, let snapshot, !isBattleOver else {
+        guard let session, var snapshot, !isBattleOver else {
+            return
+        }
+
+        if snapshot.orderDice.rulesetActive {
+            if snapshot.orderDice.current == nil {
+                guard session.prepareNextOrderDiceActivation() else {
+                    errorMessage = session.snapshot().lastAction.detail
+                    refresh()
+                    return
+                }
+                refresh()
+                guard let refreshed = self.snapshot else {
+                    return
+                }
+                snapshot = refreshed
+            }
+
+            let actionSucceeded = runOrderDiceAutomatedActivation(snapshot: snapshot, session: session)
+            errorMessage = actionSucceeded ? nil : session.snapshot().lastAction.detail
+            refresh()
             return
         }
 
@@ -570,21 +704,156 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
     }
 
     func runAITurn() {
-        guard !isBattleOver else {
+        guard !isBattleOver, let snapshot else {
+            return
+        }
+
+        if snapshot.orderDice.rulesetActive {
+            var safety = 0
+            while isBattleOver == false && safety < 16 {
+                if self.snapshot?.orderDice.current == nil {
+                    drawOrderDie()
+                }
+                guard self.snapshot?.orderDice.current?.owner == aiPlayer else {
+                    return
+                }
+                runAutomatedActiveStep()
+                safety += 1
+            }
             return
         }
 
         var safety = 0
-        while snapshot?.activePlayer != aiPlayer && isBattleOver == false && safety < 4 {
-            session?.advancePhase()
-            refresh()
+        while self.snapshot?.activePlayer != aiPlayer && isBattleOver == false && safety < 4 {
+            advancePhase()
             safety += 1
         }
 
-        while snapshot?.activePlayer == aiPlayer && isBattleOver == false && safety < 16 {
+        while self.snapshot?.activePlayer == aiPlayer && isBattleOver == false && safety < 16 {
             runAutomatedActiveStep()
             safety += 1
         }
+    }
+
+    private func runOrderDiceAutomatedActivation(
+        snapshot: NativeBoardSnapshot,
+        session: CatalystNativeSession
+    ) -> Bool {
+        let owner = snapshot.orderDice.current?.owner ?? snapshot.activePlayer
+        if owner == .guderianAI,
+           let decision = session.guderianAIDecisionState(for: snapshot) {
+            return runGuderianOrderDiceActivation(decision: decision, snapshot: snapshot, session: session)
+        }
+        if owner == .player,
+           let decision = session.opposingAIDecisionState(for: snapshot) {
+            return runOpposingOrderDiceActivation(decision: decision, snapshot: snapshot, session: session)
+        }
+        return runFallbackOrderDiceActivation(owner: owner, snapshot: snapshot, session: session)
+    }
+
+    private func runGuderianOrderDiceActivation(
+        decision: GuderianOrderDiceAIDecisionState,
+        snapshot: NativeBoardSnapshot,
+        session: CatalystNativeSession
+    ) -> Bool {
+        session.selectUnit(decision.chosenUnitID)
+        session.selectNearestEnemyToSelectedUnit()
+        let orderIssued = session.issueOrder(decision.chosenOrder, to: decision.chosenUnitID)
+        let priorities = session.targetPriorities(for: .guderianAI, phase: snapshot.phase)
+        let actionSucceeded = resolveAutomatedOrder(
+            decision.chosenOrder,
+            priorities: priorities,
+            moveDistance: 6,
+            runDistance: 9,
+            session: session
+        )
+        return orderIssued || actionSucceeded
+    }
+
+    private func runOpposingOrderDiceActivation(
+        decision: GuderianOrderDiceOpposingAIDecisionState,
+        snapshot: NativeBoardSnapshot,
+        session: CatalystNativeSession
+    ) -> Bool {
+        session.selectUnit(decision.chosenUnitID)
+        session.selectNearestEnemyToSelectedUnit()
+        let orderIssued = session.issueOrder(decision.chosenOrder, to: decision.chosenUnitID)
+        let priorities = session.targetPriorities(for: .player, phase: snapshot.phase)
+        let actionSucceeded = resolveAutomatedOrder(
+            decision.chosenOrder,
+            priorities: priorities,
+            moveDistance: 5,
+            runDistance: 8,
+            session: session
+        )
+        return orderIssued || actionSucceeded
+    }
+
+    private func runFallbackOrderDiceActivation(
+        owner: NativeBoardPlayer,
+        snapshot: NativeBoardSnapshot,
+        session: CatalystNativeSession
+    ) -> Bool {
+        guard let unit = snapshot.units
+            .filter({
+                $0.owner == owner &&
+                    !$0.destroyed &&
+                    !$0.retainedOrder &&
+                    $0.currentOrder == nil &&
+                    !$0.availableOrders.isEmpty
+            })
+            .sorted(by: { $0.id < $1.id })
+            .first else {
+            return false
+        }
+        let order = Self.fallbackOrder(for: unit)
+        session.selectUnit(unit.id)
+        session.selectNearestEnemyToSelectedUnit()
+        let orderIssued = session.issueOrder(order, to: unit.id)
+        let priorities = session.targetPriorities(for: owner, phase: snapshot.phase)
+        let actionSucceeded = resolveAutomatedOrder(
+            order,
+            priorities: priorities,
+            moveDistance: owner == .guderianAI ? 6 : 5,
+            runDistance: owner == .guderianAI ? 9 : 8,
+            session: session
+        )
+        return orderIssued || actionSucceeded
+    }
+
+    private func resolveAutomatedOrder(
+        _ order: HistoricalBoardOrder,
+        priorities: [String],
+        moveDistance: Double,
+        runDistance: Double,
+        session: CatalystNativeSession
+    ) -> Bool {
+        switch order {
+        case .advance:
+            return session.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: moveDistance) ||
+                session.moveSelectedUnitTowardNearestObjective(maxDistance: moveDistance)
+        case .run:
+            return session.moveSelectedUnitTowardPriorityObjective(named: priorities, maxDistance: runDistance) ||
+                session.moveSelectedUnitTowardNearestObjective(maxDistance: runDistance)
+        case .fire:
+            session.selectNearestEnemyToSelectedUnit()
+            return session.shootSelectedTarget()
+        case .ambush, .rally, .down:
+            return false
+        }
+    }
+
+    private static func fallbackOrder(for unit: NativeBoardUnitSnapshot) -> HistoricalBoardOrder {
+        if unit.availableOrders.contains(.fire) {
+            return .fire
+        }
+        if unit.availableOrders.contains(.advance) {
+            return .advance
+        }
+        if unit.availableOrders.contains(.run) {
+            return .run
+        }
+        return unit.availableOrders.first ?? .down
     }
 
     func playToEnd() {
@@ -632,6 +901,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
             seed: seed
            ),
            let nativeSession = NativeBoardSession(scenario: scenario, seed: seed, launch: launch) {
+            _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: nativeSession)
             session = .field(scenario, nativeSession)
             return
         }
@@ -639,6 +909,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
         if let id = entry.id.lateCareerID,
            let presentation = LateCareerGuderianPresentationCatalog.entry(for: id),
            let nativeSession = LateCareerNativeBoardSession(battlefieldID: id, seed: seed) {
+            _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: nativeSession)
             session = .late(presentation, nativeSession)
             return
         }
@@ -765,6 +1036,11 @@ private struct GuderianCatalystRootView: View {
 
                     topHUD(snapshot, in: proxy.size)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .zIndex(10)
+
+                    diceBagHUD(snapshot, in: proxy.size)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .zIndex(11)
 
                     if overlay == nil {
                         bottomDock(in: proxy.size)
@@ -803,7 +1079,7 @@ private struct GuderianCatalystRootView: View {
                         .minimumScaleFactor(0.7)
                     Text("\(snapshot.mission.name) | Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
                         .font(.caption.weight(.heavy))
-                        .foregroundStyle(CatalystPalette.commandTextRed)
+                        .foregroundStyle(.white)
                         .lineLimit(2)
                     Text("\(model.sideTitle(for: .player)) \(snapshot.mission.playerScore) - \(snapshot.mission.opponentScore) \(model.sideTitle(for: .guderianAI))")
                         .font(.caption.monospacedDigit())
@@ -853,6 +1129,65 @@ private struct GuderianCatalystRootView: View {
         .accessibilityIdentifier("catalyst-battle-hud")
     }
 
+    private func diceBagHUD(_ snapshot: NativeBoardSnapshot, in size: CGSize) -> some View {
+        let currentOwner = snapshot.orderDice.current?.owner
+        let currentTitle = currentOwner.map(model.sideTitle(for:)) ?? "No die drawn"
+        let activationUnits = activationUnits(for: currentOwner, in: snapshot)
+        let movementUnits = activationUnits.filter { unit in
+            unit.availableOrders.contains(.advance) ||
+                unit.availableOrders.contains(.run) ||
+                unit.advanceMoveAllowance > 0 ||
+                unit.runMoveAllowance > 0
+        }
+        let reactionUnits = reactionUnits(against: currentOwner, in: snapshot)
+        let width = min(460, max(280, size.width - 24))
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Label("Dice Bag", systemImage: "die.face.5.fill")
+                    .font(.subheadline.weight(.black))
+                    .foregroundStyle(Color(red: 0.07, green: 0.07, blue: 0.06))
+                Text("Current: \(currentTitle)")
+                    .font(.caption.weight(.heavy))
+                    .foregroundStyle(Color(red: 0.07, green: 0.07, blue: 0.06))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Button {
+                    model.drawOrderDie()
+                } label: {
+                    Label(currentOwner == nil ? "Reach Into Bag" : "Die Active", systemImage: "hand.draw.fill")
+                        .lineLimit(1)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(CatalystPalette.commandBlue)
+                .disabled(!model.canDrawOrderDie)
+                .accessibilityIdentifier("catalyst-opening-order-dice-bag-draw-button")
+            }
+
+            Text("Can order: \(Self.unitList(activationUnits.map(\.name), empty: "reach into the bag first"))")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color(red: 0.07, green: 0.07, blue: 0.06))
+                .lineLimit(1)
+                .accessibilityIdentifier("catalyst-opening-order-dice-activation-units")
+            Text("Move: \(Self.unitList(movementUnits.map(\.name), empty: "none yet")) | React: \(Self.unitList(reactionUnits.map(Self.reactionLabel(for:)), empty: "none retained"))")
+                .font(.caption2.monospaced())
+                .foregroundStyle(Color(red: 0.18, green: 0.18, blue: 0.16))
+                .lineLimit(1)
+                .accessibilityIdentifier("catalyst-opening-order-dice-move-reaction-units")
+        }
+        .padding(12)
+        .frame(width: width, alignment: .leading)
+        .background(Color.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.black.opacity(0.22), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.24), radius: 16, x: 0, y: 8)
+        .padding(12)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("catalyst-opening-order-dice-bag-panel")
+    }
+
     private func sideStatusPill(title: String, value: String, color: Color, systemImage: String) -> some View {
         Label {
             Text("\(title): \(value)")
@@ -887,7 +1222,7 @@ private struct GuderianCatalystRootView: View {
                     title: "Loser",
                     value: result.loserTitle,
                     systemImage: "xmark.circle",
-                    color: result.hasWinner ? CatalystPalette.commandRed : .secondary
+                    color: result.hasWinner ? .white.opacity(0.88) : .secondary
                 )
                 Spacer(minLength: 4)
                 VStack(alignment: .trailing, spacing: 2) {
@@ -923,6 +1258,65 @@ private struct GuderianCatalystRootView: View {
         }
     }
 
+    private func activationUnits(
+        for owner: NativeBoardPlayer?,
+        in snapshot: NativeBoardSnapshot
+    ) -> [NativeBoardUnitSnapshot] {
+        guard let owner else {
+            return []
+        }
+        return snapshot.units
+            .filter { unit in
+                unit.owner == owner &&
+                    !unit.destroyed &&
+                    !unit.retainedOrder &&
+                    unit.currentOrder == nil &&
+                    !unit.availableOrders.isEmpty
+            }
+            .sorted { $0.id < $1.id }
+    }
+
+    private func reactionUnits(
+        against owner: NativeBoardPlayer?,
+        in snapshot: NativeBoardSnapshot
+    ) -> [NativeBoardUnitSnapshot] {
+        guard let owner else {
+            return []
+        }
+        return snapshot.units
+            .filter { unit in
+                unit.owner != owner &&
+                    unit.owner != .none &&
+                    !unit.destroyed &&
+                    (unit.downOrderActive || unit.ambushOrderActive)
+            }
+            .sorted { lhs, rhs in
+                if lhs.ambushOrderActive != rhs.ambushOrderActive {
+                    return lhs.ambushOrderActive && !rhs.ambushOrderActive
+                }
+                return lhs.id < rhs.id
+            }
+    }
+
+    private static func reactionLabel(for unit: NativeBoardUnitSnapshot) -> String {
+        if unit.ambushOrderActive {
+            return "\(unit.name) Ambush"
+        }
+        if unit.downOrderActive {
+            return "\(unit.name) Down"
+        }
+        return unit.name
+    }
+
+    private static func unitList(_ names: [String], empty: String) -> String {
+        let visible = names.prefix(4)
+        guard !visible.isEmpty else {
+            return empty
+        }
+        let suffix = names.count > visible.count ? " +\(names.count - visible.count)" : ""
+        return visible.joined(separator: ", ") + suffix
+    }
+
     private func bottomDock(in size: CGSize) -> some View {
         let availableWidth = max(260, size.width - 24)
         let compact = availableWidth < 620
@@ -943,7 +1337,7 @@ private struct GuderianCatalystRootView: View {
 
             if !compact {
                 Slider(value: $zoom, in: 0.65...2.1)
-                    .tint(CatalystPalette.commandRed)
+                    .tint(CatalystPalette.gold)
                     .frame(width: 126)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
@@ -997,7 +1391,7 @@ private struct GuderianCatalystRootView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(CatalystPalette.commandRed)
+                .foregroundStyle(Color.white)
                 .frame(width: 44, height: 44)
                 .background(CatalystPalette.dockButtonBackground, in: RoundedRectangle(cornerRadius: 8))
                 .overlay {
@@ -1096,14 +1490,14 @@ private struct GuderianCatalystRootView: View {
                         Spacer()
                         if model.selectedEntry?.id == entry.id {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(CatalystPalette.commandRed)
+                                .foregroundStyle(CatalystPalette.gold)
                         }
                     }
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(model.selectedEntry?.id == entry.id ? CatalystPalette.commandRed.opacity(0.18) : Color.white.opacity(0.04))
+                            .fill(model.selectedEntry?.id == entry.id ? CatalystPalette.gold.opacity(0.20) : Color.white.opacity(0.04))
                     )
                 }
                 .buttonStyle(.plain)
@@ -1114,18 +1508,55 @@ private struct GuderianCatalystRootView: View {
     private var commandPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let snapshot = model.snapshot {
+                if snapshot.orderDice.rulesetActive {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Label("Dice Bag", systemImage: "die.face.5.fill")
+                                .font(.subheadline.weight(.black))
+                            Spacer(minLength: 8)
+                            commandButton("Draw", "hand.draw.fill") {
+                                model.drawOrderDie()
+                            }
+                            .disabled(!model.canDrawOrderDie)
+                            .accessibilityIdentifier("catalyst-command-draw-die-button")
+                        }
+                        Text("Current die: \(snapshot.orderDice.current.map { model.sideTitle(for: $0.owner) } ?? "Reach into the bag")")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("Select a listed unit, assign one order, then resolve that order on the map.")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        if let selected = snapshot.selectedUnit, selected.owner == model.humanPlayer {
+                            let orderOptions = selected.availableOrders.isEmpty ? HistoricalBoardOrder.allCases : selected.availableOrders
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 94), spacing: 8)], spacing: 8) {
+                                ForEach(orderOptions, id: \.self) { order in
+                                    commandButton(order.rawValue, Self.orderIcon(for: order)) {
+                                        model.issueOrder(order)
+                                    }
+                                    .disabled(!model.canIssueHumanOrders || selected.currentOrder != nil)
+                                }
+                            }
+                            .accessibilityIdentifier("catalyst-command-order-picker")
+                        }
+                    }
+                    .padding(10)
+                    .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                    .accessibilityIdentifier("catalyst-command-dice-bag-controls")
+                }
+
                 HStack(spacing: 8) {
                     commandButton("Move", "arrow.up.right") {
                         model.moveSelectedTowardObjective()
                         overlay = nil
                     }
-                    .disabled(!model.canIssueHumanOrders || snapshot.phase != .movement || snapshot.selectedUnit?.canMoveNow != true)
+                    .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canMoveNow != true)
 
                     commandButton("Fire", "scope") {
                         model.shootSelectedTarget()
                         overlay = nil
                     }
-                    .disabled(!model.canIssueHumanOrders || snapshot.phase != .shooting || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
+                    .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
                 }
 
                 HStack(spacing: 8) {
@@ -1133,13 +1564,13 @@ private struct GuderianCatalystRootView: View {
                         model.assaultSelected(advance: assaultAdvance)
                         overlay = nil
                     }
-                    .disabled(!model.canIssueHumanOrders || snapshot.phase != .assault || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
+                    .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
 
                     commandButton("Resolve", "checkmark.circle") {
                         model.resolvePendingChoice()
                         overlay = nil
                     }
-                    .disabled(!model.canIssueHumanOrders)
+                    .disabled(!model.canResolveHumanActivation)
                 }
 
                 HStack(spacing: 8) {
@@ -1156,21 +1587,21 @@ private struct GuderianCatalystRootView: View {
                     commandButton("Target", "target") {
                         model.selectNearestEnemy()
                     }
-                    .disabled(!model.canIssueHumanOrders)
+                    .disabled(!model.canResolveHumanActivation)
                 }
 
                 HStack(spacing: 8) {
-                    commandButton("Phase", "forward.end") {
-                        model.advancePhase()
+                    commandButton("Draw", "die.face.5.fill") {
+                        model.drawOrderDie()
                         overlay = nil
                     }
-                    .disabled(!model.canIssueHumanOrders)
+                    .disabled(!model.canDrawOrderDie)
 
                     commandButton("AI", "forward.frame") {
                         model.runAITurn()
                         overlay = nil
                     }
-                    .disabled(model.isBattleOver)
+                    .disabled(model.isBattleOver || (snapshot.orderDice.rulesetActive && !model.canRunAITurn && !model.canDrawOrderDie))
 
                     commandButton("Auto", "play.fill") {
                         model.runAutomatedActiveStep()
@@ -1187,13 +1618,13 @@ private struct GuderianCatalystRootView: View {
                         get: { snapshot.selectedUnit?.inCover ?? false },
                         set: { model.toggleCover($0) }
                     ))
-                    .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
+                    .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer)
 
                     Toggle("Hull-down", isOn: Binding(
                         get: { snapshot.selectedUnit?.hullDown ?? false },
                         set: { model.toggleHullDown($0) }
                     ))
-                    .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
+                    .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer)
                 }
                 .font(.caption.weight(.semibold))
 
@@ -1201,7 +1632,7 @@ private struct GuderianCatalystRootView: View {
                     commandButton("Rotate", "rotate.right") {
                         model.rotateSelected(by: 45)
                     }
-                    .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
+                    .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer)
 
                     commandButton("Debrief", "flag.checkered") {
                         model.completeBattle()
@@ -1237,6 +1668,23 @@ private struct GuderianCatalystRootView: View {
             Label(title, systemImage: systemImage)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity)
+        }
+    }
+
+    private static func orderIcon(for order: HistoricalBoardOrder) -> String {
+        switch order {
+        case .fire:
+            return "scope"
+        case .advance:
+            return "arrow.up.right"
+        case .run:
+            return "figure.run"
+        case .ambush:
+            return "eye"
+        case .rally:
+            return "flag"
+        case .down:
+            return "arrow.down.circle"
         }
     }
 
@@ -1304,7 +1752,7 @@ private struct GuderianCatalystRootView: View {
                 .foregroundStyle(result.hasWinner ? .green : .secondary)
             Text("Loser: \(result.loserTitle)")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(result.hasWinner ? CatalystPalette.commandRed : .secondary)
+                .foregroundStyle(result.hasWinner ? .primary : .secondary)
             Text("\(result.scoreLine) | turn \(result.completedTurn)")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
@@ -1886,7 +2334,6 @@ private enum CatalystPalette {
     static let background = Color(red: 0.09, green: 0.11, blue: 0.10)
     static let mapBase = Color(red: 0.58, green: 0.61, blue: 0.45)
     static let gold = Color(red: 0.92, green: 0.71, blue: 0.32)
-    static let commandTextRed = Color(red: 0.42, green: 0.00, blue: 0.00)
     static let commandRed = Color(red: 0.68, green: 0.08, blue: 0.06)
     static let fireRed = Color(red: 0.95, green: 0.32, blue: 0.22)
     static let assaultOrange = Color(red: 0.96, green: 0.50, blue: 0.18)

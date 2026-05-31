@@ -462,10 +462,17 @@ struct GuderianBattleUISwiftTests {
             contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift",
             encoding: .utf8
         )
+        let catalystSource = try String(
+            contentsOfFile: "Sources/GuderianMacCatalyst/GuderianMacCatalystApp.swift",
+            encoding: .utf8
+        )
 
         #expect(source.contains("order-dice-bag-panel"))
         #expect(source.contains("order-dice-bag-draw-button"))
         #expect(source.contains("order-dice-current-die"))
+        #expect(source.contains("opening-order-dice-bag-panel"))
+        #expect(source.contains("opening-order-dice-bag-draw-button"))
+        #expect(source.contains("opening-order-dice-activation-units"))
         #expect(source.contains("order-dice-selected-side-dice"))
         #expect(source.contains("order-dice-reach-activation-units"))
         #expect(source.contains("order-dice-reach-move-units"))
@@ -478,6 +485,24 @@ struct GuderianBattleUISwiftTests {
         #expect(source.contains("canResolveHumanActivation"))
         #expect(source.contains("Label(\"Draw Die\""))
         #expect(!source.contains("Label(\"Next Window\""))
+        #expect(!source.contains(".foregroundStyle(Color(red: 0.48, green: 0.08, blue: 0.06))"))
+
+        #expect(catalystSource.contains("catalyst-opening-order-dice-bag-panel"))
+        #expect(catalystSource.contains("catalyst-opening-order-dice-bag-draw-button"))
+        #expect(catalystSource.contains("catalyst-opening-order-dice-activation-units"))
+        #expect(catalystSource.contains("catalyst-command-dice-bag-controls"))
+        #expect(catalystSource.contains("catalyst-command-order-picker"))
+        #expect(catalystSource.contains("Reach Into Bag"))
+        #expect(catalystSource.contains("func drawOrderDie()"))
+        #expect(catalystSource.contains("func issueOrder(_ order: HistoricalBoardOrder)"))
+        #expect(catalystSource.contains("prepareNextOrderDiceActivation()"))
+        #expect(catalystSource.contains("GuderianOrderDiceSessionBootstrap.enableOrderDice"))
+        #expect(catalystSource.contains("canResolveHumanActivation"))
+        #expect(catalystSource.contains("snapshot.orderDice.current?.owner == humanPlayer"))
+        #expect(catalystSource.contains("commandButton(\"Draw\""))
+        #expect(!catalystSource.contains("commandButton(\"Phase\""))
+        #expect(!catalystSource.contains("commandTextRed"))
+        #expect(!catalystSource.contains(".tint(CatalystPalette.commandRed)"))
     }
 
     @Test("First battle tutorial explains gameplay elements through hover coach dialogs")

@@ -2384,7 +2384,10 @@ private struct DZWPlayableBattlePanelWindow: View {
                             if side.isCurrent {
                                 Text("drawn")
                                     .font(.caption2.weight(.bold))
-                                    .foregroundStyle(Color(red: 0.48, green: 0.08, blue: 0.06))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color(red: 0.42, green: 0.03, blue: 0.02)))
                             }
                         }
                         Text("Bag \(side.remaining) | Spent \(side.spent) | Held \(side.retained)")
@@ -3605,6 +3608,8 @@ public struct DZWPlayableBattleView: View {
                 Text(snapshot.mission.winner == .none ? "Native battle in progress" : "\(model.sideTitle(for: snapshot.mission.winner)) controls the scenario")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.88))
+                openingDiceBagStrip(snapshot)
+                    .padding(.top, 6)
             }
 
             Spacer()
@@ -3713,6 +3718,49 @@ public struct DZWPlayableBattleView: View {
                         .stroke(Color.white.opacity(0.14), lineWidth: 1)
                 }
         )
+    }
+
+    private func openingDiceBagStrip(_ snapshot: NativeBoardSnapshot) -> some View {
+        let bag = model.orderDiceBagState(for: snapshot)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Label("Dice Bag", systemImage: "die.face.5.fill")
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(Color(red: 0.08, green: 0.08, blue: 0.07))
+                Text("Current: \(bag.currentSideTitle)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Color(red: 0.08, green: 0.08, blue: 0.07))
+                    .accessibilityIdentifier("opening-order-dice-current-die")
+                Spacer(minLength: 8)
+                Button {
+                    markButtonCoachUsed(.nextPhase)
+                    model.drawOrderDie()
+                } label: {
+                    Label(bag.drawButtonTitle, systemImage: "hand.draw.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color(red: 0.12, green: 0.27, blue: 0.62))
+                .disabled(!bag.canDrawOrderDie)
+                .accessibilityIdentifier("opening-order-dice-bag-draw-button")
+            }
+
+            Text("Can order: \(Self.unitList(bag.activationUnitNames, empty: "draw first"))")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color(red: 0.08, green: 0.08, blue: 0.07))
+                .lineLimit(1)
+                .accessibilityIdentifier("opening-order-dice-activation-units")
+            Text("Move: \(Self.unitList(bag.movementUnitNames, empty: "none yet")) | React: \(Self.unitList(bag.reactionUnitNames, empty: "none retained"))")
+                .font(.caption2.monospaced())
+                .foregroundStyle(Color(red: 0.18, green: 0.18, blue: 0.16))
+                .lineLimit(1)
+                .accessibilityIdentifier("opening-order-dice-move-reaction-units")
+        }
+        .padding(10)
+        .frame(maxWidth: 520, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.94)))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.black.opacity(0.18), lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("opening-order-dice-bag-panel")
     }
 
     private func board(_ snapshot: NativeBoardSnapshot) -> some View {
@@ -3877,6 +3925,15 @@ public struct DZWPlayableBattleView: View {
             .disabled(!model.canIssueHumanOrders)
         }
         .buttonStyle(.bordered)
+    }
+
+    private static func unitList(_ names: [String], empty: String) -> String {
+        let visible = names.prefix(4)
+        guard !visible.isEmpty else {
+            return empty
+        }
+        let suffix = names.count > visible.count ? " +\(names.count - visible.count)" : ""
+        return visible.joined(separator: ", ") + suffix
     }
 
     private func actionsSection(_ snapshot: NativeBoardSnapshot) -> some View {
