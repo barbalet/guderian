@@ -38,12 +38,17 @@ private protocol DZWPlayableBoardSession: AnyObject {
     func shootUnit(_ attackerID: Int, targetID: Int) -> Bool
     func assaultUnit(_ attackerID: Int, targetID: Int, advance: Bool) -> Bool
     func issueOrder(_ order: HistoricalBoardOrder, to unitID: Int) -> Bool
+    func prepareNextOrderDiceActivation() -> Bool
     func shootSelectedTarget() -> Bool
     func resolveFirstPendingChoice() -> Bool
     func advancePhase()
 }
 
-extension NativeBoardSession: DZWPlayableBoardSession {}
+extension NativeBoardSession: DZWPlayableBoardSession {
+    func prepareNextOrderDiceActivation() -> Bool {
+        prepareNextOrderDiceActivation(preferredOwner: nil)
+    }
+}
 extension LateCareerNativeBoardSession: DZWPlayableBoardSession {}
 
 private enum DZWPlayableCompletionRecord {
@@ -102,6 +107,27 @@ private struct DZWPlayableBattleCompletionDisplay {
         self.debriefSummary = debriefSummary
         record = .lateCareer(completionRecord)
     }
+}
+
+private struct DZWPlayableOrderDiceSideBag: Identifiable {
+    let id: NativeBoardPlayer
+    let title: String
+    let isHumanControlled: Bool
+    let isCurrent: Bool
+    let remaining: Int
+    let spent: Int
+    let retained: Int
+}
+
+private struct DZWPlayableOrderDiceBagState {
+    let currentSideTitle: String
+    let canDrawOrderDie: Bool
+    let drawButtonTitle: String
+    let instruction: String
+    let remainingTotal: Int
+    let spentTotal: Int
+    let retainedTotal: Int
+    let sides: [DZWPlayableOrderDiceSideBag]
 }
 
 private enum DZWPlayableBattleSource {
@@ -238,9 +264,20 @@ private enum DZWPlayableBattleSource {
                 chosenHumanSideID: chosenSideID,
                 seed: seed
             )
-            return NativeBoardSession(scenario: scenario, seed: seed, launch: launch)
+            guard let session = NativeBoardSession(scenario: scenario, seed: seed, launch: launch) else {
+                return nil
+            }
+            _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+            return session
         case .lateCareer(let entry, _):
-            return LateCareerNativeBoardSession(battlefieldID: entry.id, seed: UInt32(890_000 + entry.order + restartCount * 97))
+            guard let session = LateCareerNativeBoardSession(
+                battlefieldID: entry.id,
+                seed: UInt32(890_000 + entry.order + restartCount * 97)
+            ) else {
+                return nil
+            }
+            _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+            return session
         }
     }
 
@@ -342,7 +379,22 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         guard let snapshot else {
             return false
         }
-        return !isBattleOver && snapshot.activePlayer == humanPlayer
+        return !isBattleOver && snapshot.orderDice.current?.owner == humanPlayer
+    }
+
+    var canResolveHumanActivation: Bool {
+        guard let selectedUnit, selectedUnit.owner == humanPlayer else {
+            return canIssueHumanOrders
+        }
+        return canIssueHumanOrders ||
+            (!isBattleOver && selectedUnit.currentOrder != nil && (selectedUnit.canMoveNow || selectedUnit.canShootNow || selectedUnit.canAssaultNow))
+    }
+
+    var canDrawOrderDie: Bool {
+        guard let snapshot, !isBattleOver else {
+            return false
+        }
+        return snapshot.orderDice.current == nil
     }
 
     var hasCompletion: Bool {
@@ -378,6 +430,39 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         source.sideTitle(for: player)
     }
 
+    func orderDiceBagState(for snapshot: NativeBoardSnapshot) -> DZWPlayableOrderDiceBagState {
+        let currentOwner = snapshot.orderDice.current?.owner
+        let currentSideTitle = currentOwner.map(sideTitle(for:)) ?? "No die drawn"
+        let instruction: String
+        if currentOwner == humanPlayer {
+            instruction = "\(humanSideTitle) die drawn: select one of your ready units, issue an order, then resolve its action."
+        } else if currentOwner == aiPlayer {
+            instruction = "\(aiSideTitle) die drawn: use Auto Step to resolve the opposing activation."
+        } else {
+            instruction = "Draw from the bag to decide which side activates next."
+        }
+        return DZWPlayableOrderDiceBagState(
+            currentSideTitle: currentSideTitle,
+            canDrawOrderDie: canDrawOrderDie,
+            drawButtonTitle: currentOwner == nil ? "Draw From Bag" : "Die Active",
+            instruction: instruction,
+            remainingTotal: snapshot.orderDice.remaining.count,
+            spentTotal: snapshot.orderDice.spent.count,
+            retainedTotal: snapshot.orderDice.retained.count,
+            sides: [humanPlayer, aiPlayer].map { player in
+                DZWPlayableOrderDiceSideBag(
+                    id: player,
+                    title: sideTitle(for: player),
+                    isHumanControlled: player == humanPlayer,
+                    isCurrent: currentOwner == player,
+                    remaining: snapshot.orderDice.remainingCount(for: player),
+                    spent: snapshot.orderDice.spentCount(for: player),
+                    retained: snapshot.orderDice.retainedCount(for: player)
+                )
+            }
+        )
+    }
+
     var activeUnits: [NativeBoardUnitSnapshot] {
         guard let snapshot, canIssueHumanOrders else {
             return []
@@ -392,9 +477,9 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             dzwPlayableLog.info("Select ignored battleOver=\(self.isBattleOver, privacy: .public) hasSnapshot=\(self.snapshot != nil, privacy: .public)")
             return
         }
-        if unit.owner == snapshot.activePlayer {
+        if unit.owner == humanPlayer {
             session?.selectUnit(unit.id)
-            if snapshot.activePlayer == humanPlayer {
+            if canIssueHumanOrders || unit.currentOrder != nil {
                 session?.selectNearestEnemyToSelectedUnit()
             }
         } else {
@@ -450,19 +535,18 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func canManipulate(_ unit: NativeBoardUnitSnapshot) -> Bool {
-        guard let snapshot, !isBattleOver else {
+        guard !isBattleOver else {
             return false
         }
-        return canIssueHumanOrders &&
+        return canResolveHumanActivation &&
             unit.owner == humanPlayer &&
-            snapshot.phase == .movement &&
             unit.canMoveNow &&
             !unit.destroyed
     }
 
     func moveUnit(id: Int, to point: CGPoint) {
-        guard canIssueHumanOrders else {
-            dzwPlayableLog.info("Move ignored because active side is not human-controlled.")
+        guard canResolveHumanActivation else {
+            dzwPlayableLog.info("Move ignored because no human activation is ready to resolve.")
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -477,7 +561,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func rotateSelected(by degrees: Double) {
-        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer else {
+        guard canResolveHumanActivation, let selectedUnit, selectedUnit.owner == humanPlayer else {
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -487,7 +571,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func toggleCover(_ enabled: Bool) {
-        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer else {
+        guard canResolveHumanActivation, let selectedUnit, selectedUnit.owner == humanPlayer else {
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -497,7 +581,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func toggleHullDown(_ enabled: Bool) {
-        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer else {
+        guard canResolveHumanActivation, let selectedUnit, selectedUnit.owner == humanPlayer else {
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -507,7 +591,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func shootSelected() {
-        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer, let selectedTarget else {
+        guard canResolveHumanActivation, let selectedUnit, selectedUnit.owner == humanPlayer, let selectedTarget else {
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -518,7 +602,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func assaultSelected(advance: Bool) {
-        guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer, let selectedTarget else {
+        guard canResolveHumanActivation, let selectedUnit, selectedUnit.owner == humanPlayer, let selectedTarget else {
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -528,8 +612,36 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         recordTutorialTrigger(assaulted ? .assault : .blockedAction)
     }
 
+    func drawOrderDie() {
+        if runGuderianTestControllerStep(context: "visible-order-dice-draw") {
+            return
+        }
+
+        guard canDrawOrderDie else {
+            lastError = "The current order die must be assigned before drawing again."
+            recordTutorialTrigger(.blockedAction)
+            return
+        }
+
+        let drew = session?.prepareNextOrderDiceActivation() ?? false
+        refresh()
+        if let owner = snapshot?.orderDice.current?.owner {
+            recordAIEvent("Order die drawn for \(sideTitle(for: owner)).")
+            if owner == aiPlayer {
+                recordTutorialTrigger(.germanAITurn)
+            } else {
+                recordTutorialTrigger(.unitSelection)
+            }
+        } else if !drew {
+            recordAIEvent("Order die draw blocked: \(lastError).")
+            recordTutorialTrigger(.blockedAction)
+        }
+        dzwPlayableLog.info("Order die draw requested drew=\(drew, privacy: .public) owner=\(self.snapshot?.orderDice.current?.owner.rawValue ?? "none", privacy: .public)")
+    }
+
     func issueOrder(_ order: HistoricalBoardOrder) {
         guard canIssueHumanOrders, let selectedUnit, selectedUnit.owner == humanPlayer else {
+            lastError = "Draw a \(humanSideTitle) die before issuing an order."
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -540,7 +652,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
     }
 
     func resolvePendingChoice() {
-        guard canIssueHumanOrders else {
+        guard canResolveHumanActivation else {
             recordTutorialTrigger(.blockedAction)
             return
         }
@@ -552,6 +664,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
 
     func advancePhase() {
         if runGuderianTestControllerStep(context: "visible-next-phase") {
+            return
+        }
+
+        if snapshot?.orderDice.rulesetActive == true {
+            drawOrderDie()
             return
         }
 
@@ -604,9 +721,19 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             return
         }
 
-        guard let snapshot, !isBattleOver else {
+        guard var snapshot, !isBattleOver else {
             dzwPlayableLog.info("Automated active step ignored battleOver=\(self.isBattleOver, privacy: .public) hasSnapshot=\(self.snapshot != nil, privacy: .public)")
             return
+        }
+
+        if snapshot.orderDice.rulesetActive && snapshot.orderDice.current == nil {
+            let drew = session?.prepareNextOrderDiceActivation() ?? false
+            refresh()
+            guard drew, let refreshed = self.snapshot else {
+                recordAIEvent("Automated step could not draw an order die: \(lastError).")
+                return
+            }
+            snapshot = refreshed
         }
 
         let before = "\(snapshot.activePlayer.rawValue) \(snapshot.phase.rawValue)"
@@ -639,8 +766,12 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         if !actionSucceeded {
             recordAIEvent("\(before): blocked or unavailable action - \(actionDetail)")
         }
-        session?.advancePhase()
-        refresh()
+        if snapshot.orderDice.rulesetActive {
+            refresh()
+        } else {
+            session?.advancePhase()
+            refresh()
+        }
         recordAIEvent("\(before): \(actionDetail)")
     }
 
@@ -737,6 +868,11 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             return
         }
 
+        if snapshot?.orderDice.rulesetActive == true {
+            runOrderDiceAutomationToHumanControl(context: context)
+            return
+        }
+
         let aiPlayer = source.aiPlayer
         let aiLabel = source.sideTitle(for: aiPlayer)
         dzwPlayableLog.info("AI turn runner started context=\(context, privacy: .public) aiPlayer=\(aiPlayer.rawValue, privacy: .public)")
@@ -760,6 +896,39 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             recordAIEvent("\(aiLabel) AI turn complete: control returned to \(snapshot.map { self.source.sideTitle(for: $0.activePlayer) } ?? "the player").")
             dzwPlayableLog.info("AI turn complete context=\(context, privacy: .public) activePlayer=\(self.snapshot?.activePlayer.rawValue ?? "none", privacy: .public) phase=\(self.snapshot?.phase.rawValue ?? "none", privacy: .public)")
         }
+    }
+
+    private func runOrderDiceAutomationToHumanControl(context: String) {
+        let aiLabel = source.sideTitle(for: aiPlayer)
+        dzwPlayableLog.info("Order-dice AI turn runner started context=\(context, privacy: .public) aiPlayer=\(self.aiPlayer.rawValue, privacy: .public)")
+        recordAIEvent("\(aiLabel) order-dice runner started.")
+
+        var safety = 0
+        while isBattleOver == false && safety < 20 {
+            if snapshot?.orderDice.current?.owner == humanPlayer {
+                recordAIEvent("Order die drawn for \(humanSideTitle): control returned to the player.")
+                return
+            }
+
+            if snapshot?.orderDice.current == nil {
+                let drew = session?.prepareNextOrderDiceActivation() ?? false
+                refresh()
+                guard drew else {
+                    recordAIEvent("Order-dice runner paused: \(lastError).")
+                    return
+                }
+                if snapshot?.orderDice.current?.owner == humanPlayer {
+                    recordAIEvent("Order die drawn for \(humanSideTitle): control returned to the player.")
+                    return
+                }
+            }
+
+            runAutomatedActiveStep()
+            safety += 1
+        }
+
+        recordAIEvent("\(aiLabel) order-dice runner paused: action loop hit its safety cap.")
+        dzwPlayableLog.info("Order-dice AI runner paused context=\(context, privacy: .public) currentOwner=\(self.snapshot?.orderDice.current?.owner.rawValue ?? "none", privacy: .public)")
     }
 
     func restartBattle() {
@@ -1807,7 +1976,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                 Text(model.nativeScenarioLabel)
                     .font(.headline)
                     .foregroundStyle(Color(red: 0.55, green: 0.39, blue: 0.12))
-                Text("Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
+                Text("Turn \(snapshot.turnNumber) | \(snapshot.orderDice.current.map { model.sideTitle(for: $0.owner) } ?? "No die drawn") | \(snapshot.phase.rawValue)")
                     .font(.headline)
                     .accessibilityIdentifier("battle-phase-label")
                     .firstBattleButtonCoach(
@@ -1873,11 +2042,11 @@ private struct DZWPlayableBattlePanelWindow: View {
 
                 Button {
                     markButtonCoachUsed(.nextPhase)
-                    model.advancePhase()
+                    model.drawOrderDie()
                 } label: {
-                    Label("Next Window", systemImage: "forward.end.fill")
+                    Label("Draw Die", systemImage: "die.face.5.fill")
                 }
-                .disabled(!model.canIssueHumanOrders)
+                .disabled(!model.canDrawOrderDie)
                 .accessibilityIdentifier("next-phase-button")
                 .firstBattleButtonCoach(
                     .nextPhase,
@@ -2046,6 +2215,7 @@ private struct DZWPlayableBattlePanelWindow: View {
         return VStack(alignment: .leading, spacing: 10) {
             Text("Order Dice")
                 .font(.headline)
+            orderDiceBagSection(snapshot)
             Text("Drawn side: \(state.drawnSideTitle)")
                 .font(.subheadline.weight(.semibold))
                 .accessibilityIdentifier("order-drawn-side")
@@ -2099,6 +2269,68 @@ private struct DZWPlayableBattlePanelWindow: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("order-dice-command-panel")
         .buttonStyle(.bordered)
+    }
+
+    private func orderDiceBagSection(_ snapshot: NativeBoardSnapshot) -> some View {
+        let bag = model.orderDiceBagState(for: snapshot)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                Label("Dice Bag", systemImage: "die.face.5.fill")
+                    .font(.subheadline.weight(.bold))
+                Spacer()
+                Button {
+                    model.drawOrderDie()
+                } label: {
+                    Label(bag.drawButtonTitle, systemImage: "hand.draw.fill")
+                }
+                .disabled(!bag.canDrawOrderDie)
+                .accessibilityIdentifier("order-dice-bag-draw-button")
+            }
+
+            Text("Current die: \(bag.currentSideTitle)")
+                .font(.caption.weight(.semibold))
+                .accessibilityIdentifier("order-dice-current-die")
+            Text(bag.instruction)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                ForEach(bag.sides) { side in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(side.id == .guderianAI ? Color(red: 0.72, green: 0.22, blue: 0.16) : Color(red: 0.14, green: 0.33, blue: 0.73))
+                                .frame(width: 10, height: 10)
+                            Text(side.title)
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                            if side.isCurrent {
+                                Text("drawn")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(Color(red: 0.48, green: 0.08, blue: 0.06))
+                            }
+                        }
+                        Text("Bag \(side.remaining) | Spent \(side.spent) | Held \(side.retained)")
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(side.isCurrent ? Color.white.opacity(0.72) : Color.white.opacity(0.34)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(side.isCurrent ? Color(red: 0.48, green: 0.08, blue: 0.06) : Color.black.opacity(0.08), lineWidth: side.isCurrent ? 2 : 1))
+                    .accessibilityIdentifier(side.isHumanControlled ? "order-dice-selected-side-dice" : "order-dice-opposing-side-dice")
+                }
+            }
+
+            Text("Remaining \(bag.remainingTotal) | Spent \(bag.spentTotal) | Retained \(bag.retainedTotal)")
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("order-dice-spent-dice")
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.38)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("order-dice-bag-panel")
     }
 
     private func movementPreviewSection(_ snapshot: NativeBoardSnapshot) -> some View {
@@ -2530,7 +2762,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
             }
-            .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
+            .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer)
 
             HStack {
                 Toggle("Manual Cover", isOn: Binding(
@@ -2561,7 +2793,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                 )
             }
             .font(.caption.weight(.semibold))
-            .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
+            .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer)
 
             Button {
                 markButtonCoachUsed(.shootTarget)
@@ -2569,7 +2801,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             } label: {
                 Label("Shoot Target", systemImage: "scope")
             }
-            .disabled(!model.canIssueHumanOrders || snapshot.phase != .shooting || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
+            .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("shoot-target-button")
             .firstBattleButtonCoach(
                 .shootTarget,
@@ -2592,7 +2824,7 @@ private struct DZWPlayableBattlePanelWindow: View {
                     progress: firstBattleButtonCoachProgress,
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
-                .disabled(!model.canIssueHumanOrders)
+                .disabled(!model.canResolveHumanActivation)
 
             Button {
                 markButtonCoachUsed(.assaultTarget)
@@ -2600,7 +2832,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             } label: {
                 Label("Assault Target", systemImage: "figure.run")
             }
-            .disabled(!model.canIssueHumanOrders || snapshot.phase != .assault || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
+            .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("assault-target-button")
             .firstBattleButtonCoach(
                 .assaultTarget,
@@ -2615,7 +2847,7 @@ private struct DZWPlayableBattlePanelWindow: View {
             } label: {
                 Label("Resolve Pending", systemImage: "checkmark.circle")
             }
-            .disabled(!model.canIssueHumanOrders)
+            .disabled(!model.canResolveHumanActivation)
             .accessibilityIdentifier("resolve-pending-button")
             .firstBattleButtonCoach(
                 .resolvePending,
@@ -3271,7 +3503,7 @@ public struct DZWPlayableBattleView: View {
                 Text(model.nativeScenarioLabel)
                     .font(.headline)
                     .foregroundStyle(Color(red: 0.92, green: 0.78, blue: 0.42))
-                Text("Turn \(snapshot.turnNumber) | \(model.sideTitle(for: snapshot.activePlayer)) | \(snapshot.phase.rawValue)")
+                Text("Turn \(snapshot.turnNumber) | \(snapshot.orderDice.current.map { model.sideTitle(for: $0.owner) } ?? "No die drawn") | \(snapshot.phase.rawValue)")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("battle-phase-label")
@@ -3340,11 +3572,11 @@ public struct DZWPlayableBattleView: View {
 
                 Button {
                     markButtonCoachUsed(.nextPhase)
-                    model.advancePhase()
+                    model.drawOrderDie()
                 } label: {
-                    Label("Next Window", systemImage: "forward.end.fill")
+                    Label("Draw Die", systemImage: "die.face.5.fill")
                 }
-                .disabled(!model.canIssueHumanOrders)
+                .disabled(!model.canDrawOrderDie)
                 .accessibilityIdentifier("next-phase-button")
                 .firstBattleButtonCoach(
                     .nextPhase,
@@ -3594,7 +3826,7 @@ public struct DZWPlayableBattleView: View {
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
             }
-            .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
+            .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer)
 
             HStack {
                 Toggle("Manual Cover", isOn: Binding(
@@ -3625,7 +3857,7 @@ public struct DZWPlayableBattleView: View {
                 )
             }
             .font(.caption.weight(.semibold))
-            .disabled(!model.canIssueHumanOrders || snapshot.selectedUnit?.owner != model.humanPlayer)
+            .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer)
 
             Button {
                 markButtonCoachUsed(.shootTarget)
@@ -3633,7 +3865,7 @@ public struct DZWPlayableBattleView: View {
             } label: {
                 Label("Shoot Target", systemImage: "scope")
             }
-            .disabled(!model.canIssueHumanOrders || snapshot.phase != .shooting || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
+            .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canShootNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("shoot-target-button")
             .firstBattleButtonCoach(
                 .shootTarget,
@@ -3656,7 +3888,7 @@ public struct DZWPlayableBattleView: View {
                     progress: firstBattleButtonCoachProgress,
                     completedFirstGame: firstBattleButtonCoachCompleted
                 )
-                .disabled(!model.canIssueHumanOrders)
+                .disabled(!model.canResolveHumanActivation)
 
             Button {
                 markButtonCoachUsed(.assaultTarget)
@@ -3664,7 +3896,7 @@ public struct DZWPlayableBattleView: View {
             } label: {
                 Label("Assault Target", systemImage: "figure.run")
             }
-            .disabled(!model.canIssueHumanOrders || snapshot.phase != .assault || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
+            .disabled(!model.canResolveHumanActivation || snapshot.selectedUnit?.owner != model.humanPlayer || snapshot.selectedUnit?.canAssaultNow != true || snapshot.selectedTarget == nil)
             .accessibilityIdentifier("assault-target-button")
             .firstBattleButtonCoach(
                 .assaultTarget,
@@ -3679,7 +3911,7 @@ public struct DZWPlayableBattleView: View {
             } label: {
                 Label("Resolve Pending", systemImage: "checkmark.circle")
             }
-            .disabled(!model.canIssueHumanOrders)
+            .disabled(!model.canResolveHumanActivation)
             .accessibilityIdentifier("resolve-pending-button")
             .firstBattleButtonCoach(
                 .resolvePending,

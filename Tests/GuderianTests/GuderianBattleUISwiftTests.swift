@@ -449,11 +449,30 @@ struct GuderianBattleUISwiftTests {
         )
 
         #expect(source.contains("var canIssueHumanOrders"))
-        #expect(source.contains("snapshot.activePlayer == humanPlayer"))
+        #expect(source.contains("snapshot.orderDice.current?.owner == humanPlayer"))
         #expect(source.contains("unit.owner == humanPlayer"))
         #expect(source.contains("selectedUnit.owner == humanPlayer"))
         #expect(source.contains("selected-side study mode"))
         #expect(!source.contains("You command the force resisting Guderian's formation"))
+    }
+
+    @Test("Playable battle exposes the order-dice bag as the turn driver")
+    func guderianPlayableBattleExposesOrderDiceBagGameplay() throws {
+        let source = try String(
+            contentsOfFile: "Sources/GuderianApp/DZWPlayableBattleView.swift",
+            encoding: .utf8
+        )
+
+        #expect(source.contains("order-dice-bag-panel"))
+        #expect(source.contains("order-dice-bag-draw-button"))
+        #expect(source.contains("order-dice-current-die"))
+        #expect(source.contains("order-dice-selected-side-dice"))
+        #expect(source.contains("func drawOrderDie()"))
+        #expect(source.contains("prepareNextOrderDiceActivation()"))
+        #expect(source.contains("GuderianOrderDiceSessionBootstrap.enableOrderDice"))
+        #expect(source.contains("canResolveHumanActivation"))
+        #expect(source.contains("Label(\"Draw Die\""))
+        #expect(!source.contains("Label(\"Next Window\""))
     }
 
     @Test("First battle tutorial explains gameplay elements through hover coach dialogs")

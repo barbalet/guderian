@@ -144,6 +144,35 @@ struct GuderianOrderDiceMigrationTests {
         #expect(lateReport.totalRemainingDice == lateReport.playerDice + lateReport.guderianDice)
     }
 
+    @Test("Native snapshots expose current, remaining, spent, and retained order dice")
+    func nativeSnapshotExposesOrderDiceBagState() throws {
+        let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let session = try #require(NativeBoardSession(scenario: scenario, seed: 30_101))
+        let report = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        let opening = session.snapshot()
+
+        #expect(opening.orderDice.rulesetActive)
+        #expect(opening.orderDice.current == nil)
+        #expect(opening.orderDice.remaining.count == report.totalRemainingDice)
+        #expect(opening.orderDice.remainingCount(for: .player) == report.playerDice)
+        #expect(opening.orderDice.remainingCount(for: .guderianAI) == report.guderianDice)
+
+        #expect(session.prepareNextOrderDiceActivation())
+        let drawn = session.snapshot()
+        let currentOwner = try #require(drawn.orderDice.current?.owner)
+        let orderedUnit = try #require(drawn.units.first {
+            $0.owner == currentOwner && !$0.destroyed && !$0.availableOrders.isEmpty
+        })
+        let order = try #require(orderedUnit.availableOrders.first)
+
+        #expect(drawn.orderDice.remaining.count == opening.orderDice.remaining.count - 1)
+        #expect(session.issueOrder(order, to: orderedUnit.id))
+
+        let assigned = session.snapshot()
+        #expect(assigned.orderDice.current == nil)
+        #expect(assigned.orderDice.spent.count + assigned.orderDice.retained.count >= 1)
+    }
+
     @Test("Cycles 31-35 map DZW and Guderian-specific order eligibility reasons")
     func eligibilityMapperSurfacesOrderDiceReasons() throws {
         let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
@@ -216,6 +245,7 @@ struct GuderianOrderDiceMigrationTests {
         let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
         let session = try #require(NativeBoardSession(scenario: scenario, seed: 60_060))
         _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        #expect(session.prepareNextOrderDiceActivation(preferredOwner: .player))
         let snapshot = session.snapshot()
         let selected = try #require(snapshot.selectedUnit)
         let commandState = GuderianOrderDiceCommandPanelPresenter.state(

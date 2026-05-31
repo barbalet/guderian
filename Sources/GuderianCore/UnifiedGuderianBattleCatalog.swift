@@ -1479,6 +1479,7 @@ public final class LateCareerNativeBoardSession {
             objectives: objectiveSnapshots(),
             logLines: logLines(),
             lastAction: lastAction,
+            orderDice: orderDiceSnapshot(),
             boardReport: loadedGame.boardReport,
             deploymentReport: loadedGame.deploymentReport
         )
@@ -2176,6 +2177,42 @@ public final class LateCareerNativeBoardSession {
         (0..<Int(game_log_count(handle))).map { index in
             unifiedCString(game_log_line(handle, Int32(index)))
         }
+    }
+
+    private func orderDiceSnapshot() -> NativeBoardOrderDiceSnapshot {
+        NativeBoardOrderDiceSnapshot(
+            rulesetActive: game_ruleset(handle) == DZW_RULESET_ORDER_DICE,
+            current: Self.orderDieSnapshot(game_current_order_die_view(handle)),
+            remaining: orderDiceList(
+                count: Int(game_order_dice_remaining_count(handle)),
+                view: { game_order_dice_remaining_view(self.handle, Int32($0)) }
+            ),
+            spent: orderDiceList(
+                count: Int(game_order_dice_spent_count(handle)),
+                view: { game_order_dice_spent_view(self.handle, Int32($0)) }
+            ),
+            retained: orderDiceList(
+                count: Int(game_order_dice_retained_count(handle)),
+                view: { game_order_dice_retained_view(self.handle, Int32($0)) }
+            )
+        )
+    }
+
+    private func orderDiceList(
+        count: Int,
+        view: (Int) -> order_die_view_t
+    ) -> [NativeBoardOrderDieSnapshot] {
+        (0..<count).compactMap { Self.orderDieSnapshot(view($0)) }
+    }
+
+    private static func orderDieSnapshot(_ view: order_die_view_t) -> NativeBoardOrderDieSnapshot? {
+        guard view.available else {
+            return nil
+        }
+        return NativeBoardOrderDieSnapshot(
+            sequence: Int(view.sequence),
+            owner: NativeBoardPlayer(view.owner)
+        )
     }
 
     private func unitName(id: Int) -> String {

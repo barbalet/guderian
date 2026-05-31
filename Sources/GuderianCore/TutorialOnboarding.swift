@@ -502,10 +502,10 @@ public enum GuderianTutorialCatalog {
             ),
             FirstBattleButtonCoachTip(
                 id: .nextPhase,
-                title: "Next Window",
-                body: "Advances the compatibility window after the current activation and order choices are spent. Check the selected unit first because some orders are only legal in the current window.",
+                title: "Draw Die",
+                body: "Draws the next order die from the bag. The side shown by that die is the side that may choose a ready unit and issue an order.",
                 accessibilityIdentifier: "first-battle-button-coach-next-phase",
-                requiredTopics: ["activation", "order"]
+                requiredTopics: ["activation", "order die"]
             ),
             FirstBattleButtonCoachTip(
                 id: .debrief,
@@ -780,8 +780,8 @@ public enum GuderianTutorialCatalog {
                 id: FirstBattleGuidanceHintID.phase.rawValue,
                 trigger: .phaseAdvance,
                 order: 6,
-                title: "Orders Set What Is Legal",
-                body: "The battle advances through order-dice activations. Fire, Advance, Run, Rally, Down, and Ambush each open different choices, and the compatibility window only explains where older controls fit. Use Next Window deliberately after checking whether your selected unit still has a useful order.",
+                title: "The Bag Sets The Side",
+                body: "The battle advances through order-dice activations. Draw from the bag, then use Fire, Advance, Run, Rally, Down, or Ambush to define what the selected unit can do.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-phase",
                 requiredTopics: ["activation", "order", "Fire"]
             ),

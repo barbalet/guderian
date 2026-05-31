@@ -1708,15 +1708,17 @@ public enum GuderianOrderDiceCommandPanelPresenter {
         humanSideTitle: String,
         activeSideTitle: String
     ) -> GuderianOrderDiceCommandPanelState {
+        let drawnOwner = snapshot.orderDice.current?.owner
+        let drawnSideTitle = drawnOwner == nil ? "No die drawn" : activeSideTitle
         let eligibleUnits = snapshot.units
             .filter { $0.owner == humanPlayer && !$0.destroyed && !$0.retainedOrder && $0.currentOrder == nil }
             .sorted { $0.id < $1.id }
         let selected = snapshot.selectedUnit?.owner == humanPlayer ? snapshot.selectedUnit : eligibleUnits.first
         let orderOptions = selected.map(orderOptions(for:)) ?? HistoricalBoardOrder.allCases
         return GuderianOrderDiceCommandPanelState(
-            drawnSideTitle: activeSideTitle,
+            drawnSideTitle: drawnSideTitle,
             humanSideTitle: humanSideTitle,
-            canHumanControlDrawnDie: snapshot.activePlayer == humanPlayer,
+            canHumanControlDrawnDie: drawnOwner == humanPlayer,
             eligibleUnitIDs: eligibleUnits.map(\.id),
             eligibleUnitNames: eligibleUnits.map(\.name),
             selectedUnitID: selected?.id,
@@ -1734,6 +1736,7 @@ public enum GuderianOrderDiceCommandPanelPresenter {
             return false
         }
         _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+        _ = session.prepareNextOrderDiceActivation(preferredOwner: .player)
         let snapshot = session.snapshot()
         let state = state(
             snapshot: snapshot,
@@ -4734,9 +4737,9 @@ public enum GuderianOrderDiceMigrationCleanupCatalog {
     public static let cycleRange = 191...195
 
     public static let allRows: [GuderianOrderDiceMigrationCleanupRow] = [
-        row("next-phase-visible-label", "Label(\"Next Phase\"", "Sources/GuderianApp/DZWPlayableBattleView.swift", .retiredFromVisibleSurface, "Visible player copy is now Next Window; the old phrase is compatibility history only."),
+        row("next-phase-visible-label", "Label(\"Next Phase\"", "Sources/GuderianApp/DZWPlayableBattleView.swift", .retiredFromVisibleSurface, "Visible player copy is now Draw Die; the old phrase is compatibility history only."),
         row("next-phase-accessibility-id", "next-phase-button", "Sources/GuderianApp/DZWPlayableBattleView.swift", .compatibilityOnly, "Identifier remains for compatibility with existing UI tests and downstream automation."),
-        row("advance-phase-command", "advancePhase()", "Sources/GuderianApp/DZWPlayableBattleView.swift", .compatibilityOnly, "Command remains a compatibility window wrapper around order-dice activation flow."),
+        row("advance-phase-command", "advancePhase()", "Sources/GuderianApp/DZWPlayableBattleView.swift", .compatibilityOnly, "Command remains a compatibility wrapper that draws the next order die when the order-dice ruleset is active."),
         row("max-phase-advances", "maxPhaseAdvances", "Sources/GuderianCore/GuderianTestFirstBattleAutoplay.swift", .quarantinedTestName, "Legacy test safety naming is quarantined until a downstream compatibility rename can land safely."),
         row("native-board-phase", "NativeBoardPhase", "Sources/GuderianCore/UnifiedGuderianBattleCatalog.swift", .compatibilityOnly, "Phase enum remains as DZW compatibility state while order choice drives default behavior."),
     ]
