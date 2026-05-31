@@ -127,6 +127,9 @@ private struct DZWPlayableOrderDiceBagState {
     let remainingTotal: Int
     let spentTotal: Int
     let retainedTotal: Int
+    let activationUnitNames: [String]
+    let movementUnitNames: [String]
+    let reactionUnitNames: [String]
     let sides: [DZWPlayableOrderDiceSideBag]
 }
 
@@ -441,6 +444,14 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         } else {
             instruction = "Draw from the bag to decide which side activates next."
         }
+        let activationUnits = Self.activationUnits(for: currentOwner, in: snapshot)
+        let movementUnits = activationUnits.filter { unit in
+            unit.availableOrders.contains(.advance) ||
+                unit.availableOrders.contains(.run) ||
+                unit.advanceMoveAllowance > 0 ||
+                unit.runMoveAllowance > 0
+        }
+        let reactionUnits = Self.reactionUnits(against: currentOwner, in: snapshot)
         return DZWPlayableOrderDiceBagState(
             currentSideTitle: currentSideTitle,
             canDrawOrderDie: canDrawOrderDie,
@@ -449,6 +460,9 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             remainingTotal: snapshot.orderDice.remaining.count,
             spentTotal: snapshot.orderDice.spent.count,
             retainedTotal: snapshot.orderDice.retained.count,
+            activationUnitNames: activationUnits.map(\.name),
+            movementUnitNames: movementUnits.map(\.name),
+            reactionUnitNames: reactionUnits.map(Self.reactionLabel(for:)),
             sides: [humanPlayer, aiPlayer].map { player in
                 DZWPlayableOrderDiceSideBag(
                     id: player,
@@ -461,6 +475,56 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
                 )
             }
         )
+    }
+
+    private static func activationUnits(
+        for owner: NativeBoardPlayer?,
+        in snapshot: NativeBoardSnapshot
+    ) -> [NativeBoardUnitSnapshot] {
+        guard let owner else {
+            return []
+        }
+        return snapshot.units
+            .filter { unit in
+                unit.owner == owner &&
+                    !unit.destroyed &&
+                    !unit.retainedOrder &&
+                    unit.currentOrder == nil &&
+                    !unit.availableOrders.isEmpty
+            }
+            .sorted { $0.id < $1.id }
+    }
+
+    private static func reactionUnits(
+        against owner: NativeBoardPlayer?,
+        in snapshot: NativeBoardSnapshot
+    ) -> [NativeBoardUnitSnapshot] {
+        guard let owner else {
+            return []
+        }
+        return snapshot.units
+            .filter { unit in
+                unit.owner != owner &&
+                    unit.owner != .none &&
+                    !unit.destroyed &&
+                    (unit.downOrderActive || unit.ambushOrderActive)
+            }
+            .sorted { lhs, rhs in
+                if lhs.ambushOrderActive != rhs.ambushOrderActive {
+                    return lhs.ambushOrderActive && !rhs.ambushOrderActive
+                }
+                return lhs.id < rhs.id
+            }
+    }
+
+    private static func reactionLabel(for unit: NativeBoardUnitSnapshot) -> String {
+        if unit.ambushOrderActive {
+            return "\(unit.name) Ambush"
+        }
+        if unit.downOrderActive {
+            return "\(unit.name) Down"
+        }
+        return unit.name
     }
 
     var activeUnits: [NativeBoardUnitSnapshot] {
@@ -2294,6 +2358,19 @@ private struct DZWPlayableBattlePanelWindow: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Can order: \(Self.unitList(bag.activationUnitNames, empty: "reach into the bag first"))")
+                    .font(.caption2)
+                    .accessibilityIdentifier("order-dice-reach-activation-units")
+                Text("Can move if ordered: \(Self.unitList(bag.movementUnitNames, empty: "no movement-ready unit on this die"))")
+                    .font(.caption2)
+                    .accessibilityIdentifier("order-dice-reach-move-units")
+                Text("Can react: \(Self.unitList(bag.reactionUnitNames, empty: "no retained Down or Ambush reactions"))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("order-dice-reach-reaction-units")
+            }
+
             HStack(spacing: 8) {
                 ForEach(bag.sides) { side in
                     VStack(alignment: .leading, spacing: 4) {
@@ -2727,6 +2804,15 @@ private struct DZWPlayableBattlePanelWindow: View {
 
     private static func distance(_ value: Double) -> String {
         String(format: "%.1f", value)
+    }
+
+    private static func unitList(_ names: [String], empty: String) -> String {
+        let visible = names.prefix(4)
+        guard !visible.isEmpty else {
+            return empty
+        }
+        let suffix = names.count > visible.count ? " +\(names.count - visible.count)" : ""
+        return visible.joined(separator: ", ") + suffix
     }
 
     private func actionsSection(_ snapshot: NativeBoardSnapshot) -> some View {
