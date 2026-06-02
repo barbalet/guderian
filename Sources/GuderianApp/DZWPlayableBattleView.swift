@@ -38,15 +38,15 @@ private protocol DZWPlayableBoardSession: AnyObject {
     func shootUnit(_ attackerID: Int, targetID: Int) -> Bool
     func assaultUnit(_ attackerID: Int, targetID: Int, advance: Bool) -> Bool
     func issueOrder(_ order: HistoricalBoardOrder, to unitID: Int) -> Bool
-    func prepareNextOrderDiceActivation() -> Bool
+    func prepareNextOrderDiceActivation(selectsUnit: Bool) -> Bool
     func shootSelectedTarget() -> Bool
     func resolveFirstPendingChoice() -> Bool
     func advancePhase()
 }
 
 extension NativeBoardSession: DZWPlayableBoardSession {
-    func prepareNextOrderDiceActivation() -> Bool {
-        prepareNextOrderDiceActivation(preferredOwner: nil)
+    func prepareNextOrderDiceActivation(selectsUnit: Bool = true) -> Bool {
+        prepareNextOrderDiceActivation(preferredOwner: nil, selectsUnit: selectsUnit)
     }
 }
 extension LateCareerNativeBoardSession: DZWPlayableBoardSession {}
@@ -687,7 +687,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             return
         }
 
-        let drew = session?.prepareNextOrderDiceActivation() ?? false
+        let drew = session?.prepareNextOrderDiceActivation(selectsUnit: false) ?? false
         refresh()
         if let owner = snapshot?.orderDice.current?.owner {
             recordAIEvent("Order die drawn for \(sideTitle(for: owner)).")
@@ -791,7 +791,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
         }
 
         if snapshot.orderDice.rulesetActive && snapshot.orderDice.current == nil {
-            let drew = session?.prepareNextOrderDiceActivation() ?? false
+            let drew = session?.prepareNextOrderDiceActivation(selectsUnit: false) ?? false
             refresh()
             guard drew, let refreshed = self.snapshot else {
                 recordAIEvent("Automated step could not draw an order die: \(lastError).")
@@ -975,7 +975,7 @@ private final class DZWPlayableBattleViewModel: ObservableObject {
             }
 
             if snapshot?.orderDice.current == nil {
-                let drew = session?.prepareNextOrderDiceActivation() ?? false
+                let drew = session?.prepareNextOrderDiceActivation(selectsUnit: false) ?? false
                 refresh()
                 guard drew else {
                     recordAIEvent("Order-dice runner paused: \(lastError).")

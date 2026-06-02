@@ -173,6 +173,28 @@ struct GuderianOrderDiceMigrationTests {
         #expect(assigned.orderDice.spent.count + assigned.orderDice.retained.count >= 1)
     }
 
+    @Test("Manual player-side die draw leaves unit choice to the player")
+    func manualPlayerSideDieDrawLeavesUnitChoiceUnselected() throws {
+        let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))
+        let session = try #require(NativeBoardSession(scenario: scenario, seed: 30_102))
+        _ = GuderianOrderDiceSessionBootstrap.enableOrderDice(in: session)
+
+        #expect(session.prepareNextOrderDiceActivation(preferredOwner: .player, selectsUnit: false))
+        let drawn = session.snapshot()
+        let currentOwner = try #require(drawn.orderDice.current?.owner)
+        #expect(currentOwner == .player)
+        #expect(drawn.selectedUnit == nil)
+        #expect(drawn.selectedTarget == nil)
+
+        let playerChoice = try #require(drawn.units.first {
+            $0.owner == .player && !$0.destroyed && !$0.availableOrders.isEmpty
+        })
+        let order = try #require(playerChoice.availableOrders.first)
+
+        session.selectUnit(playerChoice.id)
+        #expect(session.issueOrder(order, to: playerChoice.id))
+    }
+
     @Test("Cycles 31-35 map DZW and Guderian-specific order eligibility reasons")
     func eligibilityMapperSurfacesOrderDiceReasons() throws {
         let scenario = try #require(GuderianCampaignCatalog.scenario(id: .tucholaForest))

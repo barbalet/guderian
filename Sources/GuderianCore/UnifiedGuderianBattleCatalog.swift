@@ -1687,7 +1687,7 @@ public final class LateCareerNativeBoardSession {
     }
 
     @discardableResult
-    public func prepareNextOrderDiceActivation() -> Bool {
+    public func prepareNextOrderDiceActivation(selectsUnit: Bool = true) -> Bool {
         if !orderDiceRulesetActive {
             guard game_set_ruleset(handle, DZW_RULESET_ORDER_DICE) else {
                 return failFromEngine("Order mode blocked")
@@ -1711,8 +1711,13 @@ public final class LateCareerNativeBoardSession {
             }
         }
 
-        selectFirstActiveUnit()
-        selectNearestEnemyToSelectedUnit()
+        if selectsUnit {
+            selectFirstActiveUnit()
+            selectNearestEnemyToSelectedUnit()
+        } else {
+            selectedUnitID = nil
+            selectedTargetID = nil
+        }
         let current = game_current_order_die_view(handle)
         lastAction = NativeBoardActionMessage(
             status: current.available ? .succeeded : .blocked,

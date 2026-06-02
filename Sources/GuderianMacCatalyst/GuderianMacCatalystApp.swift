@@ -237,12 +237,12 @@ private enum CatalystNativeSession {
     }
 
     @discardableResult
-    func prepareNextOrderDiceActivation() -> Bool {
+    func prepareNextOrderDiceActivation(selectsUnit: Bool = true) -> Bool {
         switch self {
         case .field(_, let session):
-            return session.prepareNextOrderDiceActivation(preferredOwner: nil)
+            return session.prepareNextOrderDiceActivation(preferredOwner: nil, selectsUnit: selectsUnit)
         case .late(_, let session):
-            return session.prepareNextOrderDiceActivation()
+            return session.prepareNextOrderDiceActivation(selectsUnit: selectsUnit)
         }
     }
 
@@ -645,7 +645,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
             errorMessage = "Assign the current order die before reaching into the bag again."
             return
         }
-        guard session?.prepareNextOrderDiceActivation() == true else {
+        guard session?.prepareNextOrderDiceActivation(selectsUnit: false) == true else {
             errorMessage = session?.snapshot().lastAction.detail ?? "Order die draw blocked."
             refresh()
             return
@@ -661,7 +661,7 @@ private final class GuderianCatalystBattleViewModel: ObservableObject {
 
         if snapshot.orderDice.rulesetActive {
             if snapshot.orderDice.current == nil {
-                guard session.prepareNextOrderDiceActivation() else {
+                guard session.prepareNextOrderDiceActivation(selectsUnit: false) else {
                     errorMessage = session.snapshot().lastAction.detail
                     refresh()
                     return
