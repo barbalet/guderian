@@ -503,7 +503,7 @@ public enum GuderianTutorialCatalog {
             FirstBattleButtonCoachTip(
                 id: .nextPhase,
                 title: "Draw Die",
-                body: "Draws the next order die from the bag. The side shown by that die is the side that may choose a ready unit and issue an order.",
+                body: "Draws the next order die from the bag to start the activation. The side shown by that die may choose a ready unit and issue an order.",
                 accessibilityIdentifier: "first-battle-button-coach-next-phase",
                 requiredTopics: ["activation", "order die"]
             ),
@@ -781,7 +781,7 @@ public enum GuderianTutorialCatalog {
                 trigger: .phaseAdvance,
                 order: 6,
                 title: "The Bag Sets The Side",
-                body: "The battle advances through order-dice activations. Draw from the bag, then use Fire, Advance, Run, Rally, Down, or Ambush to define what the selected unit can do.",
+                body: "The battle advances through order-dice activations. Draw from the bag, then use Fire, Advance, Run, Rally, Down, or Ambush to define what the selected unit can do next.",
                 accessibilityIdentifier: "first-battle-tutorial-hint-phase",
                 requiredTopics: ["activation", "order", "Fire"]
             ),
